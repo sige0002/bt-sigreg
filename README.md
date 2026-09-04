@@ -1,1402 +1,667 @@
-# Task-Centered SIGReg for Multi-Task LeWorldModel
-## マルチタスク LeWM におけるタスク条件付き潜在正則化の研究アイデアメモ
+# Goal-Weighted Transition Geometry for Multi-Task LeWorldModel
 
-**ステータス:** 研究アイデア整理段階  
-**目的:** LeWorldModel (LeWM) の軽量・高速な JEPA 世界モデルという利点を維持しながら、マルチタスク学習で生じる潜在表現の干渉を緩和する。
+## 研究アイデアメモ
+
+**ステータス:** 仮説設計段階  
+**目的:** LeWorldModel (LeWM) の軽量・高速な潜在世界モデルという利点を維持しながら、マルチタスク環境で「タスクに必要な状態変化」を潜在表現に残し、Goal に応じて正しく計画できるようにする。
+
+> リポジトリ名 `task-centered-sigreg-lewm` は初期案に由来する。現在の本命案は、Task ごとの混合ガウスを作る方式ではなく、**共有世界表現 + Goal-weighted transition geometry + 非崩壊制約**である。
 
 ---
 
-## 1. 背景
+# 1. 問題設定
 
-LeWorldModel (LeWM) は、画像から潜在表現を生成し、行動を条件として次時刻の潜在表現を予測する世界モデルである。
-
-基本構造は、
+LeWM は画像を潜在表現へ変換し、行動を条件として未来の潜在状態を予測する。
 
 \[
 z_t = E_\theta(o_t)
 \]
 
 \[
-\hat{z}_{t+1}
-=
-F_\psi(z_{\le t}, a_{\le t})
+\hat z_{t+1} = F_\psi(z_{\le t}, a_{\le t})
 \]
 
-で表される。
-
-- \(o_t\): 時刻 \(t\) の画像観測
+- \(o_t\): 現在画像
 - \(a_t\): 行動
-- \(E_\theta\): 画像エンコーダ
-- \(z_t\): 潜在表現
-- \(F_\psi\): 行動条件付き予測器
+- \(z_t\): 潜在状態
+- \(E_\theta\): Encoder
+- \(F_\psi\): LeWM predictor
 
-LeWM の主要な特徴は、画像再構成を行わず、潜在空間で未来予測を行うことである。
-
-学習損失は概ね、
+元の LeWM は SIGReg により潜在表現を等方ガウスへ近づけ、JEPA の表現崩壊を防ぐ。
 
 \[
-\mathcal{L}_{\mathrm{LeWM}}
-=
-\mathcal{L}_{\mathrm{pred}}
-+
-\lambda
-\mathcal{L}_{\mathrm{SIGReg}}
+p(z) \approx \mathcal N(0,I)
 \]
 
-で構成される。
+しかしマルチタスクでは、潜在表現全体を単一の等方ガウスへ押し込むことが、
 
-予測損失は、
+- タスクごとの多峰構造
+- 状態進捗
+- 接触・把持などの局所状態変化
+- 低次元多様体構造
 
-\[
-\mathcal{L}_{\mathrm{pred}}
-=
-\mathbb{E}
-\left[
-\|\hat z_{t+1}-z_{t+1}\|^2
-\right]
-\]
+と衝突する可能性がある。
 
-である。
-
-一方、SIGReg は潜在表現の周辺分布を等方ガウス分布
-
-\[
-p(z)
-\approx
-\mathcal N(0,I)
-\]
-
-へ近づけることで、全画像が同一潜在表現へ写像されるような**表現崩壊**を防止する。
+重要なのは、**世界の真の潜在分布がガウスである必要はない**という点である。
 
 ---
 
-## 2. JEPA における基本的な表現崩壊
+# 2. 初期案からの変更
 
-予測損失だけの場合、
-
-\[
-E_\theta(o)=c
-\]
-
-という定数写像が存在しうる。
-
-すると、
+初期案では、Task \(k\) ごとに
 
 \[
-z_t=c,
-\qquad
-z_{t+1}=c,
-\qquad
-\hat z_{t+1}=c
+p(z\mid T=k) \approx \mathcal N(\mu_k,I)
 \]
 
-となるため、
+とし、Task 内部だけに SIGReg を適用することを考えた。
 
-\[
-\mathcal L_{\mathrm{pred}}=0
-\]
+しかしこの方式には、
 
-を達成できる。
+1. 1つの Task 内部にも approach / grasp / carry / place など多峰構造がありうる
+2. Task ごとに単一ガウスを仮定する必要性がない
+3. 同じ物理状態を Task が違うだけで分離するのは不自然な場合がある
 
-しかし、この潜在表現には状態情報が存在しない。
+という問題がある。
 
-SIGReg は、
-
-\[
-z\sim \mathcal N(0,I)
-\]
-
-という非退化な分布を要求することで、この自明解を禁止する。
+したがって、本命案では **Task ごとの分布形を人間が決めない**。
 
 ---
 
-# 3. マルチタスク LeWM における問題
+# 3. 研究の中心仮説
 
-複数タスクを同じ LeWM で学習することを考える。
+本研究では次を狙う。
 
-タスク変数を
-
-\[
-T\in\{1,\ldots,K\}
-\]
-
-とする。
-
-例えば、
-
-- Task A: 赤いキューブを右へ置く
-- Task B: 青いキューブを左へ置く
-- Task C: ボタンを押す
-
-などである。
-
-各タスクの潜在分布が、
-
-\[
-z\mid T=k
-\sim
-\mathcal N(\mu_k,\Sigma_k)
-\]
-
-のような異なるクラスタを形成すると仮定する。
-
-全体の潜在分布は、
-
-\[
-p(z)
-=
-\sum_{k=1}^{K}
-p(T=k)\,p(z\mid T=k)
-\]
-
-となる。
-
-これは一般には**混合分布**であり、単一のガウス分布とは限らない。
-
----
-
-## 4. Raw LeWM の SIGReg とマルチタスク構造の衝突
-
-Raw LeWM はタスクを区別せず、
-
-\[
-p(z)\approx \mathcal N(0,I)
-\]
-
-を要求する。
-
-しかしマルチタスクでは、
-
-```text
-潜在空間
-
- Task A                 Task B                 Task C
-
-  ○○○                    ○○○                    ○○○
- ○ μA ○                  ○ μB ○                  ○ μC ○
-  ○○○                    ○○○                    ○○○
-```
-
-のように、タスクごとに異なる潜在クラスタを持つことが自然である。
-
-にもかかわらず、Raw LeWM では、
-
-```text
-Task A ─┐
-Task B ─┼──> 全潜在表現を混合 ──> SIGReg ──> N(0,I)
-Task C ─┘
-```
-
-となる。
-
-そのため、タスク間のクラスタ中心
-
-\[
-\mu_A,\mu_B,\mu_C
-\]
-
-が離れていること自体が、「単一ガウスからのずれ」として正則化される可能性がある。
-
----
-
-## 5. 分散分解による理解
-
-全潜在分布の共分散は、
-
-\[
-\mathrm{Cov}(z)
-=
-\mathbb E_T
-[
-\mathrm{Cov}(z\mid T)
-]
-+
-\mathrm{Cov}_T
-(
-\mathbb E[z\mid T]
-)
-\]
-
-と分解できる。
-
-すなわち、
-
-\[
-\boxed{
-\mathrm{Cov}(z)
-=
-\text{タスク内分散}
-+
-\text{タスク間分散}
-}
-\]
-
-である。
-
-Raw LeWM の SIGReg は全体として、
-
-\[
-\mathrm{Cov}(z)\approx I
-\]
-
-を要求する。
-
-そのため、
-
-- タスク間の違い
-- タスク内部の状態変化
-
-が同じ分散の「予算」を共有することになる。
-
-極端には、
-
-```text
-タスク間差       : 非常に大きく表現
-タスク内状態変化 : 小さく表現
-```
-
-でも、全体として十分に分散していれば SIGReg を満たしうる。
-
-これは、マルチタスク世界モデルにおいて望ましくない可能性がある。
-
----
-
-# 6. 提案アイデア: Task-Centered SIGReg
-
-## 6.1 基本発想
-
-Raw LeWM の
-
-\[
-\mathrm{SIGReg}(Z)
-\]
-
-を、
-
-\[
-\mathrm{SIGReg}(Z_k-\mu_k)
-\]
-
-へ変更する。
-
-つまり、
-
-> 全タスクをまとめて1個のガウス分布にするのではなく、各タスクのクラスタ内部だけに SIGReg を適用する。
-
----
-
-## 6.2 タスク中心
-
-タスク \(k\) に属する潜在表現集合を、
-
-\[
-Z_k
-=
-\{z_i\mid T_i=k\}
-\]
-
-とする。
-
-その中心を、
-
-\[
-\boxed{
-\mu_k
-=
-\frac{1}{|Z_k|}
-\sum_{z_i\in Z_k}
-z_i
-}
-\]
-
-と定義する。
-
-各サンプルについて、
-
-\[
-\boxed{
-r_i
-=
-z_i-\mu_{T_i}
-}
-\]
-
-というタスク中心からの残差を作る。
-
----
-
-## 6.3 イメージ
-
-### 元の潜在空間
-
-```text
-Task A                           Task B
-
-   ○ ○ ○                           ○ ○ ○
- ○   μA  ○                       ○  μB   ○
-   ○ ○ ○                           ○ ○ ○
-```
-
-### SIGReg を計算するときだけ中心を引く
-
-```text
-Task A residual                 Task B residual
-
-    ○ ○ ○                           ○ ○ ○
-  ○   0   ○                       ○   0   ○
-    ○ ○ ○                           ○ ○ ○
-```
-
-重要なのは、**元の潜在空間で \(\mu_A\) と \(\mu_B\) を同じ位置へ移動するわけではない**ことである。
-
-SIGReg を計算するときだけ、各クラスタの局所座標系へ変換している。
-
----
-
-# 7. タスク別 SIGReg
-
-各タスクについて、
-
-\[
-\mathcal L_k
-=
-\mathrm{SIGReg}
-\left(
-Z_k-\mu_k
-\right)
-\]
-
-を計算する。
-
-例えば3タスクなら、
-
-\[
-\mathcal L_A,
-\qquad
-\mathcal L_B,
-\qquad
-\mathcal L_C
-\]
-
-を独立に計算する。
-
-その後、
-
-\[
-\boxed{
-\mathcal L_{\mathrm{TaskSIG}}
-=
-\frac{1}{K}
-\sum_{k=1}^{K}
-\mathcal L_k
-}
-\]
-
-とする。
-
----
-
-## 8. 「損失を平均する」の意味
-
-ここで平均しているのは**潜在表現ではない**。
-
-例えば、
-
-\[
-\mathcal L_A=0.10,
-\qquad
-\mathcal L_B=0.20,
-\qquad
-\mathcal L_C=0.15
-\]
-
-なら、
-
-\[
-\mathcal L_{\mathrm{TaskSIG}}
-=
-0.15
-\]
-
-とするだけである。
+> **世界状態と世界の状態変化は全 Task で共有する。**  
+> **Goal によって「どの潜在状態・状態変化が重要か」だけを変える。**  
+> **その Goal に必要な状態変化が潰れないよう、分布形を指定しない非崩壊制約を加える。**
 
 つまり、
 
 ```text
-Task A の「クラスタ内部が正常か」の採点 → 0.10
-Task B の「クラスタ内部が正常か」の採点 → 0.20
-Task C の「クラスタ内部が正常か」の採点 → 0.15
-
-                       ↓
-
-                  損失値だけ平均
+世界の表現          -> 全 Task で共有
+世界の状態変化      -> 全 Task で共有
+何を見るか          -> Goal ごとに変える
+重要な状態変化      -> 潰れないよう制約する
 ```
 
 である。
 
-以下のように潜在表現そのものを平均するわけではない。
-
-\[
-\frac{z_A+z_B+z_C}{3}
-\]
-
-したがって、
-
-- 赤いキューブを右へ置く
-- 青いキューブを左へ置く
-
-という異なる意味が、損失平均によって混ざるわけではない。
-
 ---
 
-## 9. なぜ最後にまとめるのか
+# 4. 世界モデル本体は変更しない
 
-ニューラルネット学習では、最終的に
-
-```python
-loss.backward()
-```
-
-へ渡す1つのスカラー目的関数を作る必要がある。
-
-そのため、
+LeWM predictor 自体には Task ID や Goal を入れない。
 
 \[
-\mathcal L_A,\mathcal L_B,\mathcal L_C
+\hat z_{t+1}=F_\psi(z_t,a_t)
 \]
 
-という複数の要求を、
-
-\[
-\mathcal L_{\mathrm{TaskSIG}}
-=
-\frac{\mathcal L_A+\mathcal L_B+\mathcal L_C}{3}
-\]
-
-として1つへまとめる。
-
-平均そのものが研究アイデアなのではない。
-
-本質は、
-
-\[
-\boxed{
-\mathrm{SIGReg}(Z_A\cup Z_B\cup Z_C)
-}
-\]
-
-を、
-
-\[
-\boxed{
-\mathrm{SIGReg}(Z_A-\mu_A),
-\quad
-\mathrm{SIGReg}(Z_B-\mu_B),
-\quad
-\mathrm{SIGReg}(Z_C-\mu_C)
-}
-\]
-
-へ変更することである。
-
----
-
-# 10. 最終学習目的
-
-提案法の最終損失は、
-
-\[
-\boxed{
-\mathcal L
-=
-\mathcal L_{\mathrm{pred}}
-+
-\lambda
-\mathcal L_{\mathrm{TaskSIG}}
-}
-\]
-
-である。
-
-展開すると、
-
-\[
-\boxed{
-\mathcal L
-=
-\mathcal L_{\mathrm{pred}}
-+
-\frac{\lambda}{K}
-\sum_{k=1}^{K}
-\mathrm{SIGReg}
-\left(
-Z_k-\mu_k
-\right)
-}
-\]
-
-となる。
-
----
-
-# 11. 学習アルゴリズム全体
+理由は、同じ世界状態 \(z_t\) と同じ行動 \(a_t\) なら、物理的な次状態は Task に依存しないはずだからである。
 
 ```text
-                           multi-task dataset
-
-        Task A                Task B                Task C
-      image/action          image/action          image/action
-          │                     │                     │
-          └─────────────────────┼─────────────────────┘
-                                ▼
-
-                         Shared Encoder Eθ
-                                │
-                                ▼
-                          latent z_t
-                                │
-                ┌───────────────┴────────────────┐
-                │                                │
-                ▼                                ▼
-
-       Shared LeWM Predictor              task ID で分割
-       Fψ(z, action)                           │
-                │                     ┌─────────┼─────────┐
-                │                     ▼         ▼         ▼
-                │                   Task A    Task B    Task C
-                │                     │         │         │
-                │                    μA        μB        μC
-                │                     │         │         │
-                │                  z-μA      z-μB      z-μC
-                │                     │         │         │
-                │                  SIGReg    SIGReg    SIGReg
-                │                     │         │         │
-                │                     └────┬────┴────┬────┘
-                │                          │         │
-                │                          └────┬────┘
-                │                               ▼
-                │                          task average
-                │                               │
-                ▼                               ▼
-
-          prediction loss                 TaskSIG loss
-                │                               │
-                └───────────────┬───────────────┘
-                                ▼
-
-               L = L_pred + λ L_TaskSIG
-                                │
-                                ▼
-
-                    backpropagation
-                                │
-                                ▼
-
-                Shared Encoder + Predictor
+current image
+     |
+     v
+  Encoder
+     |
+     v
+    z_t ---- action
+     |          |
+     +----------+
+          |
+          v
+   Shared LeWM
+          |
+          v
+   predicted z
 ```
 
 ---
 
-# 12. なぜ JEPA の表現崩壊を防げるのか
+# 5. Goal によって「見る潜在方向」を変える
 
-仮に Task A 内で、
-
-\[
-z_i=c_A
-\]
-
-となり、全サンプルが同一表現へ崩壊したとする。
-
-その場合、
+Goal 画像を同じ Encoder へ入れる。
 
 \[
-\mu_A=c_A
+z_g = E_\theta(o_{goal})
 \]
 
-なので、
+さらに小さなネットワーク \(W_\eta\) から Goal-dependent weight を生成する。
 
 \[
-z_i-\mu_A=0.
+w_g = W_\eta(z_g)
 \]
 
-全残差が0になる。
-
-したがって残差分布は、
+ここで、
 
 \[
-\delta(0)
+w_g \in [0,1]^D
 \]
 
-という一点集中になる。
+とする。
 
-しかし SIGReg の目標は、
-
-\[
-\mathcal N(0,I)
-\]
-
-であるため、損失が大きくなる。
-
-したがって、
-
-\[
-\boxed{
-\text{各タスク内部で全潜在表現が同一点になる表現崩壊を防止できる}
-}
-\]
-
-と期待できる。
-
----
-
-# 13. なぜ Raw LeWM のマルチタスク問題を緩和できるのか
-
-Task A 全体を潜在空間で \(\Delta\) だけ平行移動したとする。
-
-\[
-z_i'
-=
-z_i+\Delta
-\]
-
-すると、
-
-\[
-\mu_A'
-=
-\mu_A+\Delta.
-\]
-
-したがって、
-
-\[
-z_i'-\mu_A'
-=
-(z_i+\Delta)
--
-(\mu_A+\Delta)
-\]
-
-より、
-
-\[
-\boxed{
-z_i'-\mu_A'=z_i-\mu_A
-}
-\]
-
-となる。
-
-つまり Task A のクラスタ中心の絶対位置は SIGReg 損失に影響しない。
-
-そのため、
-
-\[
-\|\mu_A-\mu_B\|
-\]
-
-を SIGReg が直接縮める圧力を除去できる。
-
-これは、
-
-\[
-\boxed{
-\text{タスク間構造}
-}
-\]
-
-と、
-
-\[
-\boxed{
-\text{表現崩壊防止}
-}
-\]
-
-を切り離すことを意味する。
-
----
-
-# 14. もう一つの重要な効果
-
-Task-centered SIGReg では、タスク間差だけで潜在分散を稼ぐことができない。
-
-Raw LeWM:
-
-\[
-\mathrm{Var}(z)
-=
-\mathrm{Var}_{\mathrm{within-task}}
-+
-\mathrm{Var}_{\mathrm{between-task}}
-\]
-
-であるため、タスク間差が大きければ、タスク内状態表現が弱くても全体分散は大きくなりうる。
-
-提案法では、
-
-\[
-r=z-\mu_T
-\]
-
-なので、タスク間の平均差が除去され、
-
-\[
-\mathrm{Var}(r)
-\]
-
-は主にタスク内変動を反映する。
-
-したがって、
-
-\[
-\boxed{
-\text{各タスク内部でも非退化な状態表現を形成する必要がある}
-}
-\]
-
-という、Raw LeWM より強い制約になる。
-
----
-
-# 15. 世界モデルの予測結果は混ざらないのか
-
-今回共有するのは世界の状態変化モデル、
-
-\[
-F(z_t,a_t)
-\rightarrow
-z_{t+1}
-\]
-
-である。
-
-これは、
-
-\[
-z_t\rightarrow a_t
-\]
-
-という行動方策ではない。
-
-例えば、
-
-\[
-F(z_{\mathrm{red}},a_{\mathrm{right}})
-=
-z_{\mathrm{red,right}}
-\]
-
-と、
-
-\[
-F(z_{\mathrm{blue}},a_{\mathrm{left}})
-=
-z_{\mathrm{blue,left}}
-\]
-
-は、同じ \(F\) で同時に学習できる。
-
-入力となる状態と行動が異なるためである。
-
-したがって、
-
-```text
-Task A: 赤を右
-Task B: 青を左
-
-               ↓
-
-     「赤を左」に平均される
-```
-
-という意味平均は、TaskSIG の損失平均によって直接発生するものではない。
-
----
-
-# 16. LeWM のメリットは維持できるか
-
-今回変更するのは**学習時の正則化**だけである。
-
-そのため以下は原理的に維持できる。
-
-- 画像再構成器不要
-- EMA 教師エンコーダ不要
-- stop-gradient に依存しない
-- 事前学習済み視覚モデル不要
-- 単一の共有世界モデル
-- 潜在空間での高速ロールアウト
-- CEM/MPC の既存構造
-- 推論時の追加コストほぼなし
-- ViT-Tiny + 192次元 CLS 潜在という軽量構造を維持可能
-
-推論時には task-centered SIGReg 自体を使う必要がないため、Raw LeWM とほぼ同じ推論経路を維持できる。
-
----
-
-# 17. LeWM の潜在表現が強く抽象化される理由
-
-LeWM の潜在状態は ViT-Tiny の CLS token 1個を用いている。
-
-224×224画像、patch size 14 では、
-
-\[
-16\times16=256
-\]
-
-個のパッチが存在する。
-
-ViT 内部では、
-
-```text
-256 patch tokens
-+
-CLS token
-```
-
-が存在するが、LeWM は最終的に CLS token だけを使う。
-
-ViT-Tiny では CLS は192次元である。
-
-したがって、
-
-```text
-224×224 RGB image
-       ↓
-256 spatial patches
-       ↓
-ViT
-       ↓
-CLS token only
-       ↓
-192-dimensional latent
-```
-
-となる。
-
-この強い情報圧縮には、
-
-1. ViT-Tiny による小さな表現容量
-2. CLS 1 token のみ利用
-3. 画像再構成損失が存在しない
-4. 未来潜在予測に不要な情報を保持する必要がない
-
-という複数要因が関係する。
-
-単に「ViT-Tinyだから」だけではない。
-
----
-
-# 18. 本提案で解決できない可能性がある問題
-
-Task-centered SIGReg は万能ではない。
-
-特に、
-
-\[
-\text{潜在表現全体が非崩壊}
-\]
-
-であっても、
-
-- グリッパ開閉
-- 接触状態
-- 微小な物体位置
-- 行動によって変化する状態
-- 長期タスク進捗
-
-などの重要な状態成分が十分強く表現される保証はない。
-
-SIGReg は、
-
-\[
-\text{「何かが分散している」}
-\]
-
-ことを要求するが、
-
-\[
-\text{「何が分散するべきか」}
-\]
-
-までは指定しないためである。
-
-したがって、本提案の主張は、
-
-> JEPA のすべての潜在表現問題を解決する
-
-ではなく、
-
-> Raw LeWM のマルチタスクにおける周辺分布ガウス化とタスククラスタ構造の衝突を緩和しつつ、SIGReg の表現崩壊防止能力を維持する
-
-とするのが妥当である。
-
----
-
-# 19. 実験1
-
-## 仮説
-
-\[
-\boxed{
-\text{Raw LeWM のマルチタスク性能劣化の一因は、
-全タスクの潜在周辺分布を単一等方ガウスへ正則化することにある}
-}
-\]
-
-これを検証する。
-
----
-
-## 19.1 比較手法
-
-最低限、以下を比較する。
-
-### A. Raw LeWM
-
-\[
-\mathcal L
-=
-\mathcal L_{\mathrm{pred}}
-+
-\lambda
-SIGReg(Z)
-\]
-
-### B. Temporal-Centered LeWM
-
-時間局所平均を除去した残差へ SIGReg を適用する既存方向。
-
-\[
-r_t
-=
-z_t-\bar z_t^{\mathrm{temporal}}
-\]
-
-\[
-\mathcal L
-=
-\mathcal L_{\mathrm{pred}}
-+
-\lambda SIGReg(r)
-\]
-
-### C. Proposed Task-Centered LeWM
-
-\[
-r_i
-=
-z_i-\mu_{T_i}
-\]
-
-\[
-\boxed{
-\mathcal L
-=
-\mathcal L_{\mathrm{pred}}
-+
-\frac{\lambda}{K}
-\sum_{k=1}^K
-SIGReg(Z_k-\mu_k)
-}
-\]
-
----
-
-# 20. バッチ設計
-
-Task-centered SIGReg は、各タスク内で分布統計を計算するため、通常の完全ランダムバッチでは不利になる可能性がある。
-
-例えば50タスク、batch size 128なら、
-
-\[
-128/50\approx2.56
-\]
-
-サンプル/タスクとなり、SIGReg の統計推定には少なすぎる。
-
-そこで task-balanced batch を用いる。
+\(D=192\) なら、192次元それぞれについて「この Goal ではどの程度重要か」を表す重みになる。
 
 例:
 
-- 1 batch に8タスク
-- 各タスクから16系列
-- batch size = 128
+```text
+Task A: 赤いキューブを右へ
 
-とする。
+robot       0.8
+red cube    1.0
+blue cube   0.1
+gripper     0.8
+background  0.0
 
-さらに各系列から複数時刻を利用できるなら、SIGReg に使える潜在点数を増やせる。
+Task B: 青いキューブを左へ
 
----
+robot       0.8
+red cube    0.1
+blue cube   1.0
+gripper     0.8
+background  0.0
+```
 
-# 21. タスク損失の重み付け
-
-基本実験では、
-
-\[
-\alpha_k=\frac1K
-\]
-
-として、
-
-\[
-\mathcal L_{\mathrm{TaskSIG}}
-=
-\sum_k
-\alpha_k
-\mathcal L_k
-\]
-
-とする。
-
-これは、データ量が多いタスクだけが損失を支配するのを避けるためである。
-
-ただし将来的には、
-
-- データ数比例
-- sqrt データ数比例
-- uncertainty weighting
-- GradNorm
-- gradient conflict-aware weighting
-
-などとの比較も可能である。
+実際には各潜在次元が人間に解釈可能である必要はない。
 
 ---
 
-# 22. 評価項目
+# 6. Goal-weighted latent distance
 
-単純な成功率だけではなく、潜在表現そのものを評価する。
-
-## 制御性能
-
-- task success rate
-- long-horizon success
-- unseen configuration generalization
-- multi-task average success
-
-## 潜在表現
-
-- タスク間クラスタ中心距離
-- タスク内分散
-- between-task / within-task ratio
-- linear probe による状態復号
-- グリッパ状態復号
-- 物体位置復号
-- 行動変化に対する潜在変化量
-
-## マルチタスク干渉
-
-タスク別勾配を、
+元の LeWM は Goal との距離を、
 
 \[
-g_k
-=
-\nabla_\theta \mathcal L_k
+d(z,z_g)=\|z-z_g\|^2
 \]
 
-として、
+で評価する。
 
-\[
-\cos(g_i,g_j)
-=
-\frac{
-g_i^\top g_j
-}{
-\|g_i\|\|g_j\|
-}
-\]
-
-を測定する。
-
-Raw LeWM と比較して負の cosine similarity が減少するなら、SIGReg が引き起こしていたタスク間干渉を減らせた可能性を示せる。
-
----
-
-# 23. 重要なアブレーション
-
-1. **中心を引かない task-wise SIGReg**
-   \[
-   \frac1K\sum_k SIGReg(Z_k)
-   \]
-
-2. **中心を引く Task-Centered SIGReg**
-   \[
-   \frac1K\sum_k SIGReg(Z_k-\mu_k)
-   \]
-
-3. **Raw SIGReg**
-   \[
-   SIGReg(\cup_k Z_k)
-   \]
-
-4. **Temporal-Centered SIGReg**
-
-5. **Task-Centered + Temporal-Centered**
-
-これにより、
-
-- タスク分割そのもの
-- 中心除去
-- 時間中心化
-
-のどの要素が性能改善に寄与したか分離できる。
-
----
-
-# 24. 将来拡張1: Goal-Conditioned Center
-
-離散 task ID を使わず、Goal画像から条件中心を生成する。
-
-\[
-z_{\mathrm{goal}}
-=
-E_\theta(o_{\mathrm{goal}})
-\]
-
-\[
-\mu
-=
-h(z_{\mathrm{goal}})
-\]
-
-として、
-
-\[
-SIGReg(z-\mu(z_{\mathrm{goal}}))
-\]
-
-を考える。
-
-これにより、固定された task ID ではなく連続的なGoal条件で潜在空間を構造化できる可能性がある。
-
----
-
-# 25. 将来拡張2: Language-Conditioned Center
-
-命令文 \(c\) を言語エンコーダへ入力し、
-
-\[
-e_c
-=
-E_{\mathrm{text}}(c)
-\]
-
-\[
-\mu(c)
-=
-h(e_c)
-\]
-
-として、
-
-\[
-SIGReg(z-\mu(c))
-\]
-
-を適用する。
-
-この場合、
-
-\[
-p(z\mid c)
-\]
-
-という条件付き潜在分布として扱える。
-
-ただし外部言語モデルを導入すると、LeWM の「外部事前学習なし」という簡潔さは弱くなるため、実験1とは分離して扱う。
-
----
-
-# 26. 将来拡張3: 階層的潜在分解
-
-より一般的には、
-
-\[
-z_t
-=
-z^{\mathrm{task}}
-+
-z_t^{\mathrm{slow}}
-+
-z_t^{\mathrm{fast}}
-\]
-
-と分解することを考える。
-
-- \(z^{\mathrm{task}}\): タスク・Goalなど長期文脈
-- \(z_t^{\mathrm{slow}}\): タスク進捗やシーン構造
-- \(z_t^{\mathrm{fast}}\): 行動に応じた短期状態変化
-
-SIGReg を高速成分だけに適用する。
-
-\[
-SIGReg(z_t^{\mathrm{fast}})
-\]
-
-これは短期・中期・長期の階層世界モデルへの拡張につながる。
-
----
-
-# 27. 現時点での研究仮説
-
-本研究アイデアを一文で表すと、
+本提案では、
 
 \[
 \boxed{
-\text{
-LeWM の SIGReg を全潜在周辺分布ではなく
-タスク中心化された条件付き残差へ適用することで、
-タスク間構造を潰さず各タスク内部の表現崩壊を防止できるのではないか
-}
+d_g(z,z_g)
+=
+\|w_g\odot(z-z_g)\|^2
 }
 \]
+
+とする。
+
+つまり、Goal に関係する潜在方向だけを強く見る。
+
+```text
+shared latent z
+      |
+      +-------------------+
+      |                   |
+   Goal A              Goal B
+      |                   |
+      v                   v
+    w_A                  w_B
+      |                   |
+red-related dims     blue-related dims
+   important            important
+```
+
+---
+
+# 7. Expert trajectory から Goal の「進捗」を学ぶ
+
+成功軌道
+
+\[
+z_0,z_1,z_2,\ldots,z_g
+\]
+
+では、時間が進むにつれて Goal に近づくはずである。
+
+したがって、
+
+\[
+d_g(z_{t+1},z_g) < d_g(z_t,z_g)
+\]
+
+を要求する。
+
+margin ranking loss の例:
+
+\[
+\boxed{
+\mathcal L_{progress}
+=
+[m+d_g(z_{t+1},z_g)-d_g(z_t,z_g)]_+
+}
+\]
+
+これにより、\(w_g\) は「Goal を達成するうえで重要な潜在方向」を学習する。
+
+---
+
+# 8. 非崩壊制約
+
+## 8.1 なぜ必要か
+
+Goal weight が
+
+\[
+w_g=0
+\]
+
+になれば、
+
+\[
+d_g(z,z_g)=0
+\]
+
+となり、どの状態も Goal と同じになってしまう。
+
+また、一部の潜在方向だけに依存して Goal に必要な状態変化を失う可能性もある。
+
+そこで、**Goal によって重要だと判断された状態変化が潰れない**ことだけを要求する。
+
+---
+
+## 8.2 状態変化を見る
+
+\[
+\Delta z_t=z_{t+1}-z_t
+\]
+
+Goal-weighted transition を、
+
+\[
+\boxed{
+\Delta u_t=w_g\odot\Delta z_t
+}
+\]
+
+とする。
+
+ここで重要なのは、潜在状態 \(z\) の分布ではなく、**行動によって生じた状態変化 \(\Delta z\)** を見ることである。
+
+---
+
+## 8.3 最小版: 分散非崩壊
+
+バッチ内の Goal-weighted transition を集め、各潜在次元の標準偏差を
+
+\[
+\sigma_j = Std(\Delta u_{:,j})
+\]
+
+とする。
+
+完全に潰れた方向では、
+
+\[
+\sigma_j\approx0
+\]
+
+となる。
+
+最小実装では、例えば
+
+\[
+\boxed{
+\mathcal L_{var}
+=
+\frac1D\sum_j[\gamma-\sigma_j]_+^2
+}
+\]
+
+を用いる。
+
+意味は単純である。
+
+```text
+Goal に必要な状態変化が全部同じ / 0
+        -> variance ≈ 0
+        -> penalty
+
+Goal に必要な状態変化が残っている
+        -> variance > threshold
+        -> no penalty
+```
+
+この制約は、潜在分布をガウスにすることを要求しない。
+
+- Gaussian: OK
+- multimodal: OK
+- skewed: OK
+- curved manifold: OK
+- collapse: NG
+
+---
+
+# 9. 有効ランクは最初は使わない
+
+より強い制約として、Goal-weighted transition covariance の有効ランクを使うこともできる。
+
+しかし、
+
+\[
+r_{eff}\ge q
+\]
+
+とすると、最低ランク \(q\) が新しいハイパーパラメータになる。
+
+そのため最初の実験では使わない。
+
+研究の順序は、
+
+```text
+Step 1: 分散非崩壊のみ
+
+もし
+「完全崩壊はしないが 1〜2 次元しか使わない」
+という問題が実際に観測されたら
+
+Step 2: 有効ランク制約を追加
+```
+
+とする。
+
+---
+
+# 10. 最終損失
+
+最小版では、
+
+\[
+\boxed{
+\mathcal L
+=
+\mathcal L_{pred}
++
+\lambda_p\mathcal L_{progress}
++
+\lambda_v\mathcal L_{var}
+}
+\]
+
+とする。
+
+### 1. LeWM prediction loss
+
+\[
+\mathcal L_{pred}
+=
+\|\hat z_{t+1}-z_{t+1}\|^2
+\]
+
+### 2. Goal progress loss
+
+\[
+\mathcal L_{progress}
+\]
+
+Goal に近づくほど潜在距離が小さくなるようにする。
+
+### 3. Goal-weighted transition variance loss
+
+\[
+\mathcal L_{var}
+\]
+
+Goal に必要な状態変化が潜在表現から消えるのを防ぐ。
+
+---
+
+# 11. 学習フロー
+
+```text
+Multi-task trajectory
+        |
+        v
+     Encoder
+        |
+        +-----------------------+
+        |                       |
+       z_t                   z_{t+1}
+        |                       |
+        +-------- Δz -----------+
+        |
+        | + action
+        v
+ Shared LeWM predictor
+        |
+        v
+ prediction loss
+
+Goal image
+    |
+    v
+ Encoder
+    |
+    v
+  z_goal
+    |
+    v
+ W(z_goal)
+    |
+    v
+   w_goal
+    |
+    +--------------------------+
+    |                          |
+    v                          v
+Goal-weighted              Goal-weighted
+latent distance            transition
+    |                          |
+    v                          v
+progress loss             variance loss
+
+             all losses
+                 |
+                 v
+             backward
+```
+
+---
+
+# 12. 赤・青キューブ例
+
+## Task A
+
+赤いキューブを右へ置く。
+
+Goal weight は主に、
+
+- 赤キューブ状態
+- ロボット状態
+- グリッパ状態
+
+に関係する潜在方向を重視する。
+
+## Task B
+
+青いキューブを左へ置く。
+
+Goal weight は主に、
+
+- 青キューブ状態
+- ロボット状態
+- グリッパ状態
+
+に関係する潜在方向を重視する。
+
+しかし世界モデル \(F(z,a)\) は両 Task で同じである。
+
+```text
+                 shared world latent
+                         |
+            +------------+------------+
+            |                         |
+          Task A                    Task B
+      red -> right              blue -> left
+            |                         |
+           w_A                       w_B
+            |                         |
+       red-related              blue-related
+       transitions              transitions
+       stay visible             stay visible
+```
+
+---
+
+# 13. 研究のアイデンティティ
+
+本研究の主張は、
+
+\[
+\boxed{
+\text{LeWM の潜在分布を正則化するのではなく、}
+\text{Goal に必要な潜在状態変化を正則化する}
+}
+\]
+
+ことである。
+
+Raw LeWM の問いは、
+
+> 潜在表現 \(z\) はどの分布であるべきか？
+
+だった。
+
+本提案の問いは、
+
+> この Goal を達成するために、どの状態変化を潜在表現に残すべきか？
 
 である。
 
-数式では、
-
-### Raw LeWM
-
-\[
-\boxed{
-p(z)
-\rightarrow
-\mathcal N(0,I)
-}
-\]
-
-### Proposed Task-Centered LeWM
-
-\[
-\boxed{
-p(z-\mu_k\mid T=k)
-\rightarrow
-\mathcal N(0,I)
-}
-\]
-
-すなわち、
-
-\[
-\boxed{
-p(z\mid T=k)
-\approx
-\mathcal N(\mu_k,I)
-}
-\]
-
-という、タスクごとの局所ガウス構造を許容する。
-
-全体としては、
-
-\[
-p(z)
-=
-\sum_k
-p(T=k)
-p(z\mid T=k)
-\]
-
-となり、単一ガウスではなく、タスク構造を持つ混合分布を許容する。
+したがって、潜在分布そのものに Gaussian / mixture Gaussian といった強い仮定を置かない。
 
 ---
 
-# 28. このアイデアの新規性を検証するときの注意
-
-「task-conditioned Gaussian」や「class-conditional Gaussian」自体は一般的な機械学習の概念であり、それ自体を新規性として主張するべきではない。
-
-新規性候補は、
-
-1. LeWM / SIGReg のマルチタスク問題への適用
-2. 全潜在ガウス化ではなく task-centered residual のみを Gaussianize すること
-3. LeWM の推論構造・軽量性を変えないこと
-4. task-center removal が latent geometry とマルチタスク干渉へ与える効果の解析
-5. Temporal-Centered SIGReg との系統的比較
-
-に置くべきである。
-
----
-
-# 29. 関連研究
+# 14. 既存研究との位置付け
 
 ## LeWorldModel
 
-Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, Randall Balestriero,  
-**LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels**, 2026.
+- 潜在未来予測 + SIGReg
+- 等方ガウスによる非崩壊
 
-- arXiv: https://arxiv.org/abs/2603.19312
-- Code: https://github.com/lucas-maes/le-wm
+https://arxiv.org/abs/2603.19312
 
-LeWM は、次潜在表現予測と Gaussian latent regularization の2項のみで、画像から端から端まで JEPA 世界モデルを学習する。
+## TC-LeWM
 
-## Temporally Centered SIGReg
+- 時間的に持続する成分を除いた残差に SIGReg
+- マルチタスク LeWM の直接的 baseline
 
-Chang Liu et al.,  
-**Temporally Centered SIGReg Improves Multi-Task LeWorldModel Learning: From Analysis to Method**, 2026.
+https://arxiv.org/abs/2607.26924
 
-- arXiv: https://arxiv.org/abs/2607.26924
+## UR-JEPA
 
-マルチタスク LeWM において、全潜在周辺分布を単一ガウスへ正則化することによるタスククラスタ圧縮を分析し、時間中心化残差へ SIGReg を適用する。
+- 等方ガウスではなく局所的な低次元多様体構造を許す
 
-## SCALE
+https://arxiv.org/abs/2606.01443
 
-Jiaming Hu et al.,  
-**SCALE: State-Calibrated Latent Embeddings for JEPA Planning in the Right Geometry**, 2026.
+## No Gaussian Required / Contrastive Inverse Dynamics
 
-- arXiv: https://arxiv.org/abs/2608.16287
+- 潜在状態変化から action を識別できるようにし、分布仮定なしで崩壊を防ぐ
 
-LeWM の潜在表現に状態情報が存在するだけでなく、計画に適した潜在幾何を形成することの重要性を議論する。
+https://arxiv.org/abs/2608.17542
 
----
-
-# 30. 次に実施するべき最小実験
-
-最初の実装では複雑な言語条件やGoal条件を導入しない。
-
-**検証したい仮説を1つに絞る。**
-
-> Raw LeWM における単一周辺 Gaussian SIGReg が、マルチタスク潜在構造の悪化要因になっているか。
-
-そのため、
-
-```text
-Raw LeWM
-   vs
-Temporal-Centered LeWM
-   vs
-Task-Centered LeWM
-```
-
-を同一条件で比較する。
-
-Task-Centered LeWM の変更点は原則として、
-
-```python
-for task in tasks_in_batch:
-    z_k = z[task_id == task]
-    mu_k = z_k.mean(dim=0, keepdim=True)
-    residual_k = z_k - mu_k
-    loss_k = sigreg(residual_k)
-
-loss_task_sig = mean(loss_k for each task)
-
-loss = prediction_loss + lambda_sig * loss_task_sig
-```
-
-のみとする。
-
-これにより、ネットワーク容量、ViT、Predictor、CEM、データセットなどを固定したまま、**SIGReg の適用対象だけを変えた因果的比較**が可能になる。
+本提案は、単に action を復号するのではなく、**Goal に応じて重要な状態変化方向を選び、その方向の非崩壊と Goal progress を同時に学習する**ことを狙う。
 
 ---
 
-## 31. 現時点での要点
+# 15. 計算コスト
 
-> **平均することが研究アイデアではない。**
->
-> 重要なのは、全タスクを混ぜた潜在分布へ SIGReg をかけるのをやめ、各タスクの中心を除いたタスク内残差へ独立に SIGReg をかけることである。
->
-> これにより、各タスク内では表現崩壊を防止しつつ、タスク間のクラスタ中心距離には SIGReg が直接干渉しない潜在空間を学習できる可能性がある。
->
-> また、タスク間差だけを利用して SIGReg の分散条件を満たす「逃げ道」を減らし、各タスク内部でも十分な状態表現を持つことを促せる可能性がある。
->
-> 一方、状態変化に必要な全情報が必ず保持されること、共有Encoderによる負の転移、部分観測、長期予測誤差などは別問題として残る。
+## 学習時
+
+追加する主な処理は、
+
+1. Goal weight network \(W_\eta\)
+2. Goal-weighted difference \(w_g\odot\Delta z\)
+3. batch 内標準偏差
+4. progress ranking loss
+
+である。
+
+これらは ViT Encoder や LeWM Predictor に比べて軽量であると予想されるが、実際の wall-clock overhead は実測する。
+
+## 推論時
+
+非崩壊 loss は不要。
+
+追加されるのは Goal weight の生成と、
+
+\[
+\|w_g\odot(\hat z-z_g)\|^2
+\]
+
+の計算だけである。
+
+そのため、LeWM の潜在空間での高速 planning という利点はほぼ維持できると期待する。
+
+---
+
+# 16. 最小実験
+
+最初は以下を比較する。
+
+1. Raw LeWM
+2. TC-LeWM
+3. No Gaussian Required / Action-NCE 系
+4. Proposed: Goal-weighted transition geometry
+
+提案法では、まず有効ランクを使わず、
+
+\[
+\mathcal L_{pred}
++
+\lambda_p\mathcal L_{progress}
++
+\lambda_v\mathcal L_{var}
+\]
+
+だけで評価する。
+
+---
+
+# 17. 評価項目
+
+## 制御性能
+
+- multi-task success rate
+- long-horizon success
+- unseen object configuration
+- unseen Goal
+
+## 潜在表現
+
+- Goal progress と潜在距離の順位相関
+- object position linear probe
+- gripper state probe
+- robot state probe
+- Goal-weighted transition variance
+
+## 計算量
+
+- training step time
+- GPU memory
+- planning latency
+- CEM throughput
+
+---
+
+# 18. 今後の拡張
+
+最小版で状態変化が少数方向へ潰れることが確認された場合のみ、
+
+- effective rank regularization
+- local manifold regularization
+- counterfactual action perturbation
+- shared / private transition subspace
+
+を追加検討する。
+
+最初から複雑な制約を積み上げず、**本当に必要な制約だけを実験で追加する**。
+
+---
+
+# 19. 現時点の一文要約
+
+> **マルチタスク LeWM において、世界モデル自体は全 Task で共有したまま、Goal ごとに重要な潜在方向を学習し、その Goal に必要な状態変化が潜在空間で潰れないよう正則化する。潜在分布そのものにはガウス性を要求しない。**
