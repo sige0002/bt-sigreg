@@ -52,6 +52,7 @@ def get_dataset(cfg, dataset_name):
     else:
         dataset = swm.data.load_dataset(
             dataset_name,
+            # load_dataset resolves named datasets under <cache>/datasets.
             cache_dir=dataset_path,
             keys_to_load=cfg.dataset.keys_to_cache,
         )
