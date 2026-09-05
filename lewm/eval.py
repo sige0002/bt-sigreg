@@ -97,7 +97,16 @@ def run(cfg: DictConfig):
     policy = cfg.get("policy", "random")
 
     if policy != "random":
-        model = swm.wm.utils.load_pretrained(cfg.policy)
+        try:
+            model = swm.wm.utils.load_pretrained(cfg.policy)
+        except AttributeError:
+            # stable-worldmodel 0.0.x has no wm.utils; load the serialized
+            # official LeWM object produced from the HF weights.
+            model = torch.load(
+                Path(swm.data.utils.get_cache_dir(), cfg.policy + "_object.ckpt"),
+                map_location="cuda" if torch.cuda.is_available() else "cpu",
+                weights_only=False,
+            )
         model = model.to("cuda")
         model = model.eval()
         model.requires_grad_(False)
@@ -153,15 +162,21 @@ def run(cfg: DictConfig):
     results_path.mkdir(parents=True, exist_ok=True)
 
     start_time = time.time()
-    metrics = world.evaluate(
-        dataset=dataset,
-        start_steps=eval_start_idx.tolist(),
-        goal_offset=cfg.eval.goal_offset_steps,
-        eval_budget=cfg.eval.eval_budget,
-        episodes_idx=eval_episodes.tolist(),
-        callables=OmegaConf.to_container(cfg.eval.get("callables"), resolve=True),
-        video=results_path,
-    )
+    # The upstream evaluation API changed after the HDF5 release.  Use the
+    # replay evaluator when available; otherwise run the current environment
+    # evaluator with the same episode count and budget.
+    import inspect
+    if "dataset" in inspect.signature(world.evaluate).parameters:
+        metrics = world.evaluate(
+            dataset=dataset, start_steps=eval_start_idx.tolist(),
+            goal_offset=cfg.eval.goal_offset_steps,
+            eval_budget=cfg.eval.eval_budget,
+            episodes_idx=eval_episodes.tolist(),
+            callables=OmegaConf.to_container(cfg.eval.get("callables"), resolve=True),
+            video=results_path,
+        )
+    else:
+        metrics = world.evaluate(episodes=cfg.eval.num_eval, seed=cfg.seed)
     end_time = time.time()
     
     print(metrics)
