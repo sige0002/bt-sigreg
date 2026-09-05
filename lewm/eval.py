@@ -97,9 +97,10 @@ def run(cfg: DictConfig):
     policy = cfg.get("policy", "random")
 
     if policy != "random":
+        local_object = Path(swm.data.utils.get_cache_dir(), cfg.policy + "_object.ckpt")
         try:
-            model = swm.wm.utils.load_pretrained(cfg.policy)
-        except AttributeError:
+            model = torch.load(local_object, map_location="cuda" if torch.cuda.is_available() else "cpu", weights_only=False) if local_object.exists() else swm.wm.utils.load_pretrained(cfg.policy)
+        except (AttributeError, FileNotFoundError):
             # stable-worldmodel 0.0.x has no wm.utils; load the serialized
             # official LeWM object produced from the HF weights.
             model = torch.load(
