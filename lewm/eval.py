@@ -3,6 +3,7 @@ import os
 os.environ["MUJOCO_GL"] = "egl"
 
 import time
+import hashlib
 from pathlib import Path
 
 import hydra
@@ -143,12 +144,18 @@ def run(cfg: DictConfig):
     print(valid_mask.sum(), "valid starting points found for evaluation.")
 
     g = np.random.default_rng(cfg.seed)
-    random_episode_indices = g.choice(
-        len(valid_indices) - 1, size=cfg.eval.num_eval, replace=False
-    )
-
-    # sort increasingly to avoid issues with HDF5Dataset indexing
-    random_episode_indices = np.sort(valid_indices[random_episode_indices])
+    # Sample one valid start row per unique episode.  Sampling rows directly
+    # can select the same episode multiple times and is not an independent
+    # episode evaluation.
+    valid_episode_ids = np.unique(dataset.get_col_data(col_name)[valid_indices])
+    if len(valid_episode_ids) < cfg.eval.num_eval:
+        raise ValueError("Not enough unique episodes for evaluation.")
+    selected_episode_ids = np.sort(g.choice(valid_episode_ids, size=cfg.eval.num_eval, replace=False))
+    selected_rows = []
+    for ep_id in selected_episode_ids:
+        rows = valid_indices[dataset.get_col_data(col_name)[valid_indices] == ep_id]
+        selected_rows.append(int(g.choice(rows)))
+    random_episode_indices = np.array(sorted(selected_rows), dtype=int)
 
     print(random_episode_indices)
 
@@ -177,7 +184,14 @@ def run(cfg: DictConfig):
             video=results_path,
         )
     else:
-        metrics = world.evaluate(episodes=cfg.eval.num_eval, seed=cfg.seed)
+        raise RuntimeError("Dataset-driven evaluation API is unavailable; refusing random fallback")
+
+    ckpt = Path(swm.data.utils.get_cache_dir(), cfg.policy + "_object.ckpt")
+    if ckpt.exists():
+        sha = hashlib.sha256(ckpt.read_bytes()).hexdigest()
+        print(f"checkpoint: {ckpt} sha256={sha}")
+    print(f"evaluated_unique_episodes: {len(np.unique(eval_episodes))}")
+    print(f"start_steps: {eval_start_idx.tolist()}")
     end_time = time.time()
     
     print(metrics)
