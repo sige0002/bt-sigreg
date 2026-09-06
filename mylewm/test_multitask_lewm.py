@@ -19,6 +19,9 @@ class DummyJEPA(torch.nn.Module):
     def predict(self, emb, act_emb):
         return emb + act_emb[..., :1]
 
+    def action_encoder(self, action):
+        return action
+
 
 def test_cross_loss_backprop_and_multi_positive():
     torch.manual_seed(0)
@@ -55,8 +58,9 @@ def test_explicit_positive_and_target_detach():
 def test_official_jepa_adapter_runs_sequence():
     model = DummyJEPA()
     objective = MultiTaskJEPAObjective(model, target_detach=True)
-    contexts = {v: {"pixels": torch.randn(2, 3, 1, 2, 2), "action": torch.randn(2, 3, 2)} for v in ("a", "b")}
+    contexts = {v: {"pixels": torch.randn(2, 3, 1, 2, 2), "action": torch.randn(2, 2, 2)} for v in ("a", "b")}
     futures = {v: {"pixels": torch.randn(2, 3, 1, 2, 2)} for v in ("a", "b")}
-    loss, _ = objective.loss_from_observations(contexts, futures, horizons=(1, 2))
+    loss, _ = objective.loss_from_observations(contexts, futures, horizons=(1, 2),
+                                               future_actions=torch.randn(2, 2, 2))
     assert torch.isfinite(loss)
     loss.backward()

@@ -4,6 +4,8 @@ os.environ["MUJOCO_GL"] = "egl"
 
 import time
 import hashlib
+import json
+import random
 from pathlib import Path
 
 import hydra
@@ -62,6 +64,9 @@ def get_dataset(cfg, dataset_name):
 @hydra.main(version_base=None, config_path="./config/eval", config_name="pusht")
 def run(cfg: DictConfig):
     """Run evaluation of dinowm vs random policy."""
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
     assert (
         cfg.plan_config.horizon * cfg.plan_config.action_block <= cfg.eval.eval_budget
     ), "Planning horizon must be smaller than or equal to eval_budget"
@@ -112,6 +117,19 @@ def run(cfg: DictConfig):
         model = model.to("cuda")
         model = model.eval()
         model.requires_grad_(False)
+        # Proposed models persist their training preprocessing contract.
+        # Official checkpoints without these buffers keep the original path.
+        if hasattr(model, 'training_action_mean'):
+            mean = model.training_action_mean.detach().cpu().numpy()
+            std = model.training_action_std.detach().cpu().numpy()
+            if not np.isfinite(mean).all() or not np.isfinite(std).all() or not (std > 0).all():
+                raise ValueError('Invalid action statistics in checkpoint')
+            if mean.shape != process['action'].mean_.shape or std.shape != mean.shape:
+                raise ValueError('Checkpoint action statistics do not match environment')
+            process['action'].mean_ = mean
+            process['action'].scale_ = std
+            process['action'].var_ = std ** 2
+            print('action_statistics_source: checkpoint')
         model.interpolate_pos_encoding = True
         config = swm.PlanConfig(**cfg.plan_config)
         solver = hydra.utils.instantiate(cfg.solver, model=model)
@@ -162,6 +180,18 @@ def run(cfg: DictConfig):
     eval_episodes = dataset.get_row_data(random_episode_indices)[col_name]
     eval_start_idx = dataset.get_row_data(random_episode_indices)["step_idx"]
 
+    if cfg.eval.get('manifest'):
+        manifest = json.loads(Path(cfg.eval.manifest).read_text())
+        partition = cfg.eval.get('partition', 'pilot')
+        offset = cfg.eval.get('offset', 0)
+        cases = manifest[partition][offset:offset+cfg.eval.num_eval]
+        if len(cases) != cfg.eval.num_eval:
+            raise ValueError('Manifest does not contain requested evaluation cases')
+        eval_episodes = np.asarray([case['episode'] for case in cases])
+        eval_start_idx = np.asarray([case['start'] for case in cases])
+        if len(np.unique(eval_episodes)) != cfg.eval.num_eval:
+            raise ValueError('Evaluation cases must use unique episodes')
+
     if len(eval_episodes) < cfg.eval.num_eval:
         raise ValueError("Not enough episodes with sufficient length for evaluation.")
 
@@ -170,6 +200,8 @@ def run(cfg: DictConfig):
     results_path.mkdir(parents=True, exist_ok=True)
 
     start_time = time.time()
+    # Seed environment RNGs before the dataset evaluator's reset(seed=None).
+    world.reset(seed=cfg.seed)
     # The upstream evaluation API changed after the HDF5 release.  Use the
     # replay evaluator when available; otherwise run the current environment
     # evaluator with the same episode count and budget.
@@ -195,6 +227,15 @@ def run(cfg: DictConfig):
     end_time = time.time()
     
     print(metrics)
+
+    machine_result = {
+        'policy':cfg.policy, 'checkpoint_sha256':hashlib.sha256(ckpt.read_bytes()).hexdigest() if ckpt.exists() else None,
+        'episodes':eval_episodes.tolist(), 'starts':eval_start_idx.tolist(),
+        'successes':np.asarray(metrics['episode_successes'],dtype=bool).tolist(),
+        'success_rate':float(metrics['success_rate']),
+        'config':OmegaConf.to_container(cfg,resolve=True), 'elapsed':end_time-start_time,
+    }
+    (results_path / (cfg.output.filename + '.json')).write_text(json.dumps(machine_result,indent=2))
 
     results_path = results_path / cfg.output.filename
     results_path.parent.mkdir(parents=True, exist_ok=True)
