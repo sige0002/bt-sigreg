@@ -21,7 +21,7 @@ def bn_statistics(model):
 
 def candidate_invariance(model,pixels,actions):
     """Invoke the actual rollout and goal criterion through get_cost()."""
-    from mylewm.audit_raw_path import difference
+    from mylewm.tools.audit_raw_path import difference
     model.eval()
     # One context image, three future actions; four candidate plans.
     base=actions[:1,:1].expand(1,4,actions.shape[-1]).clone()

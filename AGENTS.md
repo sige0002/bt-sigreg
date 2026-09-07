@@ -2,7 +2,7 @@
 
 ## 最初に読むもの
 
-作業前に `README.md`、`README_RESEARCH_REVIEW.ja.md`、`mylewm/BOUNDED_TRANSPORT_PROPOSAL.ja.md` を読む。実装・評価を扱う場合は `mylewm/README.md` と `mylewm/ISSUE_IMPLEMENTATION.ja.md` も読む。古い研究MDやissueと矛盾する場合は、最新のユーザー指示と総合レビューを優先し、矛盾を明示する。
+作業前に `README.md`、`README_RESEARCH_REVIEW.ja.md`、`mylewm/docs/BT_SIGREG.ja.md` を読む。実装・評価を扱う場合は `mylewm/README.md` と `mylewm/docs/VALIDATION.ja.md` も読む。古い研究MDやissueと矛盾する場合は、最新のユーザー指示と総合レビューを優先し、矛盾を明示する。
 
 ## 変えてはいけない研究目的
 
@@ -25,7 +25,7 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。新規性・SOTA・性能向�
 
 - `lewm/` は公式比較用に残す。既存のローカル評価修正があるため、完全無改変の上流コピーとは呼ばない。比較対象を提案側で上書きしない。
 - `mylewm/` は提案・比較・監査基盤。`train_rbg.py` 等はRaw/TCでも使う共有基盤なので、名前だけで不要と判断しない。
-- 旧方式の削除記録は `mylewm/CLEANUP_20260907.ja.md`。削除前にimport、CLI、設定、checkpoint復元への依存を確認する。無関係な変更・プロセス・データを壊さない。
+- 旧文書はGit履歴へ保存し、現行文書のみを `mylewm/docs/` に置く。評価・監査CLIは `mylewm/tools/`、回帰テストは `mylewm/tests/`。旧方式の削除記録は `mylewm/docs/CLEANUP.ja.md`。削除前にimport、CLI、設定、checkpoint復元への依存を確認する。無関係な変更・プロセス・データを壊さない。
 - 現在の長時間学習はユーザー指示で停止中。文書更新、レビュー、整理を理由に学習・自動実験キューを再開しない。再開には新しいユーザー指示が必要。
 - データ、公式重み、生成ログ、ローカル環境、認証情報をGitに入れない。削除は対象を確定し、可能なら復元可能にする。
 
@@ -36,7 +36,7 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。新規性・SOTA・性能向�
 - PushTだけでマルチタスクを実証しない。LIBERO-10の平均・各タスク・下位タスクと学習seed間の変動を報告する。
 - TC論文の凍結表現＋BCと、CEMによる計画成功率を直接順位付けしない。公式checkpoint再現と同予算での再学習も別の比較である。
 - 生の潜在MSE低下を性能向上と呼ばない。尺度・アフィン対照、実制御成績、信頼区間を確認する。有限試験で無条件の非劣化保証をしない。
-- コード変更後は関連テストを実行する。通常の回帰確認は `.venv/bin/python -m pytest mylewm -q`。ABC数式の検算は `.venv/bin/python mylewm/abc_math_checks.py`。いずれもBTの学習・制御評価ではない。
+- コード変更後は関連テストを実行する。通常の回帰確認は `.venv/bin/python -m pytest mylewm -q`。旧ABCの検算はGit履歴に保存済み。回帰テスト合格をBTの学習・制御評価と呼ばない。
 - プッシュ前に `git diff --check`、差分、追加ファイル、秘密情報・生成物の混入を確認する。失敗や未検証部分を隠さない。
 
 ## 調査・報告
