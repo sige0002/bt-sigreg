@@ -4,10 +4,12 @@ import json
 from pathlib import Path
 import numpy as np
 from scipy.stats import beta
+from mylewm.evaluation_contract import protocol as evaluation_protocol
 
 
 def compare(baseline, candidate, alpha=.05):
     protocol = None
+    initial_states = {}
     def collect(paths):
         nonlocal protocol
         result={}
@@ -16,18 +18,28 @@ def compare(baseline, candidate, alpha=.05):
             data=json.loads(Path(path).read_text())
             cfg=data['config']
             # policy/output names may differ; the actual experiment must not.
-            solver={k:v for k,v in cfg['solver'].items() if k!='model'}
-            signature={k:cfg[k] for k in ('seed','world','plan_config','dataset')}
-            signature['solver']=solver
-            signature['eval']={k:cfg['eval'][k] for k in
-                               ('goal_offset_steps','eval_budget','img_size','dataset_name','callables')}
+            signature=evaluation_protocol(cfg)
+            if 'provenance' in data:
+                signature['provenance']={k:v for k,v in data['provenance'].items() if k!='checkpoint_sha256'}
+                signature['planner_action_mean']=data['planner_action_mean']
+                signature['planner_action_std']=data['planner_action_std']
+                if len(data.get('initial_runtime_hashes',[]))!=len(data['episodes']) or not data.get('physical_actions'):
+                    raise ValueError('Incomplete execution audit')
+                if data['checkpoint_sha256']!=data['provenance']['checkpoint_sha256']:
+                    raise ValueError('Checkpoint provenance mismatch')
             if protocol is None: protocol=signature
             elif signature!=protocol: raise ValueError('evaluation protocols differ')
             if checkpoint is None: checkpoint=data['checkpoint_sha256']
             elif checkpoint!=data['checkpoint_sha256']: raise ValueError('mixed checkpoints within one method')
-            for ep,start,success in zip(data['episodes'],data['starts'],data['successes'],strict=True):
+            for index,(ep,start,success) in enumerate(zip(data['episodes'],data['starts'],data['successes'],strict=True)):
                 key=(ep,start)
                 if key in result: raise ValueError('duplicate evaluation case')
+                if type(success) is not bool:raise ValueError('Nonboolean success flag')
+                if 'provenance' in data:
+                    current=data['initial_runtime_hashes'][index]
+                    if key in initial_states and initial_states[key]!=current:
+                        raise ValueError('Paired initial/goal observations differ')
+                    initial_states[key]=current
                 result[key]=bool(success)
         return result
     b,c=collect(baseline),collect(candidate)

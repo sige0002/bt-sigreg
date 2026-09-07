@@ -13,6 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT)); sys.path.insert(0,str(ROOT/'lewm'))
 import torch
 from mylewm import train_rbg as common
+from mylewm.training_state import isolated_rng
 
 
 def parameter_hash(model):
@@ -20,6 +21,54 @@ def parameter_hash(model):
     for name,p in model.named_parameters():
         h.update(name.encode()); h.update(p.detach().cpu().contiguous().numpy().tobytes())
     return h.hexdigest()
+
+
+def buffer_hashes(model):
+    return {name:hashlib.sha256(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes()).hexdigest()
+            for name,value in model.named_buffers()}
+
+
+def calibrate(model,ds,manifest,preprocess,batches,batch_size,device,seed=99117):
+    if batches<1 or batch_size<2: raise ValueError('Require batches >=1 and batch_size >=2')
+    before=parameter_hash(model); buffers_before=buffer_hashes(model)
+    allowed={f'{name}.{suffix}' for name,layer in model.named_modules()
+             if name.split('.')[0] in ('projector','pred_proj')
+             and isinstance(layer,torch.nn.modules.batchnorm._BatchNorm)
+             for suffix in ('running_mean','running_var','num_batches_tracked')}
+    indices=list(common.StepBatches(len(ds),batch_size,batches,seed))
+    index_hash=hashlib.sha256(json.dumps(indices,separators=(',',':')).encode()).hexdigest()
+    with isolated_rng(seed):
+        for stage in ('projector','pred_proj'):
+            model.eval()
+            layers=[layer for layer in getattr(model,stage).modules()
+                    if isinstance(layer,torch.nn.modules.batchnorm._BatchNorm)]
+            momenta=[layer.momentum for layer in layers]
+            try:
+                for layer in layers:
+                    layer.reset_running_stats(); layer.momentum=None; layer.train()
+                loader=torch.utils.data.DataLoader(ds,batch_sampler=indices,num_workers=0,
+                            generator=torch.Generator().manual_seed(seed))
+                with torch.no_grad():
+                    for batch in loader:
+                        x,a=preprocess(batch,manifest,device)
+                        z=model.encode({'pixels':x})['emb']
+                        if stage=='pred_proj': model.predict(z[:,:3],model.action_encoder(a))
+            finally:
+                for layer,momentum in zip(layers,momenta): layer.momentum=momentum
+                model.eval()
+    after=parameter_hash(model); buffers_after=buffer_hashes(model)
+    if before!=after: raise AssertionError('Calibration modified learned parameters')
+    changed={name for name in buffers_before if buffers_before[name]!=buffers_after[name]}
+    if buffers_before.keys()!=buffers_after.keys() or not changed<=allowed:
+        raise AssertionError('Calibration modified non-BN buffers')
+    return {'parameter_sha256_before':before,'parameter_sha256_after':after,
+            'buffer_sha256_before':buffers_before,'buffer_sha256_after':buffers_after,
+            'changed_buffers':sorted(changed),'allowed_buffers':sorted(allowed),
+            'calibration_split':'training only','seed':seed,'batches_per_stage':batches,
+            'batch_size':batch_size,'stages':['projector','pred_proj'],
+            'same_batch_order_both_stages':True,'clip_indices_sha256':index_hash,
+            'precision':'float32; autocast disabled by caller',
+            'columns':['pixels','action'] if 'files' not in manifest else [*manifest['camera_order'],'actions']}
 
 
 def main():
@@ -31,8 +80,9 @@ def main():
     p.add_argument('--batches',type=int,default=16)
     p.add_argument('--batch-size',type=int,default=16)
     p.add_argument('--device',default='cpu')
+    p.add_argument('--seed',type=int,default=99117)
     args=p.parse_args()
-    if args.output.exists(): raise FileExistsError(args.output)
+    if args.output.exists() or args.output.with_suffix('.json').exists(): raise FileExistsError(args.output)
     torch.set_num_threads(4)
     if args.benchmark=='libero10':
         from mylewm import train_rbg_libero as lib
@@ -41,30 +91,11 @@ def main():
     m=json.loads(args.manifest.read_text())
     ds=dataset_cls(m,False)
     model=torch.load(args.checkpoint,map_location=args.device,weights_only=False).eval()
-    before=parameter_hash(model)
-    for stage in ('projector','pred_proj'):
-        model.eval()
-        layers=[layer for layer in getattr(model,stage).modules()
-                if isinstance(layer,torch.nn.modules.batchnorm._BatchNorm)]
-        momenta=[layer.momentum for layer in layers]
-        for layer in layers:
-            layer.reset_running_stats(); layer.momentum=None; layer.train()
-        loader=torch.utils.data.DataLoader(ds,batch_sampler=common.StepBatches(
-            len(ds),args.batch_size,args.batches,99117),num_workers=0)
-        with torch.no_grad():
-            for batch in loader:
-                x,a=preprocess(batch,m,args.device)
-                z=model.encode({'pixels':x})['emb']
-                if stage=='pred_proj': model.predict(z[:,:3],model.action_encoder(a))
-        for layer,momentum in zip(layers,momenta): layer.momentum=momentum
-    model.eval()
-    after=parameter_hash(model)
-    if before!=after: raise AssertionError('Calibration modified learned parameters')
+    calibration=calibrate(model,ds,m,preprocess,args.batches,args.batch_size,args.device,args.seed)
     common.atomic_save(model,args.output)
-    report={**vars(args),'parameter_sha256_before':before,'parameter_sha256_after':after,
+    report={**vars(args),**calibration,
             'source_checkpoint_sha256':common.digest(args.checkpoint),
-            'manifest_sha256':common.digest(args.manifest),
-            'calibration_split':'training only; same stateless batches in both stages; seed 99117'}
+            'manifest_sha256':common.digest(args.manifest)}
     args.output.with_suffix('.json').write_text(json.dumps(report,default=str,indent=2))
     print(json.dumps(report,default=str),flush=True)
 

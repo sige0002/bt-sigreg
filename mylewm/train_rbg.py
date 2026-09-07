@@ -1,6 +1,6 @@
 """Reproducible from-scratch PushT training for RBG/Raw/TC comparisons."""
 import argparse
-import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -18,10 +18,14 @@ import numpy as np
 from omegaconf import OmegaConf
 import torch
 from mylewm.rbg import BlockSIGReg, one_step_objective
+from mylewm.data_contract import file_sha256, data_fingerprints, training_budget
+from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics
+from mylewm.training_state import (UpdateSchedule, add_schedule_arguments, capture_rng,
+    restore_rng, isolated_rng, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash)
 
 
 def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    return file_sha256(path)
 
 
 def prepare(dataset, path):
@@ -120,6 +124,10 @@ def atomic_save(value,path):
 
 
 def train(args):
+    schedule=UpdateSchedule(args.steps,args.warmup_steps,args.lr,args.min_lr)
+    if getattr(args,'deterministic',False):
+        os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG',':4096:8')
+        torch.use_deterministic_algorithms(True)
     torch.set_num_threads(4)
     random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
     device='cuda' if torch.cuda.is_available() else 'cpu'
@@ -129,64 +137,123 @@ def train(args):
         raise ValueError('Dataset changed since split preparation')
     if min(m['action_std'])<=0:
         raise ValueError('invalid action scale')
+    print(json.dumps({'event':'hashing_data_for_training_contract'}),flush=True)
+    data_identity=data_fingerprints(m)
     model=build_model().to(device)
+    initialization=getattr(args,'initialization',None)
+    if initialization is not None:
+        initial=torch.load(initialization,map_location=device,weights_only=False)
+        if initial.get('schema')!='untrained_shared_initialization_v2' or initial['seed']!=args.seed:
+            raise ValueError('Only matching newly generated untrained initialization is accepted')
+        if tensor_state_hash(initial['model'])!=initial['model_sha256']:
+            raise ValueError('Shared initialization content mismatch')
+        model.load_state_dict(initial['model'],strict=True)
+    initial_model_sha256=tensor_state_hash(model.state_dict())
     model.register_buffer('training_action_mean',torch.tensor(m['action_mean'],device=device,dtype=torch.float64))
     model.register_buffer('training_action_std',torch.tensor(m['action_std'],device=device,dtype=torch.float64))
-    reg=BlockSIGReg(blocks=args.blocks if args.mode=='rbg' else 1).to(device)
+    with isolated_rng(args.seed+10000):
+        reg=IndependentRegularizer(BlockSIGReg(blocks=args.blocks if args.mode=='rbg' else 1),args.seed+10000).to(device)
     opt=torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=.001)
-    config={**vars(args),'manifest_sha256':digest(args.manifest),
+    config={**vars(args),'schema':'controlled_training_v2',
+            'schedule':schedule.config,'device':device,
+            'precision':'bf16_autocast' if device=='cuda' else 'float32',
+            'torch_version':str(torch.__version__),
+            'dependency_versions':{name:importlib.metadata.version(name) for name in
+                ('stable-pretraining','stable-worldmodel','transformers','h5py','numpy','hydra-core')},
+            'numerical_backend':{'cudnn_benchmark':torch.backends.cudnn.benchmark,
+                'cudnn_tf32':torch.backends.cudnn.allow_tf32,'matmul_tf32':torch.backends.cuda.matmul.allow_tf32,
+                'cublas_workspace_config':os.environ.get('CUBLAS_WORKSPACE_CONFIG')},
+            'deterministic_algorithms':torch.are_deterministic_algorithms_enabled(),
+            'manifest_sha256':digest(args.manifest),
+            'initial_model_sha256':initial_model_sha256,
+            'initialization_source_sha256':digest(initialization) if initialization else None,
+            'data_identity':data_identity,'recipe':'controlled_comparison',
             'parameters':sum(p.numel() for p in model.parameters()),
             'source_sha256':{str(p.relative_to(ROOT)):digest(p) for p in
-                [Path(__file__),ROOT/'mylewm/rbg.py',ROOT/'lewm/jepa.py',ROOT/'lewm/module.py']}}
+                [Path(__file__),ROOT/'mylewm/training_state.py',ROOT/'mylewm/training_diagnostics.py',ROOT/'mylewm/data_contract.py',ROOT/'mylewm/rbg.py',
+                 ROOT/'lewm/jepa.py',ROOT/'lewm/module.py',ROOT/'lewm/config/train/model/lewm.yaml']}}
     config=json.loads(json.dumps(config,default=str))
     start_step=0
     if args.resume:
         state=torch.load(args.output/'resume.pt',map_location=device,weights_only=False)
         previous=json.loads((args.output/'config.json').read_text())
-        for key in ('seed','mode','blocks','batch_size','lr','steps','manifest_sha256','source_sha256'):
-            if previous[key]!=config[key]: raise ValueError(f'resume mismatch: {key}')
+        check_resume_config(previous,config)
+        if digest(args.output/'initialization.pt')!=state['initialization_sha256']:
+            raise ValueError('resume mismatch: initialization')
         model.load_state_dict(state['model']); opt.load_state_dict(state['optimizer'])
         reg.load_state_dict(state['regularizer'])
         start_step=state['step']
-        torch.set_rng_state(state['rng'].cpu())
-        if device=='cuda': torch.cuda.set_rng_state_all([s.cpu() for s in state['cuda_rng']])
+        schedule.load_state_dict(state['scheduler'])
+        if schedule.completed_steps!=start_step or state['next_batch_index']!=start_step:
+            raise ValueError('resume mismatch: update/data position')
+        reconcile_metrics(args.output/'metrics.jsonl',state)
+        restore_rng(state['random_state'])
     else:
         args.output.mkdir(parents=True,exist_ok=False)
         (args.output/'config.json').write_text(json.dumps(config,indent=2))
+        atomic_save({'model':model.state_dict(),'regularizer':reg.state_dict(),
+                     'random_state':capture_rng()},args.output/'initialization.pt')
+    initialization_sha256=digest(args.output/'initialization.pt')
     ds=Clips(m)
+    budget=training_budget(len(ds),args.steps,args.batch_size)
+    budget_path=args.output/'budget.json'
+    if args.resume:
+        if json.loads(budget_path.read_text())!=budget:
+            raise ValueError('resume mismatch: training budget')
+    else:
+        budget_path.write_text(json.dumps(budget,indent=2))
     loader=torch.utils.data.DataLoader(ds,batch_sampler=StepBatches(len(ds),args.batch_size,args.steps,args.seed,start_step),
-        num_workers=args.workers,pin_memory=device=='cuda',persistent_workers=args.workers>0)
-    val=torch.utils.data.DataLoader(Clips(m,True),batch_size=args.batch_size,num_workers=0)
+        num_workers=args.workers,pin_memory=device=='cuda',persistent_workers=args.workers>0,
+        generator=torch.Generator().manual_seed(args.seed+100))
+    val=torch.utils.data.DataLoader(Clips(m,True),batch_size=args.batch_size,num_workers=0,
+        generator=torch.Generator().manual_seed(args.seed+101))
     begin=time.monotonic()
+    if device=='cuda':torch.cuda.reset_peak_memory_stats()
     print(json.dumps({'event':'start','parameters':config['parameters'],'mode':args.mode,
                       'train_clips':len(ds),'steps':args.steps,'device':device}),flush=True)
     cross_weight=args.cross_weight if args.mode=='rbg' else 0.
     with (args.output/'metrics.jsonl').open('a') as log:
         for step,batch in enumerate(loader,start_step+1):
+            learning_rates=schedule.apply(opt,step)
             model.train(); opt.zero_grad(set_to_none=True)
             x,a=preprocess(batch,m,device)
             with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
                 loss,parts=one_step_objective(model,x,a,reg,args.gaussian_weight,cross_weight,args.mode)
             if not torch.isfinite(loss): raise FloatingPointError(f'loss at {step}')
+            diagnostic_every=getattr(args,'diagnostics_every',0)
+            gradient_diagnostics=None
+            if diagnostic_every and (step==1 or step%diagnostic_every==0):
+                gradient_diagnostics=encoder_gradient_norms(model,parts,args.gaussian_weight,cross_weight)
             loss.backward()
             norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
             opt.step()
+            schedule.mark_completed(step)
             row={'step':step,'loss':float(loss.detach()),'grad_norm':float(norm),
+                 'learning_rates':learning_rates,
+                 'presented_clips':step*args.batch_size,
+                 'peak_gpu_allocated_bytes':torch.cuda.max_memory_allocated() if device=='cuda' else None,
                  'elapsed_session':time.monotonic()-begin,**{k:float(v.detach()) for k,v in parts.items()}}
+            if gradient_diagnostics is not None:
+                row['weighted_encoder_projector_gradient_norms']=gradient_diagnostics
             if step%args.save_every==0 or step==args.steps:
                 model.eval(); values=[]
-                with torch.random.fork_rng(devices=[0] if device=='cuda' else []),torch.no_grad():
-                    torch.manual_seed(999)
+                regularizer_position=reg.draw_index.clone()
+                with isolated_rng(999),torch.no_grad():
                     for vb in val:
                         vx,va=preprocess(vb,m,device)
                         with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
                             _,vp=one_step_objective(model,vx,va,reg,args.gaussian_weight,cross_weight,args.mode)
                         values.append({k:float(v) for k,v in vp.items()})
+                        if diagnostic_every and len(values)==1:
+                            row['validation_first_batch_action_diagnostics']=action_diagnostics(model,vx,va)
+                reg.draw_index.copy_(regularizer_position)
                 row['validation']={k:float(np.mean([v[k] for v in values])) for k in values[0]}
                 atomic_save(model,args.output/f'step_{step}_object.ckpt')
                 atomic_save({'step':step,'model':model.state_dict(),'regularizer':reg.state_dict(),
-                    'optimizer':opt.state_dict(),'rng':torch.get_rng_state(),
-                    'cuda_rng':torch.cuda.get_rng_state_all() if device=='cuda' else []},args.output/'resume.pt')
+                    'optimizer':opt.state_dict(),'scheduler':schedule.state_dict(),
+                    'random_state':capture_rng(),'next_batch_index':step,
+                    'metrics_row':row,
+                    'initialization_sha256':initialization_sha256},args.output/'resume.pt')
             log.write(json.dumps(row)+'\n'); log.flush()
             if step==1 or step%10==0 or step==args.steps: print(json.dumps(row),flush=True)
 
@@ -198,13 +265,13 @@ def main():
     p.add_argument('--manifest',type=Path,default=ROOT/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
     p.add_argument('--output',type=Path)
     p.add_argument('--mode',choices=['rbg','raw','tc'],default='rbg')
-    p.add_argument('--steps',type=int,default=10000)
-    p.add_argument('--batch-size',type=int,default=32)
+    p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
+    p.add_argument('--batch-size',type=int,default=128)
     p.add_argument('--blocks',type=int,default=4)
     p.add_argument('--workers',type=int,default=4)
     p.add_argument('--save-every',type=int,default=1000)
     p.add_argument('--seed',type=int,default=3072)
-    p.add_argument('--lr',type=float,default=5e-5)
+    add_schedule_arguments(p)
     p.add_argument('--gaussian-weight',type=float,default=.09)
     p.add_argument('--cross-weight',type=float,default=.01)
     p.add_argument('--resume',action='store_true')

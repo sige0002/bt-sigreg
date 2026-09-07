@@ -1,14 +1,51 @@
 # myLeWM：共有世界モデルの研究実装領域
 
-更新日：2026-09-06
+更新日：2026-09-07
+
+現在の第一候補は[BT-SIGReg](BOUNDED_TRANSPORT_PROPOSAL.ja.md)。最新の採否と数学的条件は[総合レビュー](../README_RESEARCH_REVIEW.ja.md)を参照する。BTは未実装・未学習であり、以下のRBG実行例はBTの起動手順ではない。
+
+整理により交差対応表・複製ビュー・多段予測の旧Pythonコード10ファイルを削除した。残した学習・評価基盤と復元方法は[整理記録](CLEANUP_20260907.ja.md)を参照。過去の実験記述は履歴であり、削除したコマンドを実行しない。
+
+2026-09-07の運用状態：ユーザー指示で比較学習を停止し、生成ログ・学習チェックポイントをOSのごみ箱へ移動した。データセット、公式配布重み、研究レポートは保持している。現在は[Issue対応の検証記録](ISSUE_IMPLEMENTATION.ja.md)に沿って学習基盤を修正中で、長時間学習は実行していない。以下の旧RBG v0実行例・進行記録は履歴として扱い、削除したチェックポイントを前提に再開しない。
+
+## 修正後の学習スケジュール（Issue #1）
+
+2026-09-07：#1（スケジュール・再開）と#3（公式Raw計算経路の監査）は検証結果付きでclose。#2/#4/#5/#6には残件、研究#7〜#13には未実装・未検証事項がある。全issue完了ではない。整理前の回帰テストは83件合格。コード・文書の修正を今回の整理とともにバージョン管理する。
+
+次回はRawと選定した提案を同一初期値・データ順で各100,000更新比較する方針。下記50,000はCLI既定の説明であり次回予算ではない。研究案の優先順位・先行研究・未実装の数式は[研究候補レポート](RESEARCH_CANDIDATES_20260907.ja.md)を参照。新しい候補のmodeはまだ存在しないため、既存RBGコマンドを新案の実装と解釈しない。
+
+共有trainerの既定は50,000更新、batch 128、warmup 500更新、最大学習率5e-5、最小学習率0。最初の更新に1e-7、500回目に5e-5、50,000回目に0を使用する。各更新の全パラメータグループの学習率を`metrics.jsonl`へ記録する。これは研究比較用の短縮設定であり、公式100エポック再現ではない。
+
+既存Raw/RBGの50,000更新CLI例。学習開始済みではない。native Lance履歴再現は研究比較の必須前提ではなく、候補学習後のBN・制御比較は後工程である。
+
+```bash
+.venv/bin/python mylewm/train_rbg.py train --mode raw --total-steps 50000 --warmup-steps 500 --max-lr 5e-5 --min-lr 0 --batch-size 128 --output .cache/stable-wm/pusht/controlled_v2/raw_s3072
+.venv/bin/python mylewm/train_rbg.py train --mode rbg --total-steps 50000 --warmup-steps 500 --max-lr 5e-5 --min-lr 0 --batch-size 128 --output .cache/stable-wm/pusht/controlled_v2/rbg_s3072
+```
+
+同一実験の再開には同じ引数へ`--resume`を付ける。初期化は新規`initialization.pt`に保存し、旧10,000更新重みは読み込まない。総更新数、損失係数、データmanifest、ソース、アダプター、精度などの変更は拒否する。100,000更新へ変更する場合も別の出力先で新規実験にする。短い動作確認では`--steps 3 --warmup-steps 0`のようにwarmupを明示する。旧runnerの出力先・結果再利用規則は#5/#6で別途修正する。
+
+共有初期値を使う正式な比較コマンド一覧は次で生成する。これはdry-runであり、学習プロセスは起動しない。`--methods raw`などの手法選択も可能。
+
+```bash
+.venv/bin/python mylewm/plan_controlled_comparison.py --steps 100000 --methods raw rbg
+```
+
+公式モデルだけの200ケース回帰評価は`.venv/bin/python mylewm/evaluate_official_pusht.py --execute`。`--execute`無しなら4つの評価コマンドを表示する。学習キューと独立しており、既存manifestの同じ200ケース・共通の物理CEM探索分布を使う。結果の重み・データ・環境版・設定・ケースの一致を確認して再利用する。
+
+新trainerでは`budget.json`に実学習量を保存する。今回のPushT 50,000更新×128は提示数換算で約3.89周であり、100エポックではない。`--diagnostics-every 5000`で係数込みの各項のencoder/projector勾配ノルムを記録し、保存時にはvalidation先頭バッチで行動入れ替え・ゼロ行動診断を行う。これらは追加の学習損失ではない。
+
+比較planは`--deterministic`を指定する。CUDAでは既定`CUBLAS_WORKSPACE_CONFIG=:4096:8`と決定論的演算を使い、Raw/RBGともSIGReg統計をfloat32に固定する。実LeWMのGPU一更新監査では、この条件で両経路の勾配・更新後重みが許容誤差内で一致した。公式配布重みの過去の学習設定とは区別する。
 
 **目標は、通常の観測・行動経験から、複数タスクで再利用できる状態表現と遷移を学ぶこと。** 人手の交差対応表は必須にしない。現在の操作だけでなく後続の別操作に必要な情報を保持し、撮影条件が変わっても必要な物理状態差を認識できることを目指す。
 
 **LeWM程度の小ささでPushTとLIBERO-10の高精度な制御を目指す。研究の中心はSIGRegの単一等方ガウス制約と情報配分の見直しであり、多段予測損失の追加ではない。**
 
-初期候補[関係保持型ブロックSIGReg（RBG v0）](FACTOR_GAUSSIAN_PROPOSAL.ja.md)を実装し、PushTの新規学習を開始した。各ブロックのガウス性と弱い線形重複抑制を使い、単一E/A/Fで要因間の関係を予測する。性能・マルチタスク能力はまだ未実証。[進行記録](RBG_EXECUTION_STATUS.ja.md)、[ルートREADME](../README.md)、[背景レビュー](../README_RESEARCH_REVIEW.ja.md)を参照。
+実装済みの初期候補[RBG v0](FACTOR_GAUSSIAN_PROPOSAL.ja.md)は各ブロックのガウス性と弱い線形重複抑制を使う。要因間の有用な関係獲得やマルチタスク能力は未実証で、研究issueの完成版ではない。現在は学習停止中。最新公式PushT評価は176/200成功（88%）だが、提案側の新予算比較は未実施。
 
-## RBG v0の実行方法
+## RBG v0の旧実験手順（履歴・自動実行しない）
+
+以下の10,000更新コマンドとrunnerは旧予算の参照。新しい100,000更新研究案の起動手順ではない。既存の旧学習済み重みはごみ箱へ移しており、待機・自動継続も現在は行っていない。
 
 公式比較コードの依存環境とPushT HDF5が必要。新しい出力ディレクトリを使い、既存実験は上書きしない。
 
@@ -19,7 +56,7 @@
 .venv/bin/python mylewm/train_rbg.py train --mode rbg --steps 10000 --batch-size 128 --output .cache/stable-wm/pusht/rbg_v0/rbg_s3072
 ```
 
-同じentryで`--mode raw`または`--mode tc`と別の出力先を指定すると対照条件になる。現在の学習は別プロセスで進行中なので、上記を重複起動しない。10,000更新は初期比較予算で、公式の100epoch再現済みという意味ではない。
+同じentryで`--mode raw`または`--mode tc`と別の出力先を指定すると対照条件になる。10,000更新は旧初期比較予算で、公式の100epoch再現済みという意味ではない。
 
 LIBERO-10は公式配布の10 HDF5ファイルを`.cache/libero-datasets/libero_10`へ配置し、次を使う。2視点は実際の異なるカメラ画像であり、複製ビューではない。
 
@@ -56,6 +93,8 @@ LIBEROは`.venv/bin/python mylewm/probe_rbg_libero.py --checkpoint CHECKPOINT --
 
 ## 実装に求めること
 
+最新の候補レビューは[BT-SIGRegを第一候補とする総合レビュー](../README_RESEARCH_REVIEW.ja.md)。[ABC監査](ABC_RESEARCH_REVIEW.ja.md)は別仮説の検討記録として残す。目的は小型共有世界モデルのマルチタスク性能向上であり、非操作物体保持は補助診断に限る。
+
 - 共有E・A・Fを出発点とし、異なる初期状態や行動による結果の違いを保持する。
 - ある操作の予測状態を、実測未来の再入力なしに別操作の未来予測へ利用する。
 - 撮影条件への依存を減らす際に、物体の位置や識別など後続操作に必要な情報まで消さない。
@@ -66,7 +105,7 @@ LIBEROは`.venv/bin/python mylewm/probe_rbg_libero.py --checkpoint CHECKPOINT --
 
 | 項目 | 状態と制限 |
 |---|---|
-| `multitask_lewm.py`、`multitask_jepa.py` | 過去の交差予測・識別損失の実装領域。名前だけでマルチタスク能力を実証したとはみなさない |
+| 旧`multitask_lewm.py`、`multitask_jepa.py` | 交差予測・識別損失の旧実装。関連trainer・テストとともに削除しGit履歴に保存 |
 | 旧`train_pusht.py`による50,000更新 | 同時刻教師と複製ビューに問題があり、研究比較には無効。旧チェックポイントは削除済み |
 | ローカルの交差対応表方式の改訂 | 主要計算のテスト・レビューは行ったが、通常経験のみで学ぶ現在の要件を満たす完成方式ではない |
 | ローカルの通常軌道・多段予測追加実験 | 公式重みから1,000更新の追加学習を実施。公式のネットワークとSIGRegに多段予測損失を追加した検討実験であり、目的に対応する提案方式として確定していない |

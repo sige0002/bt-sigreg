@@ -41,18 +41,18 @@ def main():
         if not complete(run/f'rbg_s{args.seed}',args.steps):
             raise RuntimeError('Initial training exited without a complete checkpoint')
     results={}
-    for mode in ('rbg','raw','tc','sub','official'):
+    for mode in ('official','raw','rbg','tc','sub'):
         directory=run/f'{mode}_s{args.seed}'
         if mode!='official' and not complete(directory,args.steps):
-            if directory.exists(): raise RuntimeError(f'Incomplete run requires audit: {directory}')
             if mode=='sub':
                 command=[sys.executable,str(ROOT/'mylewm/train_subspace_control.py'),'--benchmark','pusht']
             else:
                 command=[sys.executable,str(ROOT/'mylewm/train_rbg.py'),'train','--mode',mode]
             command+=['--steps',str(args.steps),'--batch-size','128','--seed',str(args.seed),
                       '--output',str(directory)]
+            if (directory/'resume.pt').exists(): command.append('--resume')
             print(json.dumps({'event':'train_start','mode':mode}),flush=True)
-            with (run/f'{mode}_s{args.seed}_train.log').open('x') as log:
+            with (run/f'{mode}_s{args.seed}_train.log').open('a') as log:
                 subprocess.run(command,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
         policy='pusht/lewm' if mode=='official' else f'pusht/rbg_v0/{mode}_s{args.seed}/step_{args.steps}'
         policies={mode:policy}
@@ -63,7 +63,7 @@ def main():
                     '--checkpoint',str(directory/f'step_{args.steps}_object.ckpt'),
                     '--output',str(calibrated),'--manifest',str(run/'manifest.json'),
                     '--device','cuda','--batch-size','128','--batches','32']
-                with (run/f'{mode}_s{args.seed}_calibration.log').open('x') as log:
+                with (run/f'{mode}_s{args.seed}_calibration.log').open('a') as log:
                     subprocess.run(command,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
             policies[mode+'_bn']=policy+'_bn_calibrated'
         for label,eval_policy in policies.items():
@@ -76,7 +76,7 @@ def main():
                         'eval.num_eval=50',f'+eval.manifest={run}/manifest.json',
                         '+eval.partition=confirm',f'+eval.offset={offset}',f'output.filename={filename}']
                     print(json.dumps({'event':'eval_start','mode':label,'offset':offset}),flush=True)
-                    with (run/f'{label}_s{args.seed}_eval_{offset}.log').open('x') as log:
+                    with (run/f'{label}_s{args.seed}_eval_{offset}.log').open('a') as log:
                         subprocess.run(command,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
                 paths.append(str(result))
             results[label]=paths

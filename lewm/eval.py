@@ -67,6 +67,13 @@ def run(cfg: DictConfig):
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     random.seed(cfg.seed)
+    identity=None
+    if cfg.eval.get('audit_provenance',False):
+        from mylewm.evaluation_contract import provenance
+        root=Path(__file__).resolve().parents[1]
+        base=Path(swm.data.utils.get_cache_dir())
+        identity=provenance(base/'datasets'/f'{cfg.eval.dataset_name}.h5',
+            Path(cfg.eval.manifest),base/(cfg.policy+'_object.ckpt'),root)
     assert (
         cfg.plan_config.horizon * cfg.plan_config.action_block <= cfg.eval.eval_budget
     ), "Planning horizon must be smaller than or equal to eval_budget"
@@ -126,10 +133,15 @@ def run(cfg: DictConfig):
                 raise ValueError('Invalid action statistics in checkpoint')
             if mean.shape != process['action'].mean_.shape or std.shape != mean.shape:
                 raise ValueError('Checkpoint action statistics do not match environment')
-            process['action'].mean_ = mean
-            process['action'].scale_ = std
-            process['action'].var_ = std ** 2
-            print('action_statistics_source: checkpoint')
+            if cfg.eval.get('shared_physical_search',False):
+                from mylewm.planning_action_adapter import PlanningActionAdapter
+                model=PlanningActionAdapter(model,process['action'].mean_,process['action'].scale_,mean,std).eval()
+                print('action_statistics_source: checkpoint via common physical CEM search')
+            else:
+                process['action'].mean_ = mean
+                process['action'].scale_ = std
+                process['action'].var_ = std ** 2
+                print('action_statistics_source: checkpoint')
         model.interpolate_pos_encoding = True
         config = swm.PlanConfig(**cfg.plan_config)
         solver = hydra.utils.instantiate(cfg.solver, model=model)
@@ -197,7 +209,27 @@ def run(cfg: DictConfig):
 
     world.set_policy(policy)
 
+    physical_actions=[]; initial_runtime_hashes=[]
+    if identity is not None:
+        from mylewm.evaluation_contract import array_hash
+        original_get_actions=world._get_actions
+        def audited_get_actions():
+            if not initial_runtime_hashes:
+                for index in range(cfg.eval.num_eval):
+                    initial_runtime_hashes.append({key:array_hash(value[index]) for key,value in world.infos.items()
+                        if key in ('pixels','state','proprio','goal','goal_pixels','goal_state','goal_proprio')})
+            return original_get_actions()
+        world._get_actions=audited_get_actions
+        original_env_step=world.envs.step
+        def audited_env_step(actions,mask=None):
+            physical_actions.append({'actions':np.asarray(actions).tolist(),
+                'mask':np.ones(cfg.eval.num_eval,dtype=bool).tolist() if mask is None else np.asarray(mask).tolist()})
+            return original_env_step(actions,mask=mask)
+        world.envs.step=audited_env_step
+
     results_path.mkdir(parents=True, exist_ok=True)
+    if identity is not None and (results_path/(cfg.output.filename+'.json')).exists():
+        raise FileExistsError('Audited evaluation result already exists')
 
     start_time = time.time()
     # Seed environment RNGs before the dataset evaluator's reset(seed=None).
@@ -235,6 +267,12 @@ def run(cfg: DictConfig):
         'success_rate':float(metrics['success_rate']),
         'config':OmegaConf.to_container(cfg,resolve=True), 'elapsed':end_time-start_time,
     }
+    if identity is not None:
+        machine_result.update({'provenance':identity,'physical_actions':physical_actions,
+            'initial_runtime_hashes':initial_runtime_hashes,
+            'planner_action_mean':process['action'].mean_.tolist(),
+            'planner_action_std':process['action'].scale_.tolist(),
+            'shared_physical_search':bool(cfg.eval.get('shared_physical_search',False))})
     (results_path / (cfg.output.filename + '.json')).write_text(json.dumps(machine_result,indent=2))
 
     results_path = results_path / cfg.output.filename

@@ -11,6 +11,19 @@ artifacts/
 outputs/
 *.h5
 *.ckpt
+*.pt
+*.pth
+*.hdf5
+*.safetensors
+wandb/
+
+# Local credentials and editor/runtime metadata
+.env
+.env.*
+!.env.example
+.ruff_cache/
+.mypy_cache/
+.DS_Store
 
 # Legacy/local upstream checkout; the committed comparison copy is lewm/
 external/
