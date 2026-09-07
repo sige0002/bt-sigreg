@@ -1,7 +1,7 @@
 # ABCの独立数学監査：成立する命題と研究目的との隔たり
 
 2026-09-07。数学者役の独立エージェントによる監査であり、実在の数学者・外部査読者による査読ではない。
-対象はルートREADME、mylewm/README、研究候補レポート、[A #8](https://github.com/sige0002/task-centered-sigreg-lewm/issues/8)、[B #12](https://github.com/sige0002/task-centered-sigreg-lewm/issues/12)、[C #13](https://github.com/sige0002/task-centered-sigreg-lewm/issues/13)の現在の本文。
+対象はルートREADME、mylewm/README、研究候補レポート、[A #8](https://github.com/sige0002/bt-sigreg/issues/8)、[B #12](https://github.com/sige0002/bt-sigreg/issues/12)、[C #13](https://github.com/sige0002/bt-sigreg/issues/13)の現在の本文。
 旧B #9・旧C #10とは区別する。検索・先行研究の書誌確認は別担当であり、本稿は独立の数学検討を記す。
 
 ## 結論

@@ -259,4 +259,4 @@ PushTの維持とLIBERO-10共有モデルの改善、さらに同条件TC超え�
 
 今回の更新は既に行った文献調査・研究者役／数学者役の討論をレビューへ反映したもの。**BTの統合実装、単体・統合テスト、学習、ベンチマーク評価はいずれも未実施**。ABCの24件の数値検算や既存RBGのコードをBTの検証に数えない。過去のterraのABC検索と、主エージェントが行った今回のhead/flow文献確認も区別する。詳細は[提案書](mylewm/BOUNDED_TRANSPORT_PROPOSAL.ja.md)に記録した。
 
-[旧レビューはGit履歴に保存](https://github.com/sige0002/task-centered-sigreg-lewm/blob/1825a60/README_RESEARCH_REVIEW.ja.md)。交差対応表や多段予測を中心とする過去の議論より、本レビューの目的と比較方針を優先する。
+[旧レビューはGit履歴に保存](https://github.com/sige0002/bt-sigreg/blob/1825a60/README_RESEARCH_REVIEW.ja.md)。交差対応表や多段予測を中心とする過去の議論より、本レビューの目的と比較方針を優先する。

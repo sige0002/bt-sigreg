@@ -124,7 +124,7 @@ PushTでは公式と同じ開始状態・Goal・成功判定・計画予算で�
 
 - [研究目的・要件・現在の状態](../README.md)
 - [SIGRegの数学的課題・先行研究・比較方針](../README_RESEARCH_REVIEW.ja.md)（現行レビュー）
-- [旧交差対応表方式の仕様](https://github.com/sige0002/task-centered-sigreg-lewm/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/README.md)
-- [過去のmyLeWM実装説明](https://github.com/sige0002/task-centered-sigreg-lewm/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/mylewm/README.md)
+- [旧交差対応表方式の仕様](https://github.com/sige0002/bt-sigreg/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/README.md)
+- [過去のmyLeWM実装説明](https://github.com/sige0002/bt-sigreg/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/mylewm/README.md)
 
 過去の記録は経緯の参照用であり、現在の研究目的や完成したアルゴリズムの仕様を置き換えるものではない。

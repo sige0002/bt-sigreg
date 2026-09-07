@@ -1,4 +1,4 @@
-# 複数タスクの経験から共有世界モデルを学ぶmyLeWM
+# BT-SIGReg：小型マルチタスク世界モデル
 
 更新日：2026-09-07
 
@@ -68,6 +68,6 @@ PushT評価はデータセット由来のGoal状態への到達であり、固�
 - `lewm/`：公式LeWMの比較用コード。
 - [mylewm/README.md](mylewm/README.md)：提案側の目的、実装状態、実験の位置付け。
 - [研究レビュー：SIGRegの数学的課題と小型マルチタスク化](README_RESEARCH_REVIEW.ja.md)：現行の目的、先行研究、ペルソナ討論、PushT／LIBERO-10の比較方針。
-- [旧交差継続予測案のREADME](https://github.com/sige0002/task-centered-sigreg-lewm/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/README.md)：数式・対応表・過去の関連研究整理をGit履歴に保存している。
+- [旧交差継続予測案のREADME](https://github.com/sige0002/bt-sigreg/blob/04bf75f73fb0a785e193fac799bf45b8943c8da1/README.md)：数式・対応表・過去の関連研究整理をGit履歴に保存している。
 
-リポジトリ名`task-centered-sigreg-lewm`は初期案に由来する。過去の実験方式を、そのまま現在の研究目的を満たすモデルと解釈しない。
+研究名はBT-SIGReg（Bounded-Transport SIGReg）、リポジトリ名は`bt-sigreg`。仮称であり、新規性や性能達成を意味しない。エージェントの作業ルールは[AGENTS.md](AGENTS.md)にまとめる。過去の実験方式を、そのまま現在の研究目的を満たすモデルと解釈しない。
