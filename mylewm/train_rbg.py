@@ -18,8 +18,9 @@ import numpy as np
 from omegaconf import OmegaConf
 import torch
 from mylewm.rbg import BlockSIGReg, one_step_objective
+from mylewm.bt_sigreg import BTSIGReg, add_bt_arguments
 from mylewm.data_contract import file_sha256, data_fingerprints, training_budget
-from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics
+from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
 from mylewm.training_state import (UpdateSchedule, add_schedule_arguments, capture_rng,
     restore_rng, isolated_rng, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash)
 
@@ -152,8 +153,13 @@ def train(args):
     model.register_buffer('training_action_mean',torch.tensor(m['action_mean'],device=device,dtype=torch.float64))
     model.register_buffer('training_action_std',torch.tensor(m['action_std'],device=device,dtype=torch.float64))
     with isolated_rng(args.seed+10000):
-        reg=IndependentRegularizer(BlockSIGReg(blocks=args.blocks if args.mode=='rbg' else 1),args.seed+10000).to(device)
+        inner = (BTSIGReg(depth=args.bt_depth, kappa=args.bt_kappa, hidden=args.bt_hidden)
+                 if args.mode == 'bt' else BlockSIGReg(blocks=args.blocks if args.mode=='rbg' else 1))
+        reg=IndependentRegularizer(inner,args.seed+10000).to(device)
+    transport_parameters = list(reg.parameters())
     opt=torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=.001)
+    if transport_parameters:
+        opt.add_param_group({'params': transport_parameters})
     config={**vars(args),'schema':'controlled_training_v2',
             'schedule':schedule.config,'device':device,
             'precision':'bf16_autocast' if device=='cuda' else 'float32',
@@ -169,8 +175,10 @@ def train(args):
             'initialization_source_sha256':digest(initialization) if initialization else None,
             'data_identity':data_identity,'recipe':'controlled_comparison',
             'parameters':sum(p.numel() for p in model.parameters()),
+            'training_only_parameters':sum(p.numel() for p in transport_parameters),
+            'transport':inner.transport.config() if args.mode=='bt' else None,
             'source_sha256':{str(p.relative_to(ROOT)):digest(p) for p in
-                [Path(__file__),ROOT/'mylewm/training_state.py',ROOT/'mylewm/training_diagnostics.py',ROOT/'mylewm/data_contract.py',ROOT/'mylewm/rbg.py',
+                [Path(__file__),ROOT/'mylewm/bt_sigreg.py',ROOT/'mylewm/training_state.py',ROOT/'mylewm/training_diagnostics.py',ROOT/'mylewm/data_contract.py',ROOT/'mylewm/rbg.py',
                  ROOT/'lewm/jepa.py',ROOT/'lewm/module.py',ROOT/'lewm/config/train/model/lewm.yaml']}}
     config=json.loads(json.dumps(config,default=str))
     start_step=0
@@ -215,28 +223,41 @@ def train(args):
     with (args.output/'metrics.jsonl').open('a') as log:
         for step,batch in enumerate(loader,start_step+1):
             learning_rates=schedule.apply(opt,step)
-            model.train(); opt.zero_grad(set_to_none=True)
+            model.train(); reg.train(); opt.zero_grad(set_to_none=True)
             x,a=preprocess(batch,m,device)
-            with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
-                loss,parts=one_step_objective(model,x,a,reg,args.gaussian_weight,cross_weight,args.mode)
-            if not torch.isfinite(loss): raise FloatingPointError(f'loss at {step}')
             diagnostic_every=getattr(args,'diagnostics_every',0)
+            transport_diagnostics = {}
+            hook = None
+            if args.mode == 'bt' and diagnostic_every and (step == 1 or step % diagnostic_every == 0):
+                hook = inner.transport.register_forward_hook(
+                    lambda module, inputs, output: transport_diagnostics.update(transport_statistics(inputs[0], output)))
+            try:
+                with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
+                    loss,parts=one_step_objective(model,x,a,reg,args.gaussian_weight,cross_weight,args.mode)
+            finally:
+                if hook is not None: hook.remove()
+            if not torch.isfinite(loss): raise FloatingPointError(f'loss at {step}')
             gradient_diagnostics=None
             if diagnostic_every and (step==1 or step%diagnostic_every==0):
                 gradient_diagnostics=encoder_gradient_norms(model,parts,args.gaussian_weight,cross_weight)
             loss.backward()
             norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
+            transport_norm = (torch.nn.utils.clip_grad_norm_(transport_parameters,1.,error_if_nonfinite=True)
+                              if transport_parameters else None)
             opt.step()
             schedule.mark_completed(step)
             row={'step':step,'loss':float(loss.detach()),'grad_norm':float(norm),
+                 'transport_grad_norm':float(transport_norm) if transport_norm is not None else None,
                  'learning_rates':learning_rates,
                  'presented_clips':step*args.batch_size,
                  'peak_gpu_allocated_bytes':torch.cuda.max_memory_allocated() if device=='cuda' else None,
                  'elapsed_session':time.monotonic()-begin,**{k:float(v.detach()) for k,v in parts.items()}}
             if gradient_diagnostics is not None:
                 row['weighted_encoder_projector_gradient_norms']=gradient_diagnostics
+            if transport_diagnostics:
+                row['transport_diagnostics_pre_update']=transport_diagnostics
             if step%args.save_every==0 or step==args.steps:
-                model.eval(); values=[]
+                model.eval(); reg.eval(); values=[]
                 regularizer_position=reg.draw_index.clone()
                 with isolated_rng(999),torch.no_grad():
                     for vb in val:
@@ -264,7 +285,8 @@ def main():
     p.add_argument('--dataset',type=Path,default=ROOT/'.cache/stable-wm/datasets/pusht_expert_train.h5')
     p.add_argument('--manifest',type=Path,default=ROOT/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
     p.add_argument('--output',type=Path)
-    p.add_argument('--mode',choices=['rbg','raw','tc'],default='rbg')
+    p.add_argument('--mode',choices=['rbg','raw','tc','bt'],default='rbg')
+    add_bt_arguments(p)
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
     p.add_argument('--batch-size',type=int,default=128)
     p.add_argument('--blocks',type=int,default=4)

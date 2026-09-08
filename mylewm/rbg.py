@@ -66,8 +66,10 @@ def one_step_objective(model, pixels, actions, regularizer, gaussian_weight=.09,
     source = z.transpose(0, 1)
     if mode == 'tc':
         source = source - source.mean(0, keepdim=True)
-    elif mode not in ('raw', 'rbg'):
+    elif mode not in ('raw', 'rbg', 'bt'):
         raise ValueError(mode)
+    if mode == 'bt' and cross_weight != 0:
+        raise ValueError('BT uses prediction + Gaussian only; cross_weight must be zero')
     gaussian, cross = regularizer(source)
     total = one + gaussian_weight * gaussian + cross_weight * cross
     return total, {'prediction': one, 'gaussian': gaussian, 'cross': cross,

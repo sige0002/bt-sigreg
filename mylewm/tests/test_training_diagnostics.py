@@ -1,6 +1,44 @@
 from types import SimpleNamespace
 import torch
-from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics
+from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
+
+
+def test_monitor_shell_handles_missing_and_partial_logs(tmp_path):
+    import json
+    import subprocess
+    from pathlib import Path
+    script=Path(__file__).resolve().parents[1]/'tools/monitor_training.sh'
+    command=['bash',str(script),'--once','--run',str(tmp_path)]
+    result=subprocess.run(command,capture_output=True,text=True,timeout=10)
+    assert result.returncode==0 and 'Waiting for complete metrics' in result.stdout
+    (tmp_path/'config.json').write_text(json.dumps({'steps':100}))
+    row={'step':10,'loss':.5,'prediction':.2,'gaussian':3.,'elapsed_session':10.,
+         'validation':{'prediction':.3,'gaussian':4.}}
+    (tmp_path/'metrics.jsonl').write_text(json.dumps(row)+'\ninvalid\n'+ '{"step":11')
+    result=subprocess.run(command,capture_output=True,text=True,timeout=10)
+    assert result.returncode==0
+    assert 'Step: 10 / 100 (10.00%)' in result.stdout
+    assert 'Loss: 0.5' in result.stdout and 'Validation @ 10' in result.stdout
+    assert 'skipped 1 malformed' in result.stdout
+    result=subprocess.run(command+['--interval','0'],capture_output=True,text=True,timeout=10)
+    assert result.returncode==2
+
+
+def test_transport_statistics_do_not_change_gradients_or_rng():
+    z=torch.randn(4,8,12,requires_grad=True)
+    u=1.1*z
+    state=torch.get_rng_state().clone()
+    report=transport_statistics(z,u)
+    assert torch.equal(state,torch.get_rng_state()) and z.grad is None
+    assert abs(report['u_variance_trace']/report['z_variance_trace']-1.21)<1e-5
+    assert abs(report['sampled_distance_ratio_min']-1.1)<1e-6
+    assert abs(report['sampled_distance_ratio_max']-1.1)<1e-6
+    assert report['sampled_distance_pairs']==32
+    u.sum().backward()
+    torch.testing.assert_close(z.grad,torch.full_like(z,1.1))
+    collapsed=transport_statistics(torch.zeros(4,8,12),torch.zeros(4,8,12))
+    assert collapsed['sampled_distance_ratio_min'] is None
+    assert collapsed['sampled_distance_pairs']==0
 
 
 def test_gradient_diagnostics_include_coefficients_without_accumulating_gradients():

@@ -8,8 +8,8 @@ ROOT=Path(__file__).resolve().parents[2]
 
 
 def plan(seed=3072,steps=50000,methods=('raw','rbg')):
-    if steps<=500 or not methods or not set(methods)<={'raw','rbg'} or len(set(methods))!=len(methods):
-        raise ValueError('Require >500 updates and distinct Raw/RBG methods')
+    if steps<=500 or not methods or not set(methods)<={'raw','rbg','tc','bt'} or len(set(methods))!=len(methods):
+        raise ValueError('Require >500 updates and distinct Raw/RBG/TC/BT methods')
     run=ROOT/f'.cache/stable-wm/pusht/controlled_v2_s{seed}_steps{steps}'
     initial=run/'shared_initialization.pt'
     train=[]
@@ -33,14 +33,15 @@ def plan(seed=3072,steps=50000,methods=('raw','rbg')):
              'planner':'same physical search, history, goal, horizon, CEM samples and iterations'},
         'not_implemented':['automatic training/evaluation pipeline for the new plan',
                             'long-run representation/control diagnostic aggregation'],
-        'not_scheduled':['TC','Sub-JEPA','LIBERO','additional training seeds']}
+        'not_scheduled':[name for name in ['raw','rbg','tc','bt'] if name not in methods]
+                         + ['Sub-JEPA','LIBERO','additional training seeds']}
 
 
 def main():
     p=argparse.ArgumentParser()
     p.add_argument('--seed',type=int,default=3072)
     p.add_argument('--steps',type=int,default=50000)
-    p.add_argument('--methods',nargs='+',choices=['raw','rbg'],default=['raw','rbg'])
+    p.add_argument('--methods',nargs='+',choices=['raw','rbg','tc','bt'],default=['raw','rbg'])
     p.add_argument('--output',type=Path)
     args=p.parse_args()
     report=plan(args.seed,args.steps,args.methods)
