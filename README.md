@@ -2,6 +2,8 @@
 
 更新日：2026-09-08
 
+成功率の測定は[PushT評価の初心者向け手順](mylewm/docs/EVALUATE_PUSHT.ja.md)を参照してください。途中checkpointと公式配布checkpointの比較は、同じ学習予算の方式比較とは区別します。
+
 学習を始める方は[PushT／LIBERO-10の初心者向け手順](mylewm/README.md#はじめて学習する方へ)から進めてください。環境・データ確認、分割作成、短期確認、本学習、監視、再開を順番に説明しています。
 
 比較対象の[公式LeWM・PushT学習手順](lewm/TRAIN_PUSHT.ja.md)も用意しています。公式trainerと、BTと同予算で比較するRaw経路は区別してください。

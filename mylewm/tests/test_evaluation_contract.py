@@ -46,6 +46,24 @@ def test_shared_physical_actions_and_history_are_normalized_for_checkpoint():
     torch.testing.assert_close(history,candidates[:,:,:1])
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA mixed-device regression')
+def test_adapter_gpu_model_accepts_cpu_history_and_gpu_candidates():
+    model=Recorder().cuda()
+    adapter=PlanningActionAdapter(model,[1.,2.],[2.,3.],[-1.,4.],[4.,2.])
+    candidates=torch.arange(24,device='cuda').reshape(1,2,3,4).float()/10
+    history=candidates[:,:,:1].cpu().clone()
+    original=history.clone()
+    adapter.get_cost({'action':history},candidates)
+    assert model.seen[0]['action'].device == candidates.device
+    assert model.seen[1].device == candidates.device
+    torch.testing.assert_close(model.seen[0]['action'],model.seen[1][:,:,:1])
+    physical=model.seen[1].reshape(1,2,3,2,2)*torch.tensor([4.,2.],device='cuda')+torch.tensor([-1.,4.],device='cuda')
+    reference=candidates.reshape_as(physical)*torch.tensor([2.,3.],device='cuda')+torch.tensor([1.,2.],device='cuda')
+    torch.testing.assert_close(physical,reference)
+    torch.testing.assert_close(history,original)
+    assert history.device.type == 'cpu'
+
+
 def test_adapter_matches_direct_actual_jepa_rollout():
     path=Path('.cache/stable-wm/pusht/lewm_object.ckpt')
     if not path.exists():pytest.skip('Official checkpoint is a local integration fixture')

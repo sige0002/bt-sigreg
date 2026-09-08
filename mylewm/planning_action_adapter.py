@@ -17,7 +17,9 @@ class PlanningActionAdapter(torch.nn.Module):
 
     def normalize_for_model(self,actions):
         d=self.reference_mean.numel()
-        shaped=actions.reshape(*actions.shape[:-1],-1,d)
+        # SWM supplies CPU history alongside CUDA candidates. Normalize on the
+        # model device, as JEPA.get_cost does for its observation inputs.
+        shaped=actions.to(self.reference_mean.device).reshape(*actions.shape[:-1],-1,d)
         converted=(shaped*self.reference_std+self.reference_mean-self.training_mean)/self.training_std
         return converted.reshape_as(actions).to(actions.dtype)
 

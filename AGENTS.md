@@ -39,6 +39,8 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。新規性・SOTA・性能向�
 
 ## 比較と検証
 
+PushT評価の初心者用シェルは`bash mylewm/tools/evaluate_pusht.sh --help`。既定はdry-run、`--execute`だけがGPU評価を起動する。手順は`mylewm/docs/EVALUATE_PUSHT.ja.md`。新規`output/`子ディレクトリへ出力し、信頼済み`*_object.ckpt`だけを入力する。GB10の対象データclean cache解放は明示フラグで行い、他プロセス停止や全体cache削除はしない。既存評価と重複起動しない。公式配布checkpointと途中checkpointの差を、同更新予算の方式の優劣と呼ばない。
+
 - 主比較の計画はRaw/TC/BTを同じ新規E/A/F初期値、データ順、100,000更新で学習するもの。計画と実施済みを区別する。
 - データ分割、前処理、行動座標、精度、optimizer、計画予算、開始状態、Goal、環境成功関数を揃える。追加Tの訓練計算量も報告する。
 - PushTだけでマルチタスクを実証しない。LIBERO-10の平均・各タスク・下位タスクと学習seed間の変動を報告する。

@@ -1,5 +1,24 @@
 # Issue対応と検証記録
 
+## 初心者向けPushT評価手順とlauncher（2026-09-08）
+
+[評価手順](EVALUATE_PUSHT.ja.md)と`tools/evaluate_pusht.sh`を追加。既定dry-run、実行時だけ新規output作成・CUDA先行初期化・監査付き既存評価を行う。対象データclean cache解放は明示フラグ。チェックポイント/manifest/launcherのhashと起動引数を残し、正常終了後にケース・成功率の整合性を確認する。途中再開・上書きはしない。
+
+検証は`bash -n`、実20,000更新checkpointのdry-run、ヘルプ、仮データによる入力拒否と模擬subprocessでの成功/失敗処理。全回帰は`CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm -q`で**102合格・5スキップ**。稼働中の学習・評価との競合を避け、今回の全体再確認はCPUのみ。新launcherから実50ケースは追加起動しておらず、模擬結果を実制御成功率に数えない。先のGPU混在テスト14件合格とは実行範囲を区別する。
+
+同じ評価本体を使う既存ローカルlauncherでは、5,000更新2/50（4%）、15,000更新23/50（46%）を完了し、ケース・protocol・初期/Goal一致とcheckpoint hashを確認した。10,000更新はユーザー指示で途中中断し、20,000更新へ切替。公式の同50ケース再評価も予定。途中checkpointと公式配布checkpointの学習予算は異なるため、方式の優劣の結論にはしない。
+
+## PushT中間checkpoint評価：起動障害の切り分け（2026-09-08）
+
+5,000/10,000/15,000更新を共通confirm先頭50ケースで評価する途中、二つの独立した起動障害を確認した。以下は障害の解消確認で、成功率の結果ではない。
+
+- GB10のCUDA初期化OOM：カーネルログは`kgrctxAllocMainCtxBuffer`のメモリ確保失敗。学習・QwenのGPU使用量は約13.8/32.8 GiBで、評価必要量ではない。PushT HDF5だけにread-onlyで`POSIX_FADV_DONTNEED`を適用すると、システムfree RAMが約2.4→34 GiBへ増え、新規CUDA初期化・最小割当が成功した。NVIDIAも[キャッシュによる容量内OOM](https://nvidia.custhelp.com/app/answers/detail/a_id/5776/kw/hdr/related/1)を説明している。全体cache削除、ドライバ変更、他プロセス停止は行っていない。
+- CEM接続のデバイス不一致：SWMはCPUの過去行動とGPUの候補行動を渡すが、`PlanningActionAdapter`がGPU統計とCPU行動を直接演算していた。正規化前に行動をモデルのデバイスへ移すよう修正した。正規化の数式・値・物理探索分布は変更しない。元の入力は変更しない。
+
+`PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm/tests/test_evaluation_contract.py -q`で14件合格（新規CUDA混在回帰を含む）。最初のテスト起動はPYTHONPATH不足で公式fixtureの`jepa` importが失敗し、正しい経路で全件を再実行した。学習config内の全source SHA256が現行ファイルと一致することも確認した。
+
+再評価はGit対象外の`output/pusht/bt_spectral_v2_checkpoint_eval_50cases/`に隔離。ローカルwrapperで対象データのclean cache解放とCUDA先行初期化を行い、既存`lewm/eval.py`を実行する。CEM予算・50ケース・精度・seedは維持し、監査ソース変更に合わせ公式モデルも同じ50ケースで再評価する。旧失敗ログは保持。評価完了・性能結果は別途確認が必要。
+
 ## PushT BT v2・100,000ステップ開始（2026-09-08）
 
 ユーザーの新しい実行指示に基づき、短期診断とは別の新規共有初期値からPushTのみ開始した。batch128、warmup500、maxLR5e-5/minLR0、seed3072、workers4、保存/validation5,000、T/勾配診断1,000ステップごと。BTの構造・損失は短期診断で確認したv2のまま。Raw/TC/LIBEROの長時間学習は起動していない。
