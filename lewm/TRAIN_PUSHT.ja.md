@@ -101,9 +101,9 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
 
 ```bash
 cd /home/USER/bt-sigreg
-# 設定確認だけ。既存manifestを指定し、出力先は未使用名にする
+# 設定確認だけ。保存済み比較用manifestを指定し、出力先は未使用名にする
 .venv/bin/python mylewm/train.py --mode raw \
-  --manifest output/manifests/pusht/manifest.json \
+  --manifest .cache/stable-wm/pusht/rbg_v0/manifest.json \
   --output output/pusht/spt_raw_s3072 --steps 100000
 ```
 

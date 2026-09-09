@@ -37,7 +37,7 @@ ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 - `resume.pt`は学習再開用なので評価へ渡しません。
 - `torch.load(weights_only=False)`を使います。自分で生成したものや信頼確認済み公式重みだけを使用してください。
 
-既定manifestは`.cache/stable-wm/pusht/rbg_v0/manifest.json`です。現run用で、内部に旧フォルダ名があるため一時互換リンクを依存整理なしに削除しないでください。移転後の新しいmanifestを使う場合は、両モデルへ`--manifest output/manifests/pusht/manifest.json`を指定し、同じ分割・ケースで比較します。既存runのmanifestは書き換えません。
+既定manifestは`.cache/stable-wm/pusht/rbg_v0/manifest.json`です。現run用で、内部に旧フォルダ名があるため一時互換リンクを依存整理なしに削除しないでください。このリポジトリには`output/manifests/pusht/manifest.json`はまだ作成されていません。新規学習用に作成した別manifestを使う場合だけ、両モデルへ同じ`--manifest PATH_TO_NEW_MANIFEST`を指定し、同じ分割・ケースで比較します。既存runのmanifestは書き換えません。
 
 ## 3. まず設定確認だけを行う
 
