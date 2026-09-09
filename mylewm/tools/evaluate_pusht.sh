@@ -20,6 +20,7 @@ parser.add_argument('--output', type=Path, required=True, help='New directory un
 parser.add_argument('--manifest', type=Path, default=root/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
 parser.add_argument('--num-eval', type=int, default=50)
 parser.add_argument('--offset', type=int, default=0, help='Index into the fixed confirm cases')
+parser.add_argument('--seed', type=int, default=42, help='CEM/environment seed; confirm cases stay fixed')
 parser.add_argument('--gb10-cache-workaround', action='store_true', help='Release only the dataset clean file cache before CUDA initialization')
 parser.add_argument('--execute', action='store_true', help='Actually run evaluation on GPU')
 args = parser.parse_args()
@@ -71,10 +72,11 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            str(int(args.gb10_cache_workaround)), f'policy={output}/checkpoint',
            f'eval.num_eval={args.num_eval}', f'+eval.manifest={manifest}',
            '+eval.partition=confirm', f'+eval.offset={args.offset}',
+           f'seed={args.seed}',
            '+eval.audit_provenance=true', '+eval.shared_physical_search=true',
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
 plan = {'checkpoint': str(checkpoint), 'output': str(output), 'cases': len(cases),
-        'offset': args.offset, 'partition': 'confirm', 'execute': args.execute,
+        'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
         'gb10_cache_workaround': args.gb10_cache_workaround,
         'checkpoint_sha256': hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         'manifest_sha256': hashlib.sha256(manifest.read_bytes()).hexdigest(),

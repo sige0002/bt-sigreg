@@ -273,3 +273,16 @@ checkpoint SHA256（削除前に確認）：
 | 公式配布LeWM | 8.63 ms（8.52 ms） | 121.03 ms（120.74 ms） | 690.1 MB |
 
 BTのTは推論exportから除外されるため、両者のrollout速度は実質同等である。これはランダム入力の単体microbenchmarkであり、CEM全体・画像読込・環境stepを含むwall-clock制御時間、または他GPUでの速度を表さない。生結果はGit対象外の`output/pusht/bt_100000_compat_eval50/`、`official_compat_eval50/`、`rollout_latency_bt_official_50.json`、対応比較は`comparison_bt100000_official_compat50.json`に保存した。
+
+## BTと公式LeWMの5 seed評価（2026-09-09）
+
+ユーザー依頼により、CEM/environment seedを42–46へ変え、BT 100,000と公式配布LeWMを各5回ずつ評価した。各seedで両モデルへ同じ固定confirm 50ケースを使い、さらに同じseedで上流commit `8edfeb336732b5f3ce7b8b210d0ba370a09e2cac` の`eval.py`によるランダム50開始点評価を行った。合計20試行はすべて正常終了した。
+
+| 評価プロトコル | BT（seed 42–46） | 公式LeWM（seed 42–46） | 平均±標本SD | seed対応のBT−公式平均 |
+|---|---|---|---|---:|
+| 固定confirm 50ケース | 88, 94, 88, 92, 92% | 90, 94, 92, 88, 90% | BT 90.8±2.7%、公式 90.8±2.3% | 0.0ポイント |
+| 上流公式eval・ランダム50開始点 | 100, 94, 88, 86, 90% | 98, 88, 84, 90, 82% | BT 91.6±5.5%、公式 88.4±6.2% | +3.2ポイント |
+
+固定confirmのseed対応差は−2, 0, −4, +4, +2ポイントで、BTと公式の平均は一致した。上流公式evalの差は+2, +6, +4, −4, +8ポイントである。ただし上流evalは各seedで開始ケース自体が変わり、全データ正規化・action adapterなしという別プロトコルである。両行を混ぜて「BTが平均何%高い」とは結論しない。特に従来の98%は上流eval seed42の一回であり、今回の5回平均ではない。
+
+固定confirmは開始状態/Goalを固定してCEMのばらつきと対応ケースを調べる回帰比較、上流evalは公式抽出に沿う到達性能のサンプルである。いずれも単一の学習seed・既使用の評価集合を含み、Raw/TC/BTの同予算比較、学習seed間の優劣、LIBERO-10でのマルチタスク性能を証明しない。各生結果はGit対象外の`output/pusht/repeated_eval/{fixed,upstream}_{bt,official}_seed{42..46}/`に保存した。
