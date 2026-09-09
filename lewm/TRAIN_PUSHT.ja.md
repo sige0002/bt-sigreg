@@ -2,7 +2,7 @@
 
 この説明書はローカル比較用の補足です。上流の説明は[README](README.md)、参照commitは[UPSTREAM.md](UPSTREAM.md)に記録しています。対象は**既存`.venv`とダウンロード済みPushT HDF5がある、このPC**です。別PCへの完全な環境構築手順・依存lockfileはまだ整備していません。
 
-**現在はBTの学習が稼働中です。この説明書の更新では公式学習を開始していません。同じGPUで重複起動しないでください。**
+2026-09-09時点でBTの100,000更新は完了しています。この説明書の更新では公式学習を開始していません。新規実行前にGPU上の既存プロセスを確認し、重複起動しないでください。
 
 ## どちらの方法を使うか
 
@@ -91,7 +91,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
 
 途中再開について：公式コードは`run_dir/lewm_weights.ckpt`がある場合にManagerへ渡しますが、通常のLightning保存先とこの探索名の整合・完全再開をこの環境では未検証です。`weights_epoch_N.pt`をその名前に変更して代用してはいけません。確実な途中再開とBTとの比較を優先する場合はBを使います。
 
-公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[mylewm READMEのtmux手順](../mylewm/README.md#4-本学習を開始する)が使えます。
+公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/TRAINING.ja.md#4-本学習を開始する)が使えます。
 
 ## B. BTと同条件で比較するRaw LeWM
 

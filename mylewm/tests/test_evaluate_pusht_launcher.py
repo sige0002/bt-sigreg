@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import atexit
 
 import pytest
 
@@ -93,13 +94,17 @@ def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,re
             (output/'results.txt.json').write_text(json.dumps(result))
         return subprocess.CompletedProcess(cmd,returncode)
     monkeypatch.setattr(subprocess,'run',fake_run)
+    namespace={'__name__':'__main__'}
     if returncode:
         with pytest.raises(SystemExit) as error:
-            exec(compile(source,'<launcher>','exec'),{'__name__':'__main__'})
+            exec(compile(source,'<launcher>','exec'),namespace)
         assert error.value.code == 1
         assert not (output/'results.txt.json').exists()
         assert 'Evaluation failed' in capsys.readouterr().err
     else:
-        exec(compile(source,'<launcher>','exec'),{'__name__':'__main__'})
+        exec(compile(source,'<launcher>','exec'),namespace)
         assert 'Completed: 50/50 successes' in capsys.readouterr().out
     assert 'mock evaluator only' in (output/'console.log').read_text()
+    namespace['unfinished_exit']()
+    atexit.unregister(namespace['unfinished_exit'])
+    assert json.loads((output/'status.json').read_text())['state'] == ('failed' if returncode else 'succeeded')

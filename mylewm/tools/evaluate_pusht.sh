@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import atexit
+from datetime import datetime, timezone
 
 root = Path(sys.argv.pop(1))
 parser = argparse.ArgumentParser(description='Evaluate a trusted PushT inference checkpoint; default is dry-run.')
@@ -48,11 +50,11 @@ bootstrap = '''
 import os, sys, runpy
 from pathlib import Path
 root, dataset, release = sys.argv[1:4]
+import torch
 if release == '1':
     with open(dataset, 'rb') as stream:
         os.posix_fadvise(stream.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
     print('Released dataset clean cache only', flush=True)
-import torch
 torch.cuda.init()
 probe = torch.empty(1, device='cuda')
 torch.cuda.synchronize()
@@ -83,6 +85,18 @@ if not args.execute:
     print('Dry-run only: no GPU initialization, cache release, or output creation.')
     sys.exit(0)
 output.mkdir(parents=True, exist_ok=False)
+terminal = False
+def record_status(state, **details):
+    record = dict(state=state, updated_at=datetime.now(timezone.utc).isoformat(),
+                  pid=os.getpid(), checkpoint=str(checkpoint), **details)
+    temporary = output/'status.json.tmp'
+    temporary.write_text(json.dumps(record, indent=2))
+    temporary.replace(output/'status.json')
+def unfinished_exit():
+    if not terminal:
+        record_status('failed', reason='Launcher exited before validated completion; inspect console.log and service status')
+atexit.register(unfinished_exit)
+record_status('running')
 (output/'checkpoint_object.ckpt').symlink_to(checkpoint)
 (output/'launch.json').write_text(json.dumps(plan, indent=2))
 env = dict(os.environ, STABLEWM_HOME=str(root/'.cache/stable-wm'),
@@ -104,5 +118,7 @@ successes = sum(metrics['successes'])
 if abs(metrics['success_rate'] - 100*successes/len(cases)) > 1e-6:
     raise ValueError('Reported success rate differs from case flags')
 print(f'Completed: {successes}/{len(cases)} successes ({metrics["success_rate"]:.1f}%).')
+record_status('succeeded', successes=successes, cases=len(cases), success_rate=metrics['success_rate'])
+terminal = True
 print('This is a fixed-case checkpoint evaluation, not a guarantee or a matched-training-budget comparison.')
 PY
