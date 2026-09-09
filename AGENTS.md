@@ -2,7 +2,7 @@
 
 ## 現在の運用（2026-09-09）
 
-新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。SWM/SPT/Lightningへ委託し、旧 `train_rbg.py` の100k実験とは別レシピ。エピソード分離を維持し、LIBEROと旧実験の再現経路は未移行。旧manifest・重みと稼働に必要な共有コードを新経路に合わせて改変しない。不要な独立診断・旧比較準備CLIはユーザー承認で削除し、固定コミット5559095へ保存。削除一覧・復元方法はCLEANUPを参照。新しい本学習・環境評価は今回未開始。
+新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。LIBEROの入口は `mylewm/train_libero.py`、共有ループは `mylewm/training.py`、損失は `mylewm/objectives.py`。評価は `mylewm/tools/evaluate_libero.py`。旧RBG方式・専用引数・重複ツールを撤去し、旧名の互換shimは置かない。Raw/TC/BTだけを共有経路で扱う（新PushT経路はRaw/BTのみ）。削除・改名・復元方法は `mylewm/docs/CLEANUP.ja.md`。過去のmanifest・重み・config・評価証拠を変更しない。ソースhashが変わるため過去runの厳密再開は開始時のGit版を使い、照合を無効化しない。LIBEROのライブラリ経路への移行は未実施。新しい本学習・環境評価は今回未開始。
 
 PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200（89%）、別条件の上流eval 50ケース49/50（98%）を記録済み。結果の条件差はレポートを参照。新規学習・再開・追加評価は明示依頼時のみ。定期監視・checkpoint到達待機・自動評価予約は行わない。
 
@@ -25,7 +25,7 @@ PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200�
 
 ## 現在の研究案
 
-BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制約v2。PushTの単一seed・100,000更新と依頼済み評価は完了。LIBERO-10は100更新の短期診断まで。同予算Raw/TC比較・マルチタスク改善・新規性・SOTAは未実証。旧Frobenius checkpointと互換性なし。既存RBGをBTと呼ばない。最新範囲は `mylewm/docs/VALIDATION.ja.md` を確認する。
+BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制約v2。PushTの単一seed・100,000更新と依頼済み評価は完了。LIBERO-10は100更新の短期診断まで。同予算Raw/TC比較・マルチタスク改善・新規性・SOTAは未実証。旧Frobenius checkpointと互換性なし。旧RBGはGit履歴のみ。過去のRBG結果をBTと呼ばない。最新範囲は `mylewm/docs/VALIDATION.ja.md` を確認する。
 
 - 既存の状態zで予測損失・rollout・Goal距離を計算し、学習専用の同次元可逆写像u=T(z)だけにSIGRegを適用する。
 - Tは全タスク・時刻に共通。task ID、episode ID、Goal、行動、バッチ統計で条件付けず、乱数で分散を作らない。
@@ -36,7 +36,7 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 ## コードと実験の扱い
 
 - `lewm/` は公式比較用に残す。既存のローカル評価修正があるため、完全無改変の上流コピーとは呼ばない。比較対象を提案側で上書きしない。
-- `mylewm/` は提案・比較・監査基盤。`train_rbg.py` 等はRaw/TCでも使う共有基盤なので、名前だけで不要と判断しない。
+- `mylewm/` は提案・比較・監査基盤。`training.py` 等はRaw/TCでも使う共有基盤なので、名前だけで不要と判断しない。
 - 現行仕様・手順は `mylewm/docs/`、実験・監査履歴は `mylewm/docs/reports/` に分ける。旧案はGit履歴で参照する。評価・監査CLIは `mylewm/tools/`、回帰テストは `mylewm/tests/`。旧方式の削除記録は `mylewm/docs/CLEANUP.ja.md`。削除前にimport、CLI、設定、checkpoint復元への依存を確認する。無関係な変更・プロセス・データを壊さない。
 - 新規・再開の長時間学習はユーザーの明示依頼がある場合だけ動かす。文書更新、レビュー、整理を理由に別run・自動実験キューを起動しない。
 - データ、公式重み、生成ログ、ローカル環境、認証情報をGitに入れない。削除は対象を確定し、可能なら復元可能にする。

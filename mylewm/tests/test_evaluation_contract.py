@@ -6,12 +6,11 @@ import os
 import subprocess
 import sys
 from mylewm.planning_action_adapter import PlanningActionAdapter
-from mylewm.tools.evaluate_official_pusht import commands
 from mylewm.evaluation_contract import protocol,validate_result
 
 
-@pytest.mark.parametrize('script', ['compare_paired.py', 'evaluate_official_pusht.py'])
-def test_relocated_cli_works_without_pythonpath(script):
+def test_comparison_cli_works_without_pythonpath():
+    script = 'compare_paired.py'
     root = Path(__file__).resolve().parents[2]
     env = dict(os.environ)
     env.pop('PYTHONPATH', None)
@@ -80,15 +79,6 @@ def test_adapter_matches_direct_actual_jepa_rollout():
         expected_cost=model.get_cost(direct,expected)
     torch.testing.assert_close(actual_cost,expected_cost,atol=1e-5,rtol=1e-5)
 
-
-def test_official_plan_has_no_training_and_preserves_case_offsets(tmp_path):
-    plan=commands(tmp_path/'manifest.json','trial')
-    assert len(plan)==4
-    for index,command in enumerate(plan):
-        assert command[1].endswith('/lewm/eval.py')
-        assert 'policy=pusht/lewm' in command
-        assert f'+eval.offset={index*50}' in command
-        assert '+eval.shared_physical_search=true' in command
 
 
 def fixture_result():

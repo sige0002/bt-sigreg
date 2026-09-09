@@ -32,10 +32,10 @@ def transport_statistics(z, u):
         return result
 
 
-def encoder_gradient_norms(model,parts,gaussian_weight,cross_weight):
+def encoder_gradient_norms(model,parts,gaussian_weight):
     params=[p for component in (model.encoder,model.projector) for p in component.parameters() if p.requires_grad]
     result={}
-    for name,weight in [('prediction',1.),('gaussian',gaussian_weight),('cross',cross_weight)]:
+    for name,weight in [('prediction',1.),('gaussian',gaussian_weight)]:
         term=parts[name]*weight
         if not term.requires_grad:
             result[name]=0.;continue

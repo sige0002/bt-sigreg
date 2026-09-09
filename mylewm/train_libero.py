@@ -1,4 +1,4 @@
-"""LIBERO-10 data/model adapters for the identical RBG comparison trainer."""
+"""LIBERO-10 adapters for the shared Raw/TC/BT training loop."""
 import argparse
 import json
 from pathlib import Path
@@ -13,7 +13,7 @@ import numpy as np
 from omegaconf import OmegaConf
 import torch
 import torch.nn.functional as F
-from mylewm import train_rbg as common
+from mylewm import training as common
 
 
 def prepare(folder,path):
@@ -106,19 +106,17 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('command',choices=['prepare','train'])
     p.add_argument('--dataset',type=Path,default=ROOT/'.cache/libero-datasets/libero_10')
-    p.add_argument('--manifest',type=Path,default=ROOT/'.cache/stable-wm/libero10/rbg_v0/manifest.json')
+    p.add_argument('--manifest',type=Path,default=ROOT/'output/manifests/libero10/manifest.json')
     p.add_argument('--output',type=Path)
-    p.add_argument('--mode',choices=['raw','rbg','tc','bt'],default='rbg')
+    p.add_argument('--mode',choices=['raw','tc','bt'],default='bt')
     common.add_bt_arguments(p)
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
     p.add_argument('--batch-size',type=int,default=128)
-    p.add_argument('--blocks',type=int,default=4)
     p.add_argument('--workers',type=int,default=4)
     p.add_argument('--save-every',type=int,default=1000)
     p.add_argument('--seed',type=int,default=3072)
     common.add_schedule_arguments(p)
     p.add_argument('--gaussian-weight',type=float,default=.09)
-    p.add_argument('--cross-weight',type=float,default=.01)
     p.add_argument('--resume',action='store_true')
     args=p.parse_args()
     if args.command=='prepare': prepare(args.dataset,args.manifest)

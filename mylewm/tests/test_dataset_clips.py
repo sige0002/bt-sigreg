@@ -2,8 +2,8 @@
 import h5py
 import numpy as np
 import torch
-from mylewm.train_rbg import Clips
-from mylewm.train_rbg_libero import LiberoClips
+from mylewm.training import Clips
+from mylewm.train_libero import LiberoClips
 
 
 def test_pusht_last_window_does_not_cross_episode(tmp_path):

@@ -29,7 +29,7 @@ def pair(obs):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument('--checkpoint',type=Path,required=True)
-    p.add_argument('--manifest',type=Path,default=ROOT/'.cache/stable-wm/libero10/rbg_v0/manifest.json')
+    p.add_argument('--manifest',type=Path,default=ROOT/'output/manifests/libero10/manifest.json')
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--task-ids',type=int,nargs='+',default=list(range(10)))
     p.add_argument('--episodes',type=int,default=50)
@@ -40,7 +40,7 @@ def main():
     p.add_argument('--iterations',type=int,default=5)
     p.add_argument('--seed',type=int,default=42)
     p.add_argument('--device',default='cuda')
-    p.add_argument('--render-audit-dir',type=Path,default=ROOT/'.cache/stable-wm/libero10/rbg_v0/render_audit')
+    p.add_argument('--render-audit-dir',type=Path,default=ROOT/'output/libero10/render_audit')
     args=p.parse_args()
     if os.environ['MUJOCO_GL']!='osmesa':
         raise RuntimeError('EGL imagery failed local audit. Use bash mylewm/run_libero.sh for verified OSMesa rendering.')

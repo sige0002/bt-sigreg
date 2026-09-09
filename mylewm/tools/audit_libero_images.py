@@ -19,9 +19,8 @@ from libero.libero.utils.utils import postprocess_model_xml
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--output',type=Path,default=ROOT/'.cache/stable-wm/libero10/rbg_v0/image_audit_v2')
+    parser.add_argument('--output',type=Path,default=ROOT/'output/libero10/image_audit')
     parser.add_argument('--task-index',type=int,default=0,choices=range(10))
-    parser.add_argument('--export-textures',action='store_true')
     parser.add_argument('--max-mae',type=float,default=10.)
     args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=False)
@@ -44,16 +43,6 @@ def main():
             rows=[]
             for t in (0,4,8):
                 obs=env.set_init_state(demo['states'][t])
-                if t==0 and args.export_textures:
-                    model=env.sim.model._model
-                    texdata=model.tex_rgb if hasattr(model,'tex_rgb') else model.tex_data
-                    for tid in range(model.ntex):
-                        width,height=int(model.tex_width[tid]),int(model.tex_height[tid])
-                        channels=int(model.tex_nchannel[tid]) if hasattr(model,'tex_nchannel') else 3
-                        start=int(model.tex_adr[tid])
-                        texture=texdata[start:start+width*height*channels].reshape(height,width,channels)
-                        if width>100:
-                            Image.fromarray(texture).save(args.output/f'texture_{tid}.png')
                 for recorded,rendered in [('agentview_rgb','agentview_image'),('eye_in_hand_rgb','robot0_eye_in_hand_image')]:
                     target=demo[f'obs/{recorded}'][t].astype(np.float32)
                     image=obs[rendered].astype(np.float32)

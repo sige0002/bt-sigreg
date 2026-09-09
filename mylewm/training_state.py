@@ -15,7 +15,6 @@ def add_schedule_arguments(parser):
     parser.add_argument('--warmup-steps', type=int, default=500)
     parser.add_argument('--min-lr', type=float, default=0.)
     parser.add_argument('--max-lr', '--lr', dest='lr', type=float, default=5e-5)
-    parser.add_argument('--initialization',type=Path)
     parser.add_argument('--diagnostics-every',type=int,default=5000)
     parser.add_argument('--deterministic',action='store_true')
 

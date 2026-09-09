@@ -11,8 +11,8 @@ import pytest
 import torch
 
 from mylewm.bt_sigreg import BoundedResidual, BoundedTransport, BTSIGReg, SpectralLinear
-from mylewm.rbg import BlockSIGReg, one_step_objective
-from mylewm import train_rbg as training
+from mylewm.objectives import GaussianSIGReg, one_step_objective
+from mylewm import training
 from mylewm.tests.test_training_state import assert_tree_equal
 
 
@@ -156,12 +156,12 @@ def test_identity_matches_raw_loss_and_all_world_gradients(depth):
     torch.manual_seed(9)
     model = TinyBTModel().eval()
     x, a = torch.randn(3, 4, 3, requires_grad=True), torch.randn(3, 3, 10)
-    raw, bt = BlockSIGReg(blocks=1), BTSIGReg(depth=depth)
+    raw, bt = GaussianSIGReg(), BTSIGReg(depth=depth)
     torch.manual_seed(21)
-    loss, parts = one_step_objective(model, x, a, raw, cross_weight=0, mode='raw')
+    loss, parts = one_step_objective(model, x, a, raw, mode='raw')
     grads = torch.autograd.grad(loss, [x, *model.parameters()])
     torch.manual_seed(21)
-    other, btparts = one_step_objective(model, x, a, bt, cross_weight=0, mode='bt')
+    other, btparts = one_step_objective(model, x, a, bt, mode='bt')
     btgrads = torch.autograd.grad(other, [x, *model.parameters()])
     torch.testing.assert_close(loss, other, atol=0, rtol=0)
     for first, second in zip(grads, btgrads):
@@ -177,7 +177,7 @@ def test_prediction_is_native_and_future_teacher_has_gradient():
         for block in reg.transport.blocks: block.output_weight.raw_spectrum.normal_()
     seen = []
     hook = reg.transport.register_forward_pre_hook(lambda module, inputs: seen.append(inputs[0]))
-    loss, parts = one_step_objective(model, x, a, reg, cross_weight=0, mode='bt')
+    loss, parts = one_step_objective(model, x, a, reg, mode='bt')
     hook.remove()
     z = model.encode({'pixels': x})['emb']
     expected = (model.predict(z[:, :3], model.action_encoder(a))-z[:, 1:]).square().mean()
@@ -215,8 +215,8 @@ def test_bt_actual_training_loop_resume_and_inference_export(tmp_path, monkeypat
     manifest.write_text(json.dumps(dict(dataset=str(dataset), dataset_size=dataset.stat().st_size,
         dataset_mtime_ns=dataset.stat().st_mtime_ns, action_mean=[0.], action_std=[1.], views=views)))
     args = argparse.Namespace(steps=4, warmup_steps=1, lr=.003, min_lr=0., seed=17,
-        manifest=manifest, mode='bt', blocks=4, batch_size=4, workers=0, bt_depth=2,
-        bt_hidden=12, bt_kappa=.3, gaussian_weight=.09, cross_weight=.01,
+        manifest=manifest, mode='bt', batch_size=4, workers=0, bt_depth=2,
+        bt_hidden=12, bt_kappa=.3, gaussian_weight=.09,
         diagnostics_every=1, save_every=2, resume=False, output=tmp_path/'full', deterministic=True)
     training.train(args)
     full = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
@@ -253,7 +253,7 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     from types import SimpleNamespace
     from train import lejepa_forward
     from module import SIGReg
-    from mylewm.train_rbg_libero import build_model as build_libero
+    from mylewm.train_libero import build_model as build_libero
     torch.set_num_threads(4); torch.manual_seed(55)
     model = (training.build_model() if benchmark == 'pusht' else build_libero()).train()
     raw = copy.deepcopy(model)
@@ -267,7 +267,7 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     cfg = SimpleNamespace(history_size=3, num_preds=1,
                           loss=SimpleNamespace(sigreg=SimpleNamespace(weight=.09)))
     torch.manual_seed(991)
-    initial_loss, _ = one_step_objective(model, x, a, reg, cross_weight=0, mode='bt')
+    initial_loss, _ = one_step_objective(model, x, a, reg, mode='bt')
     initial_loss.backward()
     torch.manual_seed(991)
     raw_loss = lejepa_forward(official, {'pixels': x, 'action': a}, 'train', cfg)['loss']
@@ -278,7 +278,7 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     before = copy.deepcopy(reg.state_dict())
     for _ in range(2):
         opt.zero_grad()
-        loss, parts = one_step_objective(model, x, a, reg, cross_weight=0, mode='bt')
+        loss, parts = one_step_objective(model, x, a, reg, mode='bt')
         assert torch.isfinite(loss)
         loss.backward(); opt.step()
     assert any(not torch.equal(before[k], v) for k, v in reg.state_dict().items()
@@ -299,26 +299,28 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     assert not any(isinstance(m, BoundedTransport) for m in exported.modules())
 
 
-def test_both_legacy_cli_adapters():
+def test_shared_and_libero_cli_adapters():
     import os
     import subprocess
     import sys
-    for name in ('train_rbg.py', 'train_rbg_libero.py'):
+    for name in ('training.py', 'train_libero.py'):
         result = subprocess.run([sys.executable, str(training.ROOT/'mylewm'/name), '--help'],
                                 capture_output=True, text=True, timeout=30,
                                 env={k:v for k,v in os.environ.items() if k != 'PYTHONPATH'})
         assert result.returncode == 0, result.stderr
-        assert '--bt-kappa' in result.stdout and 'bt}' in result.stdout
+        assert '--bt-kappa' in result.stdout and '{raw,tc,bt}' in result.stdout
+        assert '--cross-weight' not in result.stdout and '--blocks' not in result.stdout
+        rejected = subprocess.run([sys.executable, str(training.ROOT/'mylewm'/name),
+                                   'train', '--mode', 'rbg'], capture_output=True, text=True, timeout=30)
+        assert rejected.returncode == 2 and 'invalid choice' in rejected.stderr
 
 
-def test_bt_precision_and_cross_loss_rejection():
+def test_bt_precision():
     model = TinyBTModel().eval()
     reg = BTSIGReg()
     x, a = torch.randn(2, 4, 3), torch.randn(2, 3, 10)
-    with pytest.raises(ValueError, match='cross_weight'):
-        one_step_objective(model, x, a, reg, mode='bt')
     with torch.autocast(device_type='cpu', dtype=torch.bfloat16):
         u = reg.transport(torch.randn(4, 2, 192).bfloat16())
-        loss, _ = one_step_objective(model, x, a, reg, cross_weight=0, mode='bt')
+        loss, _ = one_step_objective(model, x, a, reg, mode='bt')
     assert u.dtype == torch.float32 and loss.dtype == torch.float32
     assert torch.isfinite(loss)

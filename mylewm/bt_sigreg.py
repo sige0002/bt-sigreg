@@ -13,7 +13,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from mylewm.rbg import BlockSIGReg
+from mylewm.objectives import GaussianSIGReg
 
 
 def add_bt_arguments(parser):
@@ -114,7 +114,7 @@ class BTSIGReg(nn.Module):
     def __init__(self, dim=192, hidden=192, depth=2, kappa=.2, projections=1024, knots=17):
         super().__init__()
         self.transport = BoundedTransport(dim, hidden, depth, kappa)
-        self.gaussian = BlockSIGReg(dim=dim, blocks=1, projections=projections, knots=knots)
+        self.gaussian = GaussianSIGReg(dim=dim, projections=projections, knots=knots)
 
-    def forward(self, z, directions=None):
-        return self.gaussian(self.transport(z), directions=directions)
+    def forward(self, z):
+        return self.gaussian(self.transport(z))

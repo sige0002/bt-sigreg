@@ -45,15 +45,14 @@ def test_gradient_diagnostics_include_coefficients_without_accumulating_gradient
     encoder=torch.nn.Linear(2,2,bias=False)
     model=SimpleNamespace(encoder=encoder,projector=torch.nn.Identity())
     z=encoder(torch.tensor([[1.,2.],[3.,-1.]]))
-    parts={'prediction':(z-1).square().mean(),'gaussian':z.square().mean(),
-           'cross':(z[:,0]*z[:,1]).mean()}
+    parts={'prediction':(z-1).square().mean(),'gaussian':z.square().mean()}
     reference={name:float(torch.autograd.grad(term,encoder.weight,retain_graph=True)[0].norm())
                for name,term in parts.items()}
-    norms=encoder_gradient_norms(model,parts,.09,.01)
-    for name,weight in [('prediction',1.),('gaussian',.09),('cross',.01)]:
+    norms=encoder_gradient_norms(model,parts,.09)
+    for name,weight in [('prediction',1.),('gaussian',.09)]:
         torch.testing.assert_close(torch.tensor(norms[name]),torch.tensor(reference[name]*weight))
     assert encoder.weight.grad is None
-    (parts['prediction']+.09*parts['gaussian']+.01*parts['cross']).backward()
+    (parts['prediction']+.09*parts['gaussian']).backward()
     assert encoder.weight.grad is not None
 
 

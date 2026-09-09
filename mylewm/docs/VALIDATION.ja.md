@@ -20,11 +20,17 @@
 
 最初の接続試験では画像前処理の引数不足、テスト内の非leaf Tensorのdeepcopy、再開時のvirtual epoch長の扱いを修正した。SPTが登録するHardwareMonitorは公開設定のキー一覧に無く、生成後・setup前に除外した。環境情報の背景収集・外部tracker・追加モデルexportも無効化。独自最適化ループは追加していない。
 
-旧コード・manifest・既存100k重み・評価結果は変更していない。新経路の本学習・PushT成功率・GPU長期再開・LIBERO移行は未実施で、旧checkpointからの互換resumeも許可しない。
+新経路追加時点では旧コード・manifest・既存100k重み・評価結果は変更しなかった。その後の今回のコード整理は下記のとおりで、重み・manifest・評価結果は引き続き保持している。新経路の本学習・PushT成功率・GPU長期再開・LIBERO移行は未実施で、旧checkpointからの互換resumeも許可しない。
 
 全回帰は `CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm/tests -q` で **111合格・5スキップ**（14.35秒）。CUDA専用5件は未実行。fork/LanceとLightningのログ・再開に関する警告は残るが、上記CPU再開の実測一致を別途確認した。実manifestでの新CLI dry-run、Markdownリンク・見出し参照、Python構文、`git diff --check`も確認した。
 
 実PushTデータでも学習を起動せずnative loaderを確認し、train 1,585,717クリップ、固定validation 256件、取得画像4×3×224×224・行動4×10を確認した。旧train 1,645,509クリップとは末尾条件が異なる。実データの確認は1クリップの読込までで、全クリップの内容監査・実データ学習・成功率試験ではない。
+
+### 旧方式撤去・役割名への整理（2026-09-09）
+
+旧RBGのブロック分割・交差共分散・専用引数とテストを撤去し、共有処理・CLI・テスト6ファイルを改名した。重複するLIBERO環境smoke、旧公式専用PushT評価launcherと専用テスト2件、旧テクスチャ書出しオプションも撤去。全次元SIGReg、Raw/TC/BTの一段予測、学習条件、公式評価の成功判定は維持した。
+
+CPU回帰は **102合格・5スキップ**（15.02秒）。公式Rawとのloss・勾配一致、恒等BT、TCの適用座標、再開一致、旧方式の拒否を確認。CUDA専用5件は未実行で、長期学習・制御評価を行ったという意味ではない。詳細と互換性の境界は[整理記録](CLEANUP.ja.md)を参照。
 
 ### 既存経路での実績
 
@@ -54,7 +60,7 @@ PushTだけでマルチタスク改善を証明しません。98%を論文の3�
 
 ## Issueと運用
 
-最後に記録したGitHub対応は2026-09-07の #1・#3 close、その他は未完了です。今回GitHubの最新状態は照会・変更していません。監査履歴にある過去の状態と現在のissue状態を同一視しません。
+2026-09-09、ユーザーの明示依頼で残っていた旧issue #2・#4〜#13 の11件をすべて `not planned` としてクローズした。#1・#3は以前にclose済み。現在openは0件。これは旧計画の整理であり、上記の未完了実験を達成済みに変更するものではない。本文・コメントはGitHubに保持し、現行の未完了事項は本書へ集約する。
 
 追加学習・評価は明示依頼時のみ。定期監視・自動評価予約は行いません。手動の進捗確認は `bash mylewm/tools/monitor_training.sh --once`、評価手順は[PushT](EVALUATE_PUSHT.ja.md)／[LIBERO](EVALUATE_LIBERO.ja.md)です。完了済み学習のログが増えないことを障害とは扱いません。
 

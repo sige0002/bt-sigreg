@@ -1,6 +1,6 @@
 """PushT Raw/BT on the official SWM/SPT/Lightning stack (new recipe).
 
-Legacy train_rbg.py and its artifacts remain unchanged. No downloads, implicit
+The shared training.py uses a separate recipe; historical artifacts are preserved. No downloads, implicit
 resume, or training without --execute. Single-device, deterministic transforms.
 """
 import argparse

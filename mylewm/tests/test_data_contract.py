@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from mylewm.data_contract import data_fingerprints, training_budget
-from mylewm.train_rbg import Clips
+from mylewm.training import Clips
 
 
 def test_clip_budget_from_synthetic_episode_lengths(tmp_path):

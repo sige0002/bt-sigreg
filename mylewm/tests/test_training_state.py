@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from mylewm import train_rbg as training
+from mylewm import training
 from mylewm.training_state import UpdateSchedule, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash
 
 
@@ -54,7 +54,7 @@ def test_schedule_boundaries_and_group_lrs():
 
 
 @pytest.mark.parametrize('key', ['steps', 'warmup_steps', 'lr', 'min_lr', 'gaussian_weight',
-                                'cross_weight', 'adapter_sources', 'source_sha256',
+                                'adapter_sources', 'source_sha256',
                                 'manifest_sha256', 'seed', 'precision'])
 def test_resume_rejects_contract_changes(key):
     with pytest.raises(ValueError, match=key):
@@ -99,7 +99,7 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
     deterministic = torch.are_deterministic_algorithms_enabled()
     torch.use_deterministic_algorithms(True)
     monkeypatch.setattr(training, 'build_model', TinyModel)
-    monkeypatch.setattr(training, 'BlockSIGReg', TinyRegularizer)
+    monkeypatch.setattr(training, 'GaussianSIGReg', TinyRegularizer)
     monkeypatch.setattr(training, 'Clips', TinyClips)
     monkeypatch.setattr(training, 'preprocess', lambda batch, m, d: tuple(x.to(d) for x in batch))
     dataset = tmp_path / 'data.identity'
@@ -125,8 +125,8 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
 
     monkeypatch.setattr(training, 'one_step_objective', objective)
     args = argparse.Namespace(steps=6, warmup_steps=2, lr=.003, min_lr=0., seed=3072,
-        manifest=manifest, mode='raw', blocks=1, batch_size=4, workers=workers,
-        gaussian_weight=.09, cross_weight=.01, save_every=2, resume=False,
+        manifest=manifest, mode='raw', batch_size=4, workers=workers,
+        gaussian_weight=.09, save_every=2, resume=False,
         output=tmp_path/'full',deterministic=True)
     try:
         training.train(args)

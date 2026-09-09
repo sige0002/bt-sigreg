@@ -4,7 +4,7 @@
 
 新規のRaw／BT比較には `mylewm/train.py` を使います。データ読込はstable-worldmodel、画像前処理と一段損失は公式LeWM、逆伝播・optimizer・schedulerはstable-pretraining、訓練ループ・CSVログ・checkpointはLightningへ委託します。BT固有の処理は学習専用Tと正則化分岐です。
 
-これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。既存の `train_rbg.py`、重み・manifest・評価結果は変更していません。LIBEROは後半の従来経路を引き続き使います。今回、本学習は開始していません。
+これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。重み・manifest・評価結果は保持しています。旧RBG専用処理は撤去し、共有ループを `training.py`、LIBERO入口を `train_libero.py` へ改名しました。過去runの厳密再開は開始時のGit版が必要です。LIBEROは後半の共有経路を使います。今回、本学習は開始していません。
 
 ### 変更する条件・維持する条件
 
@@ -61,9 +61,9 @@ Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は
 
 再開位置だけは薄い補助処理で補完します。PyTorchのepochシャッフルから消費済みバッチを読み飛ばし、prefetch位置ではなくLightningの完了更新数で復元します。CPU小型モデル・worker0/2で連続6更新と3更新＋再開が一致しましたが、実LeWM全体のGPU長期再開まで保証したものではありません。
 
-## 従来経路：LIBEROと既存PushT実験の再現
+## 共通のデータ準備とLIBERO学習
 
-以下のPushTコマンドは旧 `controlled_training_v2` 用です。新しい公式ライブラリ経路と混ぜません。LIBEROは未移行のため共有trainerを残しています。旧比較計画・初期値生成・独立診断CLIは撤去済みで、過去の完全な手順はGit履歴を参照してください。
+新規PushTの学習は冒頭の `train.py` に統一します。以下の `training.py prepare` は分割作成だけです。LIBEROは `train_libero.py` から共有ループを使用します。旧RBG、`--blocks`、`--cross-weight`、廃止済み初期値ファイルの読込引数 `--initialization` はありません。Raw/TC/BTは同じseedから初期化し、記録された初期モデルhashで照合します。過去の完全な手順・再開は[整理記録](CLEANUP.ja.md)のGit履歴を参照してください。
 
 公式LeWM側を学習したい場合は[公式PushT学習の説明書](../../lewm/TRAIN_PUSHT.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
 
@@ -78,8 +78,8 @@ PushTの100,000更新は完了済みです。以下は新規実験の手順で�
 ```bash
 cd /home/USER/bt-sigreg
 .venv/bin/python --version
-.venv/bin/python mylewm/train_rbg.py --help
-.venv/bin/python mylewm/train_rbg_libero.py --help
+.venv/bin/python mylewm/training.py --help
+.venv/bin/python mylewm/train_libero.py --help
 nvidia-smi
 ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 ls .cache/libero-datasets/libero_10/*.hdf5
@@ -96,7 +96,7 @@ PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必�
 PushT用：
 
 ```bash
-.venv/bin/python mylewm/train_rbg.py prepare \
+.venv/bin/python mylewm/training.py prepare \
   --dataset .cache/stable-wm/datasets/pusht_expert_train.h5 \
   --manifest output/manifests/pusht/manifest.json
 ```
@@ -104,7 +104,7 @@ PushT用：
 LIBERO-10用：
 
 ```bash
-.venv/bin/python mylewm/train_rbg_libero.py prepare \
+.venv/bin/python mylewm/train_libero.py prepare \
   --dataset .cache/libero-datasets/libero_10 \
   --manifest output/manifests/libero10/manifest.json
 ```
@@ -113,23 +113,12 @@ LIBERO-10用：
 
 ### 3. まず100ステップだけ動作確認する
 
-下のどちらかを実行します。`--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
-
-PushT：
-
-```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg.py train \
-  --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/bt_smoke_s3072 \
-  --steps 100 --batch-size 16 --workers 0 --seed 3072 \
-  --warmup-steps 10 --lr 5e-5 --min-lr 0 \
-  --save-every 50 --diagnostics-every 25 --deterministic
-```
+PushTは冒頭の新経路で短期確認し、LIBEROは下のコマンドを実行します。`--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
 
 LIBERO-10：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_smoke_s3072 \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
@@ -148,24 +137,12 @@ tmux new -s bt-training
 cd /home/USER/bt-sigreg
 ```
 
-その中で、**どちらか一方**を実行してください。ここでの出力名`bt_train_s3072`は完了済みrunとは別です。短期学習のcheckpointは使わず、新規初期値から始めます。
-
-PushT・10万ステップ：
-
-```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg.py train \
-  --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/bt_train_s3072 \
-  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
-  --warmup-steps 500 --lr 5e-5 --min-lr 0 \
-  --bt-depth 2 --bt-kappa .2 --bt-hidden 192 \
-  --save-every 5000 --diagnostics-every 1000 --deterministic
-```
+その中で、PushTなら冒頭の新経路、LIBEROなら下のコマンドを実行してください。ここでの出力名`bt_train_s3072`は完了済みrunとは別です。短期学習のcheckpointは使わず、新規初期値から始めます。
 
 LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証していません）：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_train_s3072 \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
@@ -180,13 +157,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg_libero.py trai
 
 ### 5. 別の端末から進捗を見る
 
-```bash
-cd /home/USER/bt-sigreg
-# 上の手順で新しく始めたPushTを見る
-bash mylewm/tools/monitor_training.sh --run output/pusht/bt_train_s3072
-```
-
-LIBEROを見る場合は次を使います。
+PushTの新経路は冒頭のCSVを確認します。LIBEROのJSONLログを見る場合は次を使います。
 
 ```bash
 bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train_s3072
@@ -210,7 +181,7 @@ bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train_s3072
 
 ### 6. 中断した学習を再開する
 
-学習プロセスが終了していることと、対象runに`resume.pt`があることを確認します。**開始時と同じコマンドの末尾に`--resume`だけを追加**して実行してください。PushTは`train_rbg.py`、LIBEROは`train_rbg_libero.py`を引き続き使います。
+学習プロセスが終了していることと、対象runに`resume.pt`があることを確認します。**開始時と同じコマンドの末尾に`--resume`だけを追加**して実行してください。これは改名後に開始したLIBERO run向けで、`train_libero.py`を使います。PushT新経路は冒頭のLightning再開手順です。改名前のrunは開始時のGit版で再開し、ソース照合を解除しないでください。
 
 - `--output`は元のrunのまま。`--steps`も元の総数のままです（残りステップ数ではありません）。
 - ほかの引数・manifest・データ・学習ソース・環境を変えないでください。`resume mismatch`を無理に解除してはいけません。
@@ -229,4 +200,4 @@ bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train_s3072
 | NaN/Inf・10分以上進まない | 端末の例外、プロセス、データ読込を確認し報告。自動再起動や設定変更で隠さない |
 | lossが短期確認より大きい | SIGRegの値はbatch数にも依存する。batch16と128の生lossを直接比較しない |
 
-学習が終わっても、PushT/LIBEROの**成功率評価は別工程**です。以下の評価ツールと[検証記録](VALIDATION.ja.md)を参照してください。
+学習が終わっても、PushT/LIBEROの**成功率評価は別工程**です。[PushT評価手順](EVALUATE_PUSHT.ja.md)・[LIBERO評価手順](EVALUATE_LIBERO.ja.md)と[検証記録](VALIDATION.ja.md)を参照してください。

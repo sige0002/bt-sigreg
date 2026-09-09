@@ -32,7 +32,7 @@ def test_cem_reproducible_bounded_actions():
 
 
 def test_image_transform_matches_training():
-    from mylewm.train_rbg_libero import preprocess
+    from mylewm.train_libero import preprocess
     rgb=np.random.default_rng(1).integers(0,256,(2,128,128,3),dtype=np.uint8)
     pixels=torch.from_numpy(rgb).permute(0,3,1,2)[None,None]
     x,_=preprocess((pixels,torch.zeros(1,3,4,7)),{'action_mean':[0]*7,'action_std':[1]*7},'cpu')

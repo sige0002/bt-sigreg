@@ -12,7 +12,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from mylewm import train as new
-from mylewm.rbg import one_step_objective, BlockSIGReg
+from mylewm.objectives import one_step_objective, GaussianSIGReg
 from mylewm.tests.test_training_state import assert_tree_equal
 
 
@@ -81,7 +81,7 @@ def test_raw_and_identity_bt_match_official_loss_gradients_and_legacy_raw():
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(44 + int(raw.sigreg.draw_index))
         old_loss, _ = one_step_objective(old_model, batch['pixels'], batch['action'][:, :3],
-                                          BlockSIGReg(dim=6, blocks=1, projections=16), .09, 0., 'raw')
+                                          GaussianSIGReg(dim=6, projections=16), .09, 'raw')
     clean_batch = {k: batch[k].detach().clone() for k in ('pixels', 'action')}
     torch.testing.assert_close(raw(clean_batch, stage='validate')['loss'], old_loss)
 

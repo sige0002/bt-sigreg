@@ -1,4 +1,8 @@
-"""Reproducible from-scratch PushT training for RBG/Raw/TC comparisons."""
+"""Shared Raw/TC/BT training loop and PushT split/reference adapter.
+
+New PushT runs use train.py. LIBERO uses this loop via train_libero.py.
+Historical runs require their original source revision for strict resume.
+"""
 import argparse
 import importlib.metadata
 import json
@@ -17,7 +21,7 @@ import hydra
 import numpy as np
 from omegaconf import OmegaConf
 import torch
-from mylewm.rbg import BlockSIGReg, one_step_objective
+from mylewm.objectives import GaussianSIGReg, one_step_objective
 from mylewm.bt_sigreg import BTSIGReg, add_bt_arguments
 from mylewm.data_contract import file_sha256, data_fingerprints, training_budget
 from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
@@ -125,6 +129,8 @@ def atomic_save(value,path):
 
 
 def train(args):
+    if args.mode not in ('raw', 'tc', 'bt'):
+        raise ValueError(f'Unsupported mode: {args.mode}')
     schedule=UpdateSchedule(args.steps,args.warmup_steps,args.lr,args.min_lr)
     if getattr(args,'deterministic',False):
         os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG',':4096:8')
@@ -141,20 +147,12 @@ def train(args):
     print(json.dumps({'event':'hashing_data_for_training_contract'}),flush=True)
     data_identity=data_fingerprints(m)
     model=build_model().to(device)
-    initialization=getattr(args,'initialization',None)
-    if initialization is not None:
-        initial=torch.load(initialization,map_location=device,weights_only=False)
-        if initial.get('schema')!='untrained_shared_initialization_v2' or initial['seed']!=args.seed:
-            raise ValueError('Only matching newly generated untrained initialization is accepted')
-        if tensor_state_hash(initial['model'])!=initial['model_sha256']:
-            raise ValueError('Shared initialization content mismatch')
-        model.load_state_dict(initial['model'],strict=True)
     initial_model_sha256=tensor_state_hash(model.state_dict())
     model.register_buffer('training_action_mean',torch.tensor(m['action_mean'],device=device,dtype=torch.float64))
     model.register_buffer('training_action_std',torch.tensor(m['action_std'],device=device,dtype=torch.float64))
     with isolated_rng(args.seed+10000):
         inner = (BTSIGReg(depth=args.bt_depth, kappa=args.bt_kappa, hidden=args.bt_hidden)
-                 if args.mode == 'bt' else BlockSIGReg(blocks=args.blocks if args.mode=='rbg' else 1))
+                 if args.mode == 'bt' else GaussianSIGReg())
         reg=IndependentRegularizer(inner,args.seed+10000).to(device)
     transport_parameters = list(reg.parameters())
     opt=torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=.001)
@@ -172,13 +170,12 @@ def train(args):
             'deterministic_algorithms':torch.are_deterministic_algorithms_enabled(),
             'manifest_sha256':digest(args.manifest),
             'initial_model_sha256':initial_model_sha256,
-            'initialization_source_sha256':digest(initialization) if initialization else None,
             'data_identity':data_identity,'recipe':'controlled_comparison',
             'parameters':sum(p.numel() for p in model.parameters()),
             'training_only_parameters':sum(p.numel() for p in transport_parameters),
             'transport':inner.transport.config() if args.mode=='bt' else None,
             'source_sha256':{str(p.relative_to(ROOT)):digest(p) for p in
-                [Path(__file__),ROOT/'mylewm/bt_sigreg.py',ROOT/'mylewm/training_state.py',ROOT/'mylewm/training_diagnostics.py',ROOT/'mylewm/data_contract.py',ROOT/'mylewm/rbg.py',
+                [Path(__file__),ROOT/'mylewm/bt_sigreg.py',ROOT/'mylewm/training_state.py',ROOT/'mylewm/training_diagnostics.py',ROOT/'mylewm/data_contract.py',ROOT/'mylewm/objectives.py',
                  ROOT/'lewm/jepa.py',ROOT/'lewm/module.py',ROOT/'lewm/config/train/model/lewm.yaml']}}
     config=json.loads(json.dumps(config,default=str))
     start_step=0
@@ -219,7 +216,6 @@ def train(args):
     if device=='cuda':torch.cuda.reset_peak_memory_stats()
     print(json.dumps({'event':'start','parameters':config['parameters'],'mode':args.mode,
                       'train_clips':len(ds),'steps':args.steps,'device':device}),flush=True)
-    cross_weight=args.cross_weight if args.mode=='rbg' else 0.
     with (args.output/'metrics.jsonl').open('a') as log:
         for step,batch in enumerate(loader,start_step+1):
             learning_rates=schedule.apply(opt,step)
@@ -233,13 +229,13 @@ def train(args):
                     lambda module, inputs, output: transport_diagnostics.update(transport_statistics(inputs[0], output)))
             try:
                 with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
-                    loss,parts=one_step_objective(model,x,a,reg,args.gaussian_weight,cross_weight,args.mode)
+                    loss,parts=one_step_objective(model,x,a,reg,args.gaussian_weight,args.mode)
             finally:
                 if hook is not None: hook.remove()
             if not torch.isfinite(loss): raise FloatingPointError(f'loss at {step}')
             gradient_diagnostics=None
             if diagnostic_every and (step==1 or step%diagnostic_every==0):
-                gradient_diagnostics=encoder_gradient_norms(model,parts,args.gaussian_weight,cross_weight)
+                gradient_diagnostics=encoder_gradient_norms(model,parts,args.gaussian_weight)
             loss.backward()
             norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
             transport_norm = (torch.nn.utils.clip_grad_norm_(transport_parameters,1.,error_if_nonfinite=True)
@@ -263,7 +259,7 @@ def train(args):
                     for vb in val:
                         vx,va=preprocess(vb,m,device)
                         with torch.autocast(device_type=device,dtype=torch.bfloat16,enabled=device=='cuda'):
-                            _,vp=one_step_objective(model,vx,va,reg,args.gaussian_weight,cross_weight,args.mode)
+                            _,vp=one_step_objective(model,vx,va,reg,args.gaussian_weight,args.mode)
                         values.append({k:float(v) for k,v in vp.items()})
                         if diagnostic_every and len(values)==1:
                             row['validation_first_batch_action_diagnostics']=action_diagnostics(model,vx,va)
@@ -283,19 +279,17 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('command',choices=['prepare','train'])
     p.add_argument('--dataset',type=Path,default=ROOT/'.cache/stable-wm/datasets/pusht_expert_train.h5')
-    p.add_argument('--manifest',type=Path,default=ROOT/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
+    p.add_argument('--manifest',type=Path,default=ROOT/'output/manifests/pusht/manifest.json')
     p.add_argument('--output',type=Path)
-    p.add_argument('--mode',choices=['rbg','raw','tc','bt'],default='rbg')
+    p.add_argument('--mode',choices=['raw','tc','bt'],default='bt')
     add_bt_arguments(p)
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
     p.add_argument('--batch-size',type=int,default=128)
-    p.add_argument('--blocks',type=int,default=4)
     p.add_argument('--workers',type=int,default=4)
     p.add_argument('--save-every',type=int,default=1000)
     p.add_argument('--seed',type=int,default=3072)
     add_schedule_arguments(p)
     p.add_argument('--gaussian-weight',type=float,default=.09)
-    p.add_argument('--cross-weight',type=float,default=.01)
     p.add_argument('--resume',action='store_true')
     args=p.parse_args()
     if args.command=='prepare': prepare(args.dataset,args.manifest)
