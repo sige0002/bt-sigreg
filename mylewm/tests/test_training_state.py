@@ -178,17 +178,3 @@ def test_tensor_initialization_hash_detects_weight_change():
     assert tensor_state_hash(a)==tensor_state_hash(b)
     b['weight'][0,0]+=1
     assert tensor_state_hash(a)!=tensor_state_hash(b)
-
-
-def test_new_plan_shares_initial_weights_and_does_not_queue_other_methods():
-    from mylewm.tools.plan_controlled_comparison import plan
-    first=plan()
-    assert first['dry_run'] and first['methods']==['raw','rbg']
-    initial=first['shared_initialization']
-    for command in first['training']:
-        assert command[command.index('--initialization')+1]==initial[initial.index('--output')+1]
-        assert command[command.index('--steps')+1]=='50000'
-        assert command[command.index('--batch-size')+1]=='128'
-        assert command[command.index('--save-every')+1]=='5000'
-        assert '--deterministic' in command
-    assert plan(steps=100000)['output']!=first['output']

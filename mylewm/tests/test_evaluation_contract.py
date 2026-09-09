@@ -10,8 +10,7 @@ from mylewm.tools.evaluate_official_pusht import commands
 from mylewm.evaluation_contract import protocol,validate_result
 
 
-@pytest.mark.parametrize('script', ['audit_rbg_checkpoint.py', 'compare_paired.py', 'evaluate_official_pusht.py',
-                                   'plan_controlled_comparison.py'])
+@pytest.mark.parametrize('script', ['compare_paired.py', 'evaluate_official_pusht.py'])
 def test_relocated_cli_works_without_pythonpath(script):
     root = Path(__file__).resolve().parents[2]
     env = dict(os.environ)

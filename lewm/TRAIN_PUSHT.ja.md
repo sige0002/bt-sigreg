@@ -6,12 +6,12 @@
 
 ## どちらの方法を使うか
 
-2026-09-09追記：新規の同条件Raw／BT比較には、公式ライブラリへ委託した [新PushT経路](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09) の `mylewm/train.py --mode raw` を使ってください。以下のBは既存 `controlled_training_v2` の再現用として保持しています。Aの公式trainer自体は変更していません。
+2026-09-09追記：新規の同条件Raw／BT比較には、公式ライブラリへ委託した [新PushT経路](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09) の `mylewm/train.py --mode raw` を使ってください。以下のBも新しい経路に更新しました。旧比較レシピはGit履歴を参照してください。Aの公式trainer自体は変更していません。
 
 | 方法 | 使う場面 | 注意 |
 |---|---|---|
 | A：`lewm/train.py` | 公式trainerの設定・処理に沿って学びたい | この環境へのHDF5指定変更が必要。設定展開まで確認し、学習完走・途中再開は未検証 |
-| B：`mylewm/train_rbg.py --mode raw` | BTと同じデータ分割・更新予算で比較したい | 公式E/A/FとRaw SIGRegを使用するが、公式trainer・全レシピの完全再現ではない |
+| B：`mylewm/train.py --mode raw` | BTと同じデータ分割・更新予算で比較したい | 公式E/A/FとRaw SIGRegを使用するが、公式trainer・全レシピの完全再現ではない |
 
 公式LeWMの損失は「次の潜在状態の予測誤差＋SIGReg」です。RawにはBTの追加写像Tはありません。公式配布checkpointの再現評価と、自分で新規学習する実験も別です。
 
@@ -97,56 +97,16 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
 
 ## B. BTと同条件で比較するRaw LeWM
 
-### B1. 分割を準備する
-
-初回だけ実行します。BTにも同じmanifestを使う計画にします。既に作成済みなら再作成しません。
-
-```bash
-.venv/bin/python mylewm/train_rbg.py prepare \
-  --dataset .cache/stable-wm/datasets/pusht_expert_train.h5 \
-  --manifest output/manifests/pusht/manifest.json
-```
-
-### B2. 100ステップで確認する
-
-```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg.py train \
-  --mode raw --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/raw_smoke_s3072 \
-  --steps 100 --batch-size 16 --workers 0 --seed 3072 \
-  --warmup-steps 10 --lr 5e-5 --min-lr 0 \
-  --save-every 50 --diagnostics-every 25 --deterministic
-```
-
-`--mode raw`が公式の全潜在SIGRegで、`--mode bt`が提案側です。RawではTが存在しないため、監視画面のT勾配は`-`で正常です。
-
-### B3. 比較用の新規初期値を共通化し、10万更新する
-
-以下は**新しい比較実験の例**です。今稼働中のBTと比較する場合は、その開始記録にある共有初期値・manifest・すべての設定を照合して使います。新しいmanifestを作っただけで既存runと完全に同条件とはみなしません。
-
-```bash
-.venv/bin/python mylewm/tools/create_shared_initialization.py \
-  --seed 3072 --output output/pusht/comparison_s3072_initial.pt
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg.py train \
-  --mode raw --manifest output/manifests/pusht/manifest.json \
-  --initialization output/pusht/comparison_s3072_initial.pt \
-  --output output/pusht/raw_train_s3072 \
-  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
-  --warmup-steps 500 --lr 5e-5 --min-lr 0 \
-  --save-every 5000 --diagnostics-every 1000 --deterministic
-```
-
-比較するBTにも同じ`--initialization`とmanifestを渡し、出力先だけ分けます。同じseedだけで済ませず、configの`initial_model_sha256`も比較します。公式損失との恒等時loss/勾配一致をテストしていますが、GPU丸め・学習レシピまで無条件に同一という意味ではありません。
-
-### B4. 監視・再開する
-
-別の端末で実行します。
+新しい比較には `pusht_spt_v1` を使います。分割作成、短期確認、CSVの見方、保存再開は[新しいPushT学習手順](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)に集約しています。
 
 ```bash
 cd /home/USER/bt-sigreg
-bash mylewm/tools/monitor_training.sh --run output/pusht/raw_train_s3072
+# 設定確認だけ。既存manifestを指定し、出力先は未使用名にする
+.venv/bin/python mylewm/train.py --mode raw \
+  --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/spt_raw_s3072 --steps 100000
 ```
 
-5,000更新ごとに検証・推論重みと`resume.pt`を保存します。中断後は**開始時と同じコマンドの末尾に`--resume`だけ追加**します。総steps・batch・初期値・コード・データを変えず、学習プロセスが二重に動かないよう確認してください。初回保存前の中断は別の未使用出力名で新規開始します。
+本当に学習を開始する場合だけ、上記へ `--execute` を付け、GPUでは `CUBLAS_WORKSPACE_CONFIG=:4096:8` を指定します。比較するBTは `--mode bt` と別の出力名に変え、それ以外は共通にします。両configの `initial_model_sha256`、データ・manifest・予算・前処理を確認してください。新経路に旧 `--initialization` や旧 `resume.pt` を渡しません。
 
-出力の意味、OOM等の対処は[mylewmの初心者手順](../mylewm/README.md#はじめて学習する方へ)を参照。Rawを学習しただけでは成功率は分かりません。BTとの比較は同じ初期状態・Goal・CEM予算で別途制御評価し、訓練lossだけで順位付けしないでください。
+旧初期値生成・比較計画CLIは削除済みです。以前の方式で追試する必要がある場合は[整理記録](../mylewm/docs/CLEANUP.ja.md)の固定コミットから別ディレクトリへ復元します。現在の公式配布重み・既存100kの評価結果と、新規同予算比較は別の実験です。

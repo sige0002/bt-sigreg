@@ -1,6 +1,49 @@
 # 構成整理と復元
 
-## 2026-09-09：現行仕様・手順・レポートの分離
+## 最新：不要なPythonの削除（2026-09-09）
+
+ユーザー承認に基づき、独立診断・旧比較準備CLIと専用テストを13ファイル削除した。現在の `mylewm/` は **Python 43→30個**（直下12、tools7、tests11）。単なる移動・ファイル結合ではない。
+
+削除一覧：
+
+- `mylewm/bn_diagnostics.py`
+- `mylewm/representation_probes.py`
+- `mylewm/tools/calibrate_rbg_bn.py`
+- `mylewm/tools/probe_rbg_pusht.py`
+- `mylewm/tools/probe_rbg_libero.py`
+- `mylewm/tools/audit_rbg_checkpoint.py`
+- `mylewm/tools/audit_raw_path.py`
+- `mylewm/tools/audit_data_contract.py`
+- `mylewm/tools/benchmark_rbg.py`
+- `mylewm/tools/plan_controlled_comparison.py`
+- `mylewm/tools/create_shared_initialization.py`
+- `mylewm/tests/test_bn_calibration.py`
+- `mylewm/tests/test_representation_probes.py`
+
+旧plan専用テスト1件と、廃止CLIのhelp確認2ケースも除去した。BTテスト内の旧plan確認部分は取り除き、両従来trainerのhelpテストは維持した。学習・モデル・正則化・再開・評価本体は変更していない。
+
+### 残した理由と範囲
+
+- `train.py`：新規PushT Raw/BTの入口。
+- `train_rbg.py`：LIBEROが `common.train` として呼ぶ学習ループ、および新規PushT manifestのprepareに必要。まだ削除できる独立した旧コードではない。
+- `train_rbg_libero.py`・`libero_model.py`・`libero_planner.py`：未移行のLIBERO学習・共有モデル・評価。
+- `rbg.py`・`training_state.py`・`training_diagnostics.py`：既存BT/LIBEROと、移行の一致テストから使用。名前だけで削除しない。
+- データ・評価契約、行動正規化、公式/提案の評価・対応付き比較、記録行動の再実行、LIBERO画像監査は保持。
+- 残した機能の回帰テストは維持。以前の診断で得た測定値・失敗記録・レポートも保持。
+
+### 復元と検証
+
+削除前は固定コミット [5559095](https://github.com/sige0002/bt-sigreg/tree/5559095/mylewm)。全13ファイルはGitへコミット・push済みだったことと、削除前の未コミット差分が無いことを確認した。
+
+`git show 5559095:mylewm/対象ファイル.py` で旧内容を読める。旧実験を完全に追試する場合はこのコミットを別の作業ディレクトリへ展開し、現在のファイルを一括上書きしない。過去のレポートに残る削除済みCLI名は当時の実行記録であり、現行コマンドではない。
+
+CPU限定回帰は **103合格・5スキップ**（13.40秒）。直前の111合格から減った8件は削除した機能専用の検査。新しい公式ライブラリ経路・BT数学・LIBERO・再開・評価契約の検査は維持した。CUDA専用5件は今回未実行。fork/Lance/Lightning等の依存警告は残る。Python構文・Markdown参照・差分も確認する。
+
+重み・データ・manifest・評価結果・ログ・ローカル環境は削除していない。Git履歴に置き換えられるコードだけが対象である。LIBERO移行後の共有trainer撤去は未実施。
+
+## 前段階の文書整理（2026-09-09・履歴）
+
+以下は今回の削除より前の記録。「残したコード」は当時の判断で、現在の一覧は上節を優先する。
 
 ### 今回の変更
 

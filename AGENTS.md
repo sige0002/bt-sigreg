@@ -2,7 +2,7 @@
 
 ## 現在の運用（2026-09-09）
 
-新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。SWM/SPT/Lightningへ委託し、旧 `train_rbg.py` の100k実験とは別レシピ。エピソード分離を維持し、LIBEROと旧実験の再現経路は未移行。旧manifest・重み・コードを新経路に合わせて改変しない。新しい本学習・環境評価は今回未開始。
+新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。SWM/SPT/Lightningへ委託し、旧 `train_rbg.py` の100k実験とは別レシピ。エピソード分離を維持し、LIBEROと旧実験の再現経路は未移行。旧manifest・重みと稼働に必要な共有コードを新経路に合わせて改変しない。不要な独立診断・旧比較準備CLIはユーザー承認で削除し、固定コミット5559095へ保存。削除一覧・復元方法はCLEANUPを参照。新しい本学習・環境評価は今回未開始。
 
 PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200（89%）、別条件の上流eval 50ケース49/50（98%）を記録済み。結果の条件差はレポートを参照。新規学習・再開・追加評価は明示依頼時のみ。定期監視・checkpoint到達待機・自動評価予約は行わない。
 

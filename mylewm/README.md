@@ -33,13 +33,13 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 | `train.py` | 新規PushT Raw／BT用。SWMデータ読込・公式forward・SPT更新・Lightning管理への接続 |
 | `train_rbg.py` / `train_rbg_libero.py` / `rbg.py` | Raw/TC/RBG/BTの共有trainer・一段損失。旧名だが現役 |
 | `libero_model.py` / `libero_planner.py` | 2つの実カメラを使う共有モデル・計画器 |
-| その他の直下Python | データ・再開・評価契約、行動正規化、診断の共通部品 |
-| `tools/` | 学習補助・評価・比較・監査CLI |
+| その他の直下Python | データ・再開・評価契約、行動正規化、学習中診断の共通部品 |
+| `tools/` | PushT/LIBERO評価・結果比較・行動再実行・LIBERO画像監査 |
 | `tests/` | 残した実装の回帰テスト |
 | `docs/` / `docs/reports/` | 手順・研究仕様／実験結果・監査記録 |
 | `run_libero.sh` | ローカルOSMesa環境の起動wrapper |
 
-既存checkpointの復元・ソース照合を壊さないため、従来の共有Pythonの名前や配置は維持します。新経路は旧trainerのループを呼びませんが、BTの写像と少数のhash・乱数補助は再利用します。移行期間中のためファイル総数は減っていません。LIBERO移行・旧経路の撤去とは別工程です。
+既存checkpointの復元・ソース照合を壊さないため、従来の共有Pythonの名前や配置は維持します。新経路は旧trainerのループを呼びませんが、BTの写像と少数のhash・乱数補助は再利用します。不要な独立診断・旧比較準備CLIと専用テスト13ファイルを削除し、Pythonは43→30個になりました。`train_rbg.py`はLIBEROの学習ループとPushTのmanifest作成にまだ必要なので残しています。削除物は[固定コミットから復元](docs/CLEANUP.ja.md)できます。
 
 ## シェルと回帰確認
 

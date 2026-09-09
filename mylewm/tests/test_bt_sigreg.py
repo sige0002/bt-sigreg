@@ -299,13 +299,10 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     assert not any(isinstance(m, BoundedTransport) for m in exported.modules())
 
 
-def test_bt_and_tc_plan_and_both_cli_adapters():
+def test_both_legacy_cli_adapters():
     import os
     import subprocess
     import sys
-    from mylewm.tools.plan_controlled_comparison import plan
-    report = plan(steps=100000, methods=('raw', 'tc', 'bt'))
-    assert report['methods'] == ['raw', 'tc', 'bt'] and report['dry_run']
     for name in ('train_rbg.py', 'train_rbg_libero.py'):
         result = subprocess.run([sys.executable, str(training.ROOT/'mylewm'/name), '--help'],
                                 capture_output=True, text=True, timeout=30,

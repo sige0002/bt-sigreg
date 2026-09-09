@@ -63,7 +63,7 @@ Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は
 
 ## 従来経路：LIBEROと既存PushT実験の再現
 
-以下のPushTコマンドは旧 `controlled_training_v2` 用です。新しい公式ライブラリ経路と混ぜません。LIBERO移行と旧コードの撤去は、まだ行っていません。
+以下のPushTコマンドは旧 `controlled_training_v2` 用です。新しい公式ライブラリ経路と混ぜません。LIBEROは未移行のため共有trainerを残しています。旧比較計画・初期値生成・独立診断CLIは撤去済みで、過去の完全な手順はGit履歴を参照してください。
 
 公式LeWM側を学習したい場合は[公式PushT学習の説明書](../../lewm/TRAIN_PUSHT.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
 
@@ -176,7 +176,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_rbg_libero.py trai
 
 `Ctrl-b`を押して離し、次に`d`を押すとtmuxから離れます。戻るには`tmux attach -t bt-training`。学習画面でのCtrl-Cは**学習そのものを中断**します。tmuxは端末切断対策で、OS再起動や停電後に学習を自動再開するものではありません。
 
-これらは単独学習の手順です。Raw/TCとの厳密な比較では同一の未学習初期重み・データ順・batch・予算等をそろえます。`tools/create_shared_initialization.py`は現状**PushT用**で、生成した重みをLIBEROへ渡してはいけません。完了済みPushTの開始コマンドは[実行記録](reports/PUSHT_TRAINING_100K.ja.md)に残しています。
+これらは単独学習の手順です。Raw/TCとの厳密な比較では同一の未学習初期重み・データ順・batch・予算等をそろえます。旧初期値生成CLIは削除しました。新規PushTの比較は冒頭の新経路で共通seedから初期化し、configの初期モデルhashを照合します。完了済みPushTの開始コマンドは[実行記録](reports/PUSHT_TRAINING_100K.ja.md)に残しています。
 
 ### 5. 別の端末から進捗を見る
 
