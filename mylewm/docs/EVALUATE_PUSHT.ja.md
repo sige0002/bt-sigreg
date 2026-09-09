@@ -124,7 +124,20 @@ bash mylewm/tools/evaluate_pusht.sh \
 
 `evaluation protocols differ`を無視したりJSONを改変して通してはいけません。ソース版・前処理・manifest・ケース・計画条件を確認し、必要ならそろえて再評価します。
 
-## 7. 別ステップ・ケース数とトラブル
+## 7. 世界モデルrolloutの速度を測る
+
+制御成功率とは別に、環境・CEM反復・Goal encoder・I/Oを除いたE/A/Fのrollout時間を測れます。既定のCEM候補数300を一つのbatchにし、観測3フレームから予測器を1回または20回呼ぶ時間をCUDA eventで測ります。入力は乱数なので、この値は精度・実環境の総制御時間ではありません。
+
+```bash
+.venv/bin/python mylewm/tools/benchmark_pusht_rollout.py \
+  --checkpoint output/pusht/bt_spectral_v2_100k_s3072/step_100000_object.ckpt \
+  --checkpoint .cache/stable-wm/pusht/lewm_object.ckpt \
+  --output output/pusht/rollout_latency_bt_official.json
+```
+
+出力JSONには各checkpoint hash、warm-up後20反復の平均・中央値・最小/最大、peak GPUメモリを保存します。BTの学習専用Tは推論exportに含まれないため、この測定ではE/A/Fの計算量だけを比較します。
+
+## 8. 別ステップ・ケース数とトラブル
 
 別ステップは`--checkpoint`と`--output`を変え、一つずつ評価します。途中再開は未対応。新しい出力名でケース集合を最初からやり直し、失敗ログは残します。
 

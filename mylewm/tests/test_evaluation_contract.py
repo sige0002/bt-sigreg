@@ -5,6 +5,7 @@ import pytest
 import os
 import subprocess
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lewm'))
 from mylewm.planning_action_adapter import PlanningActionAdapter
 from mylewm.evaluation_contract import protocol,validate_result
 

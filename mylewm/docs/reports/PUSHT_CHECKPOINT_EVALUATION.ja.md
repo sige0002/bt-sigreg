@@ -253,3 +253,23 @@ checkpoint SHA256（削除前に確認）：
 再試行の評価本体はexit0で結果保存まで完了したが、親launcherが成功フラグを`successes`と読み違え、実際の`episode_successes`へのアクセスに失敗した。この親のfailed状態を上書きせず、`verify_result.py`が正しい項目名で別途検査し、`retry/verified_summary.json`へresult_verifiedを記録した。数字を取り直すGPU評価はしていない。
 
 生結果は`retry/results.json`と公式自身が書いた`retry/results.txt`、ケースは`retry/cases.json`、実行設定は`retry/hydra/.hydra/config.yaml`。結果JSON SHA256は`261624952de9a27aebd1d33a301f3c1d73a74781443ffad789f2611c0a4b1667`。PyTorch peak allocated/reservedは471,936,000/497,025,024 bytes。学習再開、checkpoint削除、既存結果の上書きはしていない。
+
+## 保存済みBTと公式配布LeWMの互換・速度比較（2026-09-09）
+
+コード整理後の互換確認として、保存済みBT 100,000更新重みと手元の公式配布LeWM重みを、同じ現行launcher・同じconfirm先頭50ケース・同じ物理CEM探索で個別に評価した。両runは`status=succeeded`となり、checkpoint/manifest SHA256と成功フラグをlauncherが照合した。BTの44/50は既存100kのoffset 0結果と一致するため、今回の結果を新しい独立試験とは扱わない。
+
+| checkpoint | 成功数 | 成功率 | BTとの差 |
+|---|---:|---:|---:|
+| 公式配布LeWM | 45/50 | 90.0% | 基準 |
+| BT 100,000 | 44/50 | 88.0% | −2.0ポイント |
+
+対応付き内訳はBTのみ成功2件、公式のみ成功3件。固定50ケースでの片側95%差下限は−16.06ポイントで、観測上も厳密な非劣性も確認できない。同予算学習・学習seed・マルチタスク性能の比較ではない。
+
+同じGB10で、CEM候補数300・warm-up 5回後20反復、環境/CEM反復/Goal encoder/I/Oを除くE/A/F rolloutをCUDA eventで計測した。観測3フレームをencoderへ一度通し、1遷移はpredictor 1回、20遷移は逐次predictor 20回である。
+
+| checkpoint | 1遷移 mean（median） | 20遷移 mean（median） | peak allocated |
+|---|---:|---:|---:|
+| BT 100,000 | 8.73 ms（8.77 ms） | 121.04 ms（120.63 ms） | 690.8 MB |
+| 公式配布LeWM | 8.63 ms（8.52 ms） | 121.03 ms（120.74 ms） | 690.1 MB |
+
+BTのTは推論exportから除外されるため、両者のrollout速度は実質同等である。これはランダム入力の単体microbenchmarkであり、CEM全体・画像読込・環境stepを含むwall-clock制御時間、または他GPUでの速度を表さない。生結果はGit対象外の`output/pusht/bt_100000_compat_eval50/`、`official_compat_eval50/`、`rollout_latency_bt_official_50.json`、対応比較は`comparison_bt100000_official_compat50.json`に保存した。
