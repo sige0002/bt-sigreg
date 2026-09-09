@@ -5,6 +5,7 @@
 | レポート | 内容 |
 |---|---|
 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md) | 途中・最終checkpoint、固定200ケースと上流50ケース、比較条件・失敗・hash |
+| [PushT失敗監査](PUSHT_FAILURE_AUDIT.ja.md) | 固定ケースの一段・5遷移誤差と、遷移／cost／探索の切り分け範囲 |
 | [PushT 100k学習](PUSHT_TRAINING_100K.ja.md) | 完了済みrunの開始条件・出力・最終loss |
 | [実装・運用監査履歴](IMPLEMENTATION_AUDIT.ja.md) | 数学・接続・再開テスト、LIBERO短期診断、Issue対応、旧試作・失敗記録 |
 | [LeWM引用研究のウォッチリスト](LEWM_CITATION_WATCH_20260909.ja.md) | TC-LeWM、LpWM、Fast-LeWM等の採否・比較順・再現性上の注意 |
