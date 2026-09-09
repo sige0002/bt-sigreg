@@ -22,6 +22,7 @@ parser.add_argument('--num-eval', type=int, default=50)
 parser.add_argument('--offset', type=int, default=0, help='Index into the fixed confirm cases')
 parser.add_argument('--seed', type=int, default=42, help='CEM/environment seed; confirm cases stay fixed')
 parser.add_argument('--gb10-cache-workaround', action='store_true', help='Release only the dataset clean file cache before CUDA initialization')
+parser.add_argument('--cem-audit', action='store_true', help='Record CEM convergence and selected-plan diagnostics')
 parser.add_argument('--execute', action='store_true', help='Actually run evaluation on GPU')
 args = parser.parse_args()
 checkpoint = args.checkpoint.resolve()
@@ -75,8 +76,11 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            f'seed={args.seed}',
            '+eval.audit_provenance=true', '+eval.shared_physical_search=true',
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
+if args.cem_audit:
+    command.append('solver._target_=mylewm.cem_audit.AuditedCEMSolver')
 plan = {'checkpoint': str(checkpoint), 'output': str(output), 'cases': len(cases),
         'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
+        'cem_audit': args.cem_audit,
         'gb10_cache_workaround': args.gb10_cache_workaround,
         'checkpoint_sha256': hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         'manifest_sha256': hashlib.sha256(manifest.read_bytes()).hexdigest(),
@@ -104,6 +108,8 @@ record_status('running')
 env = dict(os.environ, STABLEWM_HOME=str(root/'.cache/stable-wm'),
            PYTHONPATH=os.pathsep.join([str(root), str(root/'lewm')]),
            PYTHONUNBUFFERED='1', OMP_NUM_THREADS='4', MKL_NUM_THREADS='4')
+if args.cem_audit:
+    env['BT_CEM_AUDIT_PATH'] = str(output/'cem_audit.jsonl')
 print(f"Running; follow progress with: tail -f {output/'console.log'}", flush=True)
 with (output/'console.log').open('x') as stream:
     result = subprocess.run(command, cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
@@ -114,6 +120,8 @@ sys.path.insert(0, str(root))
 from mylewm.evaluation_contract import validate_result, protocol
 metrics = json.loads((output/'results.txt.json').read_text())
 validate_result(metrics, cases, metrics['provenance'], protocol(metrics['config']))
+if args.cem_audit and (not (output/'cem_audit.jsonl').is_file() or not (output/'cem_audit.jsonl').stat().st_size):
+    raise ValueError('CEM audit was requested but no records were written')
 if metrics['checkpoint_sha256'] != plan['checkpoint_sha256'] or metrics['provenance']['manifest_sha256'] != plan['manifest_sha256']:
     raise ValueError('Checkpoint or manifest changed during evaluation')
 successes = sum(metrics['successes'])
