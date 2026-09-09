@@ -1,6 +1,6 @@
 # PushT成功率評価：初心者向け手順
 
-更新日：2026-09-09。学習・依頼済み評価は完了しています。新規評価は明示依頼時のみ実行し、定期監視・自動評価予約は行いません。
+更新日：2026-09-10。新規評価は明示依頼時のみ実行し、定期監視・自動評価予約は行いません。
 
 このPCの既存`.venv`、ダウンロード済みPushTデータ、信頼済みcheckpointを使います。[学習手順](TRAINING.ja.md)とは別工程で、**追加学習はしません**。LIBERO評価にはこのシェルを使わないでください。
 
@@ -18,11 +18,38 @@
 
 公式配布checkpointを「公式15,000ステップ」等と呼ばないでください。過去の公式は同50ケース46/50、全200ケース176/200でしたが、修正後の公式50ケース再評価は45/50でした。異なる版の結果を混ぜて200件を集計しません。PushTだけでマルチタスク達成や任意の場面での非劣化を保証できません。
 
-## 2. 重複起動を避け、ファイルを確認する
+## 2. 新しいRaw/BT runを評価する
+
+新レシピ `pusht_spt_v1` のRaw/BTでは、**100,000更新が正常終了してから**評価します。稼働中の学習とCEM評価を同時に実行しないでください。次はRawの例です。BTでは`raw`を`bt`へ置き換えます。`--execute`なしは安全な設定確認だけで、GPU初期化・出力作成・評価はしません。
+
+```bash
+cd /home/USER/bt-sigreg
+.venv/bin/python -c 'import json; d=json.load(open("output/pusht/spt_raw_s3072/completed.json")); assert d == {"step": 100000, "state": "completed", "recipe": "pusht_spt_v1"}; print(d)'
+ls -lh output/pusht/spt_raw_s3072/step_100000_object.ckpt
+
+# まずdry-run。出力名は未使用にし、ディレクトリを先に作らない。
+bash mylewm/tools/evaluate_pusht.sh \
+  --checkpoint output/pusht/spt_raw_s3072/step_100000_object.ckpt \
+  --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/eval_spt_raw_s3072_confirm50 \
+  --gb10-cache-workaround
+
+# dry-runの内容を確認してから、この1回だけを実行する。
+bash mylewm/tools/evaluate_pusht.sh \
+  --checkpoint output/pusht/spt_raw_s3072/step_100000_object.ckpt \
+  --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/eval_spt_raw_s3072_confirm50 \
+  --gb10-cache-workaround --execute
+```
+
+`completed.json`がない、内容が一致しない、checkpointがない、または学習プロセスが残っている場合は評価を始めません。`resume.pt`と`last.ckpt`は学習再開用であり、評価へ渡しません。Raw/BT比較では、両方に**同じ新manifest、`--num-eval`、`--offset`、`--seed`、CEM設定**を使い、各評価の`status.json`が`succeeded`になった後で比較します。新しいrunの評価結果を、旧BT runや公式配布checkpointの数値と同じ条件の方式比較として混ぜません。
+
+## 3. 既存checkpointを評価する前の確認
 
 ```bash
 cd /home/USER/bt-sigreg
 systemctl --user list-units --all 'bt-pusht*'
+tmux list-sessions 2>/dev/null || true
 nvidia-smi
 bash mylewm/tools/monitor_training.sh --once
 ls -lh output/pusht/bt_spectral_v2_100k_s3072/step_*_object.ckpt
@@ -37,9 +64,9 @@ ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 - `resume.pt`は学習再開用なので評価へ渡しません。
 - `torch.load(weights_only=False)`を使います。自分で生成したものや信頼確認済み公式重みだけを使用してください。
 
-既定manifestは`.cache/stable-wm/pusht/rbg_v0/manifest.json`です。現run用で、内部に旧フォルダ名があるため一時互換リンクを依存整理なしに削除しないでください。このリポジトリには`output/manifests/pusht/manifest.json`はまだ作成されていません。新規学習用に作成した別manifestを使う場合だけ、両モデルへ同じ`--manifest PATH_TO_NEW_MANIFEST`を指定し、同じ分割・ケースで比較します。既存runのmanifestは書き換えません。
+既定manifestは`.cache/stable-wm/pusht/rbg_v0/manifest.json`です。現run用で、内部に旧フォルダ名があるため一時互換リンクを依存整理なしに削除しないでください。新レシピ用の`output/manifests/pusht/manifest.json`がある場合は、上の新run手順どおり明示指定します。比較する二つの新runには同じmanifestを使い、既存runのmanifestは書き換えません。
 
-## 3. まず設定確認だけを行う
+## 4. 既存checkpointの設定確認だけを行う
 
 リポジトリ直下で、未使用の出力名を指定します。出力フォルダ自体はまだ作りません。
 
@@ -54,7 +81,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 
 `--gb10-cache-workaround`はこのGB10の起動OOM対処です。**実行時だけ**対象PushT HDF5の読み取りcacheへ解放ヒントを出し、データ読込より先にCUDAを初期化します。データ削除、全体の`drop_caches`、モデルや学習条件の変更はしません。学習側の再読込で一時的に遅くなる可能性はあります。通常の別GPUではこのフラグを外せます。
 
-## 4. 評価を実行し、ログを見る
+## 5. 評価を実行し、ログを見る
 
 端末切断後も続けたいなら、先に`tmux new -s pusht-eval`を実行し、その中で次を実行します。設定確認と同じコマンドに`--execute`を追加します。
 
@@ -79,7 +106,7 @@ tail -f output/pusht/eval_bt_100000_50/console.log
 
 既定条件は50ケース、seed42、CEM候補300・更新30・上位30・batch1、計画horizon5・行動block5・再計画間隔5、評価予算50、画像224です。既存`lewm/eval.py`と設定を使い、重み・データ・前処理ソース・依存版・初期状態/Goal・実行行動を記録します。片方だけ候補数等を減らして比較しないでください。
 
-## 5. 終了と結果を確認する
+## 6. 終了と結果を確認する
 
 正常終了すると`Completed: 成功数/ケース数 successes (...)`を表示します。`echo $?`を実行**直後**に確認すると終了コードで、0が正常です。ログのエラーも確認してください。
 
@@ -100,7 +127,7 @@ tail -n 12 output/pusht/eval_bt_100000_50/console.log
 
 `success_rate`は百分率で46.0なら46%。後述の比較ツールの`candidate_rate`等は0–1なので0.46が46%です。途中終了・結果未生成は**未測定**で、0%ではありません。全出力はGit対象外の`output/`。元checkpointを移動・削除するとリンクも使えなくなるので保持してください。
 
-## 6. 公式モデルと比較する
+## 7. 公式モデルと比較する
 
 提案側が終わってから、別の未使用名で公式を評価します。同じmanifest、ケース数、offset、コード版を使います。
 
@@ -124,7 +151,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 
 `evaluation protocols differ`を無視したりJSONを改変して通してはいけません。ソース版・前処理・manifest・ケース・計画条件を確認し、必要ならそろえて再評価します。
 
-## 7. 世界モデルrolloutの速度を測る
+## 8. 世界モデルrolloutの速度を測る
 
 制御成功率とは別に、環境・CEM反復・Goal encoder・I/Oを除いたE/A/Fのrollout時間を測れます。既定のCEM候補数300を一つのbatchにし、観測3フレームから予測器を1回または20回呼ぶ時間をCUDA eventで測ります。入力は乱数なので、この値は精度・実環境の総制御時間ではありません。
 
@@ -137,7 +164,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 
 出力JSONには各checkpoint hash、warm-up後20反復の平均・中央値・最小/最大、peak GPUメモリを保存します。BTの学習専用Tは推論exportに含まれないため、この測定ではE/A/Fの計算量だけを比較します。
 
-## 8. 別ステップ・ケース数とトラブル
+## 9. 別ステップ・ケース数とトラブル
 
 別ステップは`--checkpoint`と`--output`を変え、一つずつ評価します。途中再開は未対応。新しい出力名でケース集合を最初からやり直し、失敗ログは残します。
 

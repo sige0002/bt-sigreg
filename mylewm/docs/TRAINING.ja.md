@@ -4,7 +4,7 @@
 
 新規のRaw／BT比較には `mylewm/train.py` を使います。データ読込はstable-worldmodel、画像前処理と一段損失は公式LeWM、逆伝播・optimizer・schedulerはstable-pretraining、訓練ループ・CSVログ・checkpointはLightningへ委託します。BT固有の処理は学習専用Tと正則化分岐です。
 
-これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。重み・manifest・評価結果は保持しています。旧RBG専用処理は撤去し、共有ループを `training.py`、LIBERO入口を `train_libero.py` へ改名しました。過去runの厳密再開は開始時のGit版が必要です。LIBEROは後半の共有経路を使います。今回、本学習は開始していません。
+これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。重み・manifest・評価結果は保持しています。旧RBG専用処理は撤去し、共有ループを `training.py`、LIBERO入口を `train_libero.py` へ改名しました。過去runの厳密再開は開始時のGit版が必要です。LIBEROは後半の共有経路を使います。本学習・環境評価はユーザーの明示依頼時だけ実行します。
 
 ### 変更する条件・維持する条件
 
@@ -25,7 +25,7 @@
 
 ### 設定確認と実行
 
-このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「2. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスで、現時点では存在しません。保存済みBTの評価には使わず、既存manifestも書き換えません。
+このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「2. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスです。存在する場合は内容を変更せずに使い、保存済みBTの評価には使いません。
 
 ```bash
 cd /home/USER/bt-sigreg
@@ -54,6 +54,8 @@ Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は
 - `step_N.ckpt`／`last.ckpt`：Lightning形式のモデル・T・optimizer・scheduler・乱数・再開条件。既定5,000更新ごとと最終時点に保存。
 - `step_N_object.ckpt`：Tなしの推論専用モデル。従来の `evaluate_pusht.sh` に渡す形式です。新重みの実環境成功率はまだ未測定です。
 - `completed.json`：訓練ループ正常完了後のみ生成。例外・途中停止を成功扱いしません。
+
+100,000更新を完走した後は、`completed.json`の`state=completed`と`step=100000`、`step_100000_object.ckpt`の両方を確認してから、[PushT評価手順](EVALUATE_PUSHT.ja.md#2-新しいrawbt-runを評価する)へ進みます。`last.ckpt`や途中の`step_N_object.ckpt`を最終成績として評価しないでください。評価は学習が終了してGPUを使っていないときに、別の新規出力先で実行します。
 
 現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt_s3072/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
 
