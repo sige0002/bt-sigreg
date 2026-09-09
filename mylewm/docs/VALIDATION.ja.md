@@ -4,6 +4,28 @@
 
 ## 実施済み
 
+### 公式ライブラリへのPushT移行（2026-09-09）
+
+`mylewm/train.py` の新レシピ `pusht_spt_v1` を実装。SWMのHDF5Dataset、公式画像前処理・`lejepa_forward`・SIGReg、SPTの逆伝播／optimizer／scheduler、Lightningのループ・CSV・checkpointを使用する。エピソード分離・train-only統計を維持するが、クリップ末尾条件・抽出・LR添字は旧経路と異なる。[条件差と手順](TRAINING.ja.md)を参照。
+
+追加の9テストで次を確認した。性能実験ではない。
+
+- 小型モデルのRaw／恒等BTで損失・全モデル勾配が一致し、旧Rawの同一入力での損失も一致。未来教師勾配とTへの予測損失勾配不在を確認。
+- 本物のPushT E/A/FでもRaw／恒等BTの損失・勾配が一致（CPU、合成28×28画像）。実画像制御や224×224での長期学習ではない。
+- native HDF5ローダーを自己生成fixtureへ適用し、episode分離・形状・正規化・固定validationケースを確認。
+- CPU小型BN/Dropoutモデル、worker0/2で連続6更新と3更新＋再開のバッチ・loss・全state・optimizer・schedulerが完全一致。モデルとTの更新、Tなしexport、設定変更時の拒否を確認。
+- 新entrypointのRaw／BT両方でnative fixture・小型モデルの3更新が完了し、CSV・最終checkpoint・完了記録と出力上書き拒否を確認。
+
+最初の接続試験では画像前処理の引数不足、テスト内の非leaf Tensorのdeepcopy、再開時のvirtual epoch長の扱いを修正した。SPTが登録するHardwareMonitorは公開設定のキー一覧に無く、生成後・setup前に除外した。環境情報の背景収集・外部tracker・追加モデルexportも無効化。独自最適化ループは追加していない。
+
+旧コード・manifest・既存100k重み・評価結果は変更していない。新経路の本学習・PushT成功率・GPU長期再開・LIBERO移行は未実施で、旧checkpointからの互換resumeも許可しない。
+
+全回帰は `CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm/tests -q` で **111合格・5スキップ**（14.35秒）。CUDA専用5件は未実行。fork/LanceとLightningのログ・再開に関する警告は残るが、上記CPU再開の実測一致を別途確認した。実manifestでの新CLI dry-run、Markdownリンク・見出し参照、Python構文、`git diff --check`も確認した。
+
+実PushTデータでも学習を起動せずnative loaderを確認し、train 1,585,717クリップ、固定validation 256件、取得画像4×3×224×224・行動4×10を確認した。旧train 1,645,509クリップとは末尾条件が異なる。実データの確認は1クリップの読込までで、全クリップの内容監査・実データ学習・成功率試験ではない。
+
+### 既存経路での実績
+
 | 項目 | 確認した範囲 |
 |---|---|
 | BT v2 | Cayley特異値制約、非奇関数の原点固定写像、距離境界、勾配・推論分離・保存再開のテスト |

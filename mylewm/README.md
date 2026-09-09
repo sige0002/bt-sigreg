@@ -19,6 +19,8 @@ LeWMの一段予測と小型E/A/Fを維持し、学習専用の有界可逆写�
 
 ## 現在の状態（2026-09-09）
 
+新規PushTのRaw／BT比較用に `train.py` を追加しました。公式SWM/SPT/Lightningを使い、エピソード分離を維持します。[新経路の手順と条件差](docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)を参照。旧100kの継続ではなく新レシピで、本学習・成功率評価は未実施です。
+
 PushT BT v2の100,000更新は正常終了。固定confirm 200ケースでは178/200（89%）、別条件の上流eval 50ケースでは49/50（98%）です。ケース・正規化・seed処理が異なるので混ぜません。[評価レポート](docs/reports/PUSHT_CHECKPOINT_EVALUATION.ja.md)に条件と留保を記録しています。
 
 LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学習seed、マルチタスク性能向上は未実証です。新規学習・評価・定期監視を自動開始しません。
@@ -28,6 +30,7 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 | 場所 | 用途 |
 |---|---|
 | `bt_sigreg.py` | 現行BTの有界変換・正則化 |
+| `train.py` | 新規PushT Raw／BT用。SWMデータ読込・公式forward・SPT更新・Lightning管理への接続 |
 | `train_rbg.py` / `train_rbg_libero.py` / `rbg.py` | Raw/TC/RBG/BTの共有trainer・一段損失。旧名だが現役 |
 | `libero_model.py` / `libero_planner.py` | 2つの実カメラを使う共有モデル・計画器 |
 | その他の直下Python | データ・再開・評価契約、行動正規化、診断の共通部品 |
@@ -36,7 +39,7 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 | `docs/` / `docs/reports/` | 手順・研究仕様／実験結果・監査記録 |
 | `run_libero.sh` | ローカルOSMesa環境の起動wrapper |
 
-既存checkpointの復元・ソース照合を壊さないため、共有Pythonの名前や配置は維持します。補助診断を実行できることと、研究目的を達成したことは別です。
+既存checkpointの復元・ソース照合を壊さないため、従来の共有Pythonの名前や配置は維持します。新経路は旧trainerのループを呼びませんが、BTの写像と少数のhash・乱数補助は再利用します。移行期間中のためファイル総数は減っていません。LIBERO移行・旧経路の撤去とは別工程です。
 
 ## シェルと回帰確認
 

@@ -25,6 +25,8 @@ PushT BT v2は単一seedで100,000更新を完了しました。
 
 ## 読む順序
 
+新規PushT Raw／BTの学習入口は `mylewm/train.py` です。公式SWM/SPT/Lightningへの移行経路で、既存100kとは別レシピです。エピソード分離を維持し、旧コード・重み・評価は保持しています。LIBEROは従来経路のままです。
+
 | 目的 | 文書 |
 |---|---|
 | アルゴリズムを理解する | [BT-SIGReg仕様](mylewm/docs/BT_SIGREG.ja.md) |

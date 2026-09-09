@@ -2,6 +2,8 @@
 
 ## 現在の運用（2026-09-09）
 
+新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。SWM/SPT/Lightningへ委託し、旧 `train_rbg.py` の100k実験とは別レシピ。エピソード分離を維持し、LIBEROと旧実験の再現経路は未移行。旧manifest・重み・コードを新経路に合わせて改変しない。新しい本学習・環境評価は今回未開始。
+
 PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200（89%）、別条件の上流eval 50ケース49/50（98%）を記録済み。結果の条件差はレポートを参照。新規学習・再開・追加評価は明示依頼時のみ。定期監視・checkpoint到達待機・自動評価予約は行わない。
 
 実フォルダは `/home/USER/bt-sigreg`。旧パス `/home/USER/task-centered-sigreg-lewm` は一時互換リンクであり恒久運用しない。ただし保存済みmanifestに依存が残るため、依存・復元方法を整理せず削除しない。新規処理で旧パス依存を増やさず、既存configやmanifestを改変してhash照合を回避しない。

@@ -1,5 +1,70 @@
 # PushT／LIBERO-10：初心者向け学習手順
 
+## 新しいPushT経路：公式ライブラリへ委託（2026-09-09）
+
+新規のRaw／BT比較には `mylewm/train.py` を使います。データ読込はstable-worldmodel、画像前処理と一段損失は公式LeWM、逆伝播・optimizer・schedulerはstable-pretraining、訓練ループ・CSVログ・checkpointはLightningへ委託します。BT固有の処理は学習専用Tと正則化分岐です。
+
+これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。既存の `train_rbg.py`、重み・manifest・評価結果は変更していません。LIBEROは後半の従来経路を引き続き使います。今回、本学習は開始していません。
+
+### 変更する条件・維持する条件
+
+| 項目 | 新しいRaw／BTで共通の条件 |
+|---|---|
+| 分割・行動統計 | 既存manifestのエピソード分離80/10/10とtrain-only統計を維持 |
+| 画像・行動の取得 | SWMの4フレーム・frameskip5。20ステップ分を取得し、予測には先頭3行動chunkを使う。旧ローダーの16ステップ分とは末尾の有効クリップ数が異なる |
+| 抽出 | PyTorchのepoch単位シャッフル・drop_last。旧経路の更新ごとの復元抽出から変更 |
+| 予測損失 | 公式 `lejepa_forward` をそのまま使用。未来教師への勾配を維持 |
+| 正則化 | 公式SIGRegを両方式ともFP32で計算。BTだけTを追加。射影乱数はモデルから分離 |
+| 更新予算 | 両方式100,000、batch128、seed3072、同一の新規E/A/F初期値 |
+| 学習率 | SPTのwarmup500＋cosine、最大5e-5、目標最小0。初回LRは0、最終更新に使うLRはごく小さい正値。旧添字規約とは異なる |
+| optimizer | AdamW、全重みweight decay .001。モデルとTの勾配を別々にノルム1でclip |
+| validation | manifestにある固定validationケースを使用（既存PushTは256件）。無ければvalidationエピソードの全有効クリップ |
+| 推論 | 公式E/A/Fのみ。Tなし。訓練統計bufferを保持し、既存評価シェルで使用可能 |
+
+各runにmanifest・データ・初期モデル・ソース・主要依存ソースのhash、依存版、レシピを記録します。新Rawと新BTを比較し、旧10万BTとの違いをTだけの効果とは解釈しません。公式配布モデルの完全な学習再現とも呼びません。
+
+### 設定確認と実行
+
+このPCの既存環境を前提とします。新規manifestが無い場合だけ、後半の「2. 学習・検証の分割ファイルを作る」を実施してください。既存manifestは書き換えません。
+
+```bash
+cd /home/USER/bt-sigreg
+.venv/bin/python mylewm/train.py --help
+# 既定はdry-run。学習・GPU初期化・出力作成は行わない
+.venv/bin/python mylewm/train.py --mode bt \
+  --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/spt_bt_s3072
+```
+
+dry-runは設定・ソース識別の確認までで、全データhash・重み・学習動作の保証ではありません。出力先は未使用名を指定し、先にmkdirしないでください。
+
+実際に新規学習する場合だけ、同じコマンドに `--execute` を追加します。GPUの決定論設定も指定します。
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train.py \
+  --mode bt --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/spt_bt_s3072 --steps 100000 --execute
+```
+
+Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は同じにします。同時起動しません。まず短期動作確認をするなら、別出力名で `--steps 100 --warmup-steps 10 --batch-size 16 --workers 0 --save-every 50` を両方式に揃えて指定します。短期checkpointを10万更新へ延長する用途のresumeはできません。
+
+### ログ・保存・再開
+
+- `metrics/version_N/metrics.csv`：LightningのCSVログ。`update`は1始まりの更新番号、`lr_used`はその更新に使った学習率、`fit/loss`・`fit/pred_loss`・`fit/sigreg_loss`が損失。CSVの標準`step`は0始まりなので区別します。
+- `step_N.ckpt`／`last.ckpt`：Lightning形式のモデル・T・optimizer・scheduler・乱数・再開条件。既定5,000更新ごとと最終時点に保存。
+- `step_N_object.ckpt`：Tなしの推論専用モデル。従来の `evaluate_pusht.sh` に渡す形式です。新重みの実環境成功率はまだ未測定です。
+- `completed.json`：訓練ループ正常完了後のみ生成。例外・途中停止を成功扱いしません。
+
+現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt_s3072/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
+
+中断後は**同じ設定・総更新数**で、`--resume 元run/last.ckpt --output 新しい未使用run --execute` を指定します。元のrunは上書きせず、ログは新runへ分離します。自己生成した信頼済みcheckpointだけを使ってください。旧 `resume.pt`、完了済みcheckpoint、変更したレシピでの再開は拒否します。
+
+再開位置だけは薄い補助処理で補完します。PyTorchのepochシャッフルから消費済みバッチを読み飛ばし、prefetch位置ではなくLightningの完了更新数で復元します。CPU小型モデル・worker0/2で連続6更新と3更新＋再開が一致しましたが、実LeWM全体のGPU長期再開まで保証したものではありません。
+
+## 従来経路：LIBEROと既存PushT実験の再現
+
+以下のPushTコマンドは旧 `controlled_training_v2` 用です。新しい公式ライブラリ経路と混ぜません。LIBERO移行と旧コードの撤去は、まだ行っていません。
+
 公式LeWM側を学習したい場合は[公式PushT学習の説明書](../../lewm/TRAIN_PUSHT.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
 
 この手順は**このPCの既存`.venv`とダウンロード済みデータを使う手順**です。別PCへの環境構築・ダウンロードを自動化したものではありません。以下のコマンドを順番に実行しますが、PushTとLIBEROの学習は一方ずつにしてください。

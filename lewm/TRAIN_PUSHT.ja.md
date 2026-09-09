@@ -6,6 +6,8 @@
 
 ## どちらの方法を使うか
 
+2026-09-09追記：新規の同条件Raw／BT比較には、公式ライブラリへ委託した [新PushT経路](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09) の `mylewm/train.py --mode raw` を使ってください。以下のBは既存 `controlled_training_v2` の再現用として保持しています。Aの公式trainer自体は変更していません。
+
 | 方法 | 使う場面 | 注意 |
 |---|---|---|
 | A：`lewm/train.py` | 公式trainerの設定・処理に沿って学びたい | この環境へのHDF5指定変更が必要。設定展開まで確認し、学習完走・途中再開は未検証 |
