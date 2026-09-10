@@ -25,7 +25,7 @@
 
 ### 設定確認と実行
 
-このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「2. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスです。存在する場合は内容を変更せずに使い、保存済みBTの評価には使いません。
+このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「3. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスです。存在する場合は内容を変更せずに使い、保存済みBTの評価には使いません。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -87,25 +87,50 @@ uv run python mylewm/train.py --help
 
 LIBEROのPython依存は`uv sync --locked --group libero`で追加します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
 
-### 1. 作業フォルダ・環境・データを確認する
+### 1. データを任意の保存先へ取得する
+
+データはGitに入れません。次の例では`BT_SIGREG_DATA_ROOT`だけを自分の大容量ストレージへ変更します。PushTの公式データは圧縮済みで約13.1GB、展開後は約46.3GBです。LIBERO-10は10個で約13.7GBです。必要な空き容量とネットワークを確認してから実行してください。
+
+```bash
+export BT_SIGREG_DATA_ROOT=/absolute/path/to/bt-sigreg-data
+export PUSHT_HDF5="$BT_SIGREG_DATA_ROOT/pusht/pusht_expert_train.h5"
+export LIBERO10_DATASET="$BT_SIGREG_DATA_ROOT/libero_10"
+mkdir -p "$(dirname "$PUSHT_HDF5")"
+
+# PushT: 公式 LeWM dataset を取得して HDF5 を展開する。
+uv run hf download quentinll/lewm-pusht --repo-type dataset \
+  --local-dir "$BT_SIGREG_DATA_ROOT/pusht-source"
+zstd -d --stdout "$BT_SIGREG_DATA_ROOT/pusht-source/pusht_expert_train.h5.zst" \
+  > "$PUSHT_HDF5"
+
+# LIBERO-10: 公式 LIBERO dataset の必要な10ファイルだけを取得する。
+uv run hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
+  --include 'libero_10/*' --local-dir "$BT_SIGREG_DATA_ROOT"
+```
+
+`zstd: command not found`ならOS側のZstandardコマンドを導入してから、PushTの展開行だけを再実行します。ダウンロード済みファイルの削除・再取得は自動では行いません。公式LIBERO Python scriptの`--datasets`には`libero_10`の選択肢がないため、この用途では上の公式Hugging Face repositoryを直接指定します。
+
+### 2. 作業フォルダ・環境・データを確認する
 
 全コマンドはリポジトリ直下で実行します。別の場所に置いた場合は、最初の`cd`だけ実際の場所に変更してください。仮想環境のactivateは不要です。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
+export PUSHT_HDF5=/absolute/path/to/pusht_expert_train.h5
+export LIBERO10_DATASET=/absolute/path/to/libero_10
 uv run python --version
 uv run python mylewm/training.py --help
 uv run python mylewm/train_libero.py --help
 nvidia-smi
-ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
-ls .cache/libero-datasets/libero_10/*.hdf5
+ls -lh "$PUSHT_HDF5"
+ls "$LIBERO10_DATASET"/*.hdf5
 ```
 
-PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必要です。対象benchmarkのデータが見つからなければ先へ進まないでください。`uv run python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。別PCの完全な再現環境用lockfileは現状ありません。
+PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必要です。`/absolute/path/to/...`は実際の任意の保存場所へ置き換えてください。対象benchmarkのデータが見つからなければ先へ進まないでください。`uv run python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。
 
 学習では実画像・実行行動から一段先の潜在状態を予測します。LIBEROは2つの実カメラを使い、10タスクで1つのモデルを共有します。HDF5からの学習にはMuJoCo/OSMesaの起動は不要です。シミュレータが必要なのは後述の制御評価です。
 
-### 2. 学習・検証の分割ファイルを作る（最初の1回だけ）
+### 3. 学習・検証の分割ファイルを作る（最初の1回だけ）
 
 `manifest.json`はデータの場所、学習/検証/テストの分割、行動の正規化統計を記録するファイルです。データ本体を複製・生成する処理ではありません。新しいmanifestを**現在の実フォルダで**作り、旧フォルダ名の一時リンクに依存しないようにします。
 
@@ -113,7 +138,7 @@ PushT用：
 
 ```bash
 uv run python mylewm/training.py prepare \
-  --dataset .cache/stable-wm/datasets/pusht_expert_train.h5 \
+  --dataset "$PUSHT_HDF5" \
   --manifest output/manifests/pusht/manifest.json
 ```
 
@@ -121,13 +146,13 @@ LIBERO-10用：
 
 ```bash
 uv run python mylewm/train_libero.py prepare \
-  --dataset .cache/libero-datasets/libero_10 \
+  --dataset "$LIBERO10_DATASET" \
   --manifest output/manifests/libero10/manifest.json
 ```
 
-完了すると分割件数が表示されます。LIBEROは隣に`files.json`も作ります。既に作成済みならこの工程を飛ばしてください。`FileExistsError`は上書き防止です。学習開始後はmanifest・データ・フォルダ名を変更しないでください。移転後の**新規実験**は新しいmanifestを作れますが、途中再開のために元のmanifestを書き換えると互換性チェックで拒否されます。
+完了すると分割件数が表示されます。manifestにはデータの**絶対パス**、サイズ、更新時刻（PushTはhashも）を記録し、学習・評価はその記録を使います。LIBEROは隣に`files.json`も作ります。既に作成済みならこの工程を飛ばしてください。`FileExistsError`は上書き防止です。学習開始後はmanifest・データ・フォルダ名を変更しないでください。移転後の**新規実験**は新しいmanifestを作れますが、途中再開のために元のmanifestを書き換えると互換性チェックで拒否されます。
 
-### 3. まず100ステップだけ動作確認する
+### 4. まず100ステップだけ動作確認する
 
 PushTは冒頭の新経路で短期確認し、LIBEROは下のコマンドを実行します。`--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
 
@@ -144,7 +169,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 
 最初に全データのハッシュを確認するので、すぐにstepが出なくても停止とは限りません。`hashing_data_for_training_contract`の後に`start`、`step`が出ることを確認します。最後にstep100と`resume.pt`があれば短期処理が終了しています。エラーで終了していないことも確認してください。loss低下だけでは制御性能やマルチタスク能力を評価できません。
 
-### 4. 本学習を開始する
+### 5. 本学習を開始する
 
 まず端末を閉じても実行を保持するため、既存のtmuxで作業用セッションを作ります。このPCではtmuxを確認済みです。
 
@@ -171,7 +196,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 
 これらは単独学習の手順です。Raw/TCとの厳密な比較では同一の未学習初期重み・データ順・batch・予算等をそろえます。旧初期値生成CLIは削除しました。新規PushTの比較は冒頭の新経路で共通seedから初期化し、configの初期モデルhashを照合します。完了済みPushTの開始コマンドは[実行記録](reports/PUSHT_TRAINING_100K.ja.md)に残しています。
 
-### 5. 別の端末から進捗を見る
+### 6. 別の端末から進捗を見る
 
 PushTの新経路は冒頭のCSVを確認します。LIBEROのJSONLログを見る場合は次を使います。
 
@@ -195,7 +220,7 @@ bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train
 
 出力はすべて`output/`以下でGit対象外です。通常の数値ログは自動保存されますが、このtmux手順は端末の全stdout/stderrを別のconsole.logへ自動保存するものではありません。エラー発生時は端末のtracebackも残してください。
 
-### 6. 中断した学習を再開する
+### 7. 中断した学習を再開する
 
 学習プロセスが終了していることと、対象runに`resume.pt`があることを確認します。**開始時と同じコマンドの末尾に`--resume`だけを追加**して実行してください。これは改名後に開始したLIBERO run向けで、`train_libero.py`を使います。PushT新経路は冒頭のLightning再開手順です。改名前のrunは開始時のGit版で再開し、ソース照合を解除しないでください。
 

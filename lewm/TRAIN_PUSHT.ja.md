@@ -23,7 +23,8 @@
 cd "$(git rev-parse --show-toplevel)"
 uv run python --version
 nvidia-smi
-ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
+export LOCAL_DATASET_DIR=/absolute/path/to/stable-wm-cache
+ls -lh "$LOCAL_DATASET_DIR/datasets/pusht_expert_train.h5"
 ```
 
 このPCのデータは約46.3GB。見つからなければ学習を始めないでください。新しい学習出力は`output/`へ保存します（Git対象外）。不明なcheckpointを読み込む必要はなく、以下は新規初期値から始めます。
@@ -37,11 +38,11 @@ ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 データと出力を分けるため、次の環境変数を使います。両方ともその端末で設定してください。
 
 ```bash
-export LOCAL_DATASET_DIR="$PWD/.cache/stable-wm"
+export LOCAL_DATASET_DIR=/absolute/path/to/stable-wm-cache
 export STABLEWM_HOME="$PWD/output/pusht/official_native_trial"
 ```
 
-`LOCAL_DATASET_DIR`の下の`datasets/pusht_expert_train.h5`が読み込まれます。`STABLEWM_HOME`は新しいモデル等の出力先です。既存の別実験に同じ出力先を使わないでください。データをこの出力先へコピーする必要はありません。
+`LOCAL_DATASET_DIR`の下の`datasets/pusht_expert_train.h5`が読み込まれます。ここは任意の保存場所にできますが、上流loaderがこのファイル名・`datasets/`階層を使うため、個別HDF5ファイルそのものは指定できません。`STABLEWM_HOME`は新しいモデル等の出力先です。既存の別実験に同じ出力先を使わないでください。データをこの出力先へコピーする必要はありません。
 
 ### A2. 学習せずに設定を確認する
 

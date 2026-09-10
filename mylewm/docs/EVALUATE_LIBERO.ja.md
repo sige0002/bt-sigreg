@@ -14,9 +14,10 @@ Raw/BTは同じ新規manifest、seed、batch、workers、更新数、optimizer�
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-ls .cache/libero-datasets/libero_10/*.hdf5
+export LIBERO10_DATASET=/absolute/path/to/libero_10
+ls "$LIBERO10_DATASET"/*.hdf5
 uv run python mylewm/train_libero.py prepare \
-  --dataset .cache/libero-datasets/libero_10 \
+  --dataset "$LIBERO10_DATASET" \
   --manifest output/manifests/libero10/manifest.json
 ```
 
