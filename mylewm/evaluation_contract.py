@@ -31,6 +31,7 @@ def provenance(dataset,manifest,checkpoint,root,verify_data=True):
     sources=[root/'lewm/eval.py',root/'lewm/jepa.py',root/'lewm/module.py',
              root/'mylewm/evaluation_contract.py',root/'mylewm/planning_action_adapter.py',
              root/'mylewm/pusht_eval_data.py',
+             root/'mylewm/pusht_action_audit.py', root/'mylewm/cem_audit.py',
              Path(inspect.getfile(swm.World)),Path(inspect.getfile(swm.solver.CEMSolver)),
              Path(inspect.getfile(swm.policy.WorldModelPolicy))]
     metadata = json.loads(Path(manifest).read_text())
@@ -55,6 +56,8 @@ def provenance(dataset,manifest,checkpoint,root,verify_data=True):
 
 
 def validate_result(data,expected_cases,identity,expected_protocol):
+    if data.get('action_path_diagnostics', {}).get('performance_interpretation_valid') is False:
+        raise ValueError('Action-path diagnostics failed; success rate is not a valid performance result')
     if data.get('provenance')!=identity: raise ValueError('Evaluation provenance/cache mismatch')
     if protocol(data['config'])!=expected_protocol: raise ValueError('Evaluation protocol/cache mismatch')
     cases=list(zip(data['episodes'],data['starts'],strict=True))

@@ -31,6 +31,7 @@ def test_actual_loader_outside_cache(tmp_path):
         f['ep_len'] = [41]
         f['ep_offset'] = [0]
         f['action'] = np.zeros((41, 2), dtype=np.float32)
+        f['pixels'] = np.arange(41*4*4*3, dtype=np.uint8).reshape(41, 4, 4, 3)
     cfg = OmegaConf.create({'eval': {'dataset_path': str(path)},
                             'dataset': {'keys_to_cache': ['action']}})
     dataset = get_dataset(cfg, 'ignored_cache_name')
@@ -39,6 +40,14 @@ def test_actual_loader_outside_cache(tmp_path):
     assert dataset.get_col_data('action').shape == (41, 2)
     assert dataset.get_row_data([0, 40])['episode_idx'].tolist() == [0, 0]
     assert dataset.get_row_data([0, 40])['step_idx'].tolist() == [0, 40]
+    assert 'pixels' in dataset.column_names
+    assert 'pixels' not in dataset._cache
+    from stable_worldmodel.world.world import _extract_init_goal
+    initial, goal = _extract_init_goal(dataset, [0], [0], 25)
+    assert initial['pixels'].shape == (1, 4, 4, 3)
+    with h5py.File(path) as f:
+        np.testing.assert_array_equal(initial['pixels'][0], f['pixels'][0])
+        np.testing.assert_array_equal(goal['goal'][0], f['pixels'][25])
 
 
 def test_existing_episode_column_is_not_hidden(tmp_path):

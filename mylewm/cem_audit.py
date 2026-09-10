@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from mylewm.pusht_action_audit import action_summary
 from stable_worldmodel.solver import CEMSolver
 
 
@@ -29,28 +30,41 @@ class AuditedCEMSolver(CEMSolver):
     def solve(self, info_dict, init_action=None):
         calls = []
         original = self.model.get_cost
+        final_inputs = {}
 
         def observed(info, candidates):
-            costs = original(info, candidates)
-            goal = info['goal'][:, 0]
+            # JEPA.get_cost mutates info and materializes expanded CUDA images.
+            # Retaining views AFTER that call keeps every candidate image alive
+            # for every iteration. Own only one CPU input sample per case.
             def first_sample(value, row):
-                if torch.is_tensor(value) or isinstance(value, np.ndarray):
-                    return value[row:row + 1, :1]
+                if torch.is_tensor(value):
+                    return value[row:row + 1, :1].detach().cpu().clone()
+                if isinstance(value, np.ndarray):
+                    return value[row:row + 1, :1].copy()
                 if isinstance(value, list):
                     return value[row:row + 1]
                 return value
+            snapshots = [{k: first_sample(v, row) for k, v in info.items()}
+                         for row in range(candidates.shape[0])]
+            costs = original(info, candidates)
+            converted = self.model.normalize_for_model(candidates) if hasattr(self.model, 'normalize_for_model') else candidates
+            goal = info['goal'][:, 0]
             for row in range(costs.shape[0]):
                 fingerprint = tensor_hash(goal[row])
                 if fingerprint not in self.goal_cases:
                     self.goal_cases[fingerprint] = len(self.goal_cases)
+                final_inputs[self.goal_cases[fingerprint]] = snapshots[row]
                 values = costs[row].detach().float().cpu()
                 best = int(values.argmin())
                 calls.append({'case': self.goal_cases[fingerprint], 'goal_sha256': fingerprint,
+                    'candidate_before_normalization': action_summary(candidates[row].detach().float().cpu().numpy()),
+                    'candidate_after_normalization': action_summary(converted[row].detach().float().cpu().numpy()),
                     'cost_min': float(values.min()), 'cost_mean': float(values.mean()),
                     'cost_std': float(values.std(unbiased=False)),
                     'cost_median': float(values.median()), 'best_index': best,
-                    'best_action': candidates[row, best].detach().float().cpu().tolist(),
-                    '_info': {k: first_sample(v, row) for k, v in info.items()}})
+                    'best_action': candidates[row, best].detach().float().cpu().tolist()})
+                if len(calls) % self.n_steps == 0:
+                    print(f'CEM audit: case {self.goal_cases[fingerprint]} candidate scoring finished ({self.n_steps} iterations)', flush=True)
             return costs
 
         self.model.get_cost = observed
@@ -68,12 +82,11 @@ class AuditedCEMSolver(CEMSolver):
             if any(item['case'] != case for item in history):
                 raise RuntimeError('CEM batch/case ordering changed')
             chosen = outputs['actions'][row:row + 1].to(self.device).unsqueeze(1)
-            chosen_cost = original(history[-1].pop('_info'), chosen).detach().float().cpu()
-            for item in history[:-1]:
-                item.pop('_info')
+            chosen_cost = original(final_inputs.pop(case), chosen).detach().float().cpu()
             replan = self.replans.get(case, 0)
             self.replans[case] = replan + 1
             records.append({'case': case, 'replan': replan,
+                'selected_plan_summary': action_summary(outputs['actions'][row].float().numpy()),
                 'iterations': [{k: v for k, v in item.items() if k not in ('best_action', '_info')}
                                for item in history],
                 'final_best_action': history[-1]['best_action'],

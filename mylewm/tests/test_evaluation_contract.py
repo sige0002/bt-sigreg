@@ -93,7 +93,7 @@ def fixture_result():
     return result,[{'episode':1,'start':0},{'episode':2,'start':0}],identity,protocol(cfg)
 
 
-@pytest.mark.parametrize('change',['weight','source','cases','incomplete','actions','protocol'])
+@pytest.mark.parametrize('change',['weight','source','cases','incomplete','actions','protocol','diagnostics'])
 def test_cached_evaluation_rejects_mismatch(change):
     result,cases,identity,expected=fixture_result()
     validate_result(result,cases,identity,expected)
@@ -104,4 +104,5 @@ def test_cached_evaluation_rejects_mismatch(change):
     if change=='incomplete':result['successes']=[True]
     if change=='actions':result['physical_actions']=[]
     if change=='protocol':result['config']['seed']=43
+    if change=='diagnostics':result['action_path_diagnostics']={'performance_interpretation_valid':False}
     with pytest.raises(ValueError):validate_result(result,cases,identity,expected)

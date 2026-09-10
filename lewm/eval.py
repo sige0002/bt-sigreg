@@ -48,8 +48,8 @@ def get_dataset(cfg, dataset_name):
         if path.suffix != '.h5':
             raise ValueError('PushT evaluator requires a .h5 file')
         return EvaluationDataset(str(path.with_suffix('')), cache_dir=path.parent,
-                                    keys_to_load=cfg.dataset.keys_to_cache)
-    dataset_path = Path(cfg.cache_dir or swm.data.utils.get_cache_dir())
+                                    keys_to_cache=list(cfg.dataset.keys_to_cache))
+    dataset_path = Path(cfg.get('cache_dir') or swm.data.utils.get_cache_dir())
     # stable-worldmodel >=0.1 resolves datasets through its format registry.
     # Older LeWM revisions exposed HDF5Dataset directly; retain compatibility
     # with both APIs so the evaluation entry point remains usable.
@@ -101,12 +101,15 @@ def run(cfg: DictConfig):
 
     print('Loading HDF5 and action statistics', flush=True)
     dataset = get_dataset(cfg, cfg.eval.dataset_name)
+    if 'pixels' not in dataset.column_names:
+        raise ValueError('PushT evaluation requires dataset pixels for the initial image and goal')
     stats_dataset = dataset  # get_dataset(cfg, cfg.dataset.stats)
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_indices, _ = np.unique(stats_dataset.get_col_data(col_name), return_index=True)
 
     from mylewm.pusht_eval_data import fit_statistics
     process = fit_statistics(stats_dataset, cfg.dataset.keys_to_cache)
+    print('reference_mean:', process['action'].mean_.tolist(), 'reference_std (StandardScaler.scale_):', process['action'].scale_.tolist(), flush=True)
     print('HDF5 and action statistics ready', flush=True)
 
     # -- run evaluation
@@ -132,6 +135,7 @@ def run(cfg: DictConfig):
         if hasattr(model, 'training_action_mean'):
             mean = model.training_action_mean.detach().cpu().numpy()
             std = model.training_action_std.detach().cpu().numpy()
+            print('training_mean:', mean.tolist(), 'training_std:', std.tolist(), flush=True)
             if not np.isfinite(mean).all() or not np.isfinite(std).all() or not (std > 0).all():
                 raise ValueError('Invalid action statistics in checkpoint')
             if mean.shape != process['action'].mean_.shape or std.shape != mean.shape:
@@ -212,7 +216,12 @@ def run(cfg: DictConfig):
 
     world.set_policy(policy)
 
-    physical_actions=[]; initial_runtime_hashes=[]
+    from mylewm.pusht_action_audit import EnvironmentAudit
+    environment_audit = EnvironmentAudit(world.envs)
+    # Snapshot observations even without provenance logging: video must never
+    # retain mutable EnvPool buffers in either entry path.
+    world.envs.step = environment_audit.step
+    physical_actions=environment_audit.records; initial_runtime_hashes=[]
     if identity is not None:
         from mylewm.evaluation_contract import array_hash
         original_get_actions=world._get_actions
@@ -224,11 +233,8 @@ def run(cfg: DictConfig):
                         if key in ('pixels','state','proprio','goal','goal_pixels','goal_state','goal_proprio')})
             return original_get_actions()
         world._get_actions=audited_get_actions
-        original_env_step=world.envs.step
         def audited_env_step(actions,mask=None):
-            physical_actions.append({'actions':np.asarray(actions).tolist(),
-                'mask':np.ones(cfg.eval.num_eval,dtype=bool).tolist() if mask is None else np.asarray(mask).tolist()})
-            result = original_env_step(actions,mask=mask)
+            result = environment_audit.step(actions,mask=mask)
             print(f'Environment step call {len(physical_actions)} completed; active cases={cfg.eval.num_eval if mask is None else int(np.asarray(mask).sum())}', flush=True)
             return result
         world.envs.step=audited_env_step
@@ -275,6 +281,9 @@ def run(cfg: DictConfig):
         'config':OmegaConf.to_container(cfg,resolve=True), 'elapsed':end_time-start_time,
     }
     if identity is not None:
+        diagnostics = environment_audit.summary()
+        print('action_path_diagnostics:', json.dumps(diagnostics), flush=True)
+        machine_result['action_path_diagnostics'] = diagnostics
         machine_result.update({'provenance':identity,'physical_actions':physical_actions,
             'initial_runtime_hashes':initial_runtime_hashes,
             'planner_action_mean':process['action'].mean_.tolist(),

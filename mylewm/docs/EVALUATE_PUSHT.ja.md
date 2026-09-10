@@ -110,7 +110,7 @@ cd "$(git rev-parse --show-toplevel)"
 tail -f output/pusht/eval_bt_100000_50/console.log
 ```
 
-こちらの`tail`のCtrl-Cは表示だけを止めます。起動時には約46.3GBのデータ内容ハッシュ等を確認するため、ログの間隔が空く場合があります。`CEM solve time`は一回の計画処理の終了で、評価全体の完了ではありません。
+こちらの`tail`のCtrl-Cは表示だけを止めます。通常起動ではデータ全量hashを計算しません（`--verify-data`指定時のみ）。HDF5統計読込やCEM計算中はログの間隔が空きます。`CEM solve time`は一回の計画処理の終了で、評価全体の完了ではありません。
 
 既定条件は50ケース、seed42、CEM候補300・更新30・上位30・batch1、計画horizon5・行動block5・再計画間隔5、評価予算50、画像224です。既存`lewm/eval.py`と設定を使い、重み・データ・前処理ソース・依存版・初期状態/Goal・実行行動を記録します。片方だけ候補数等を減らして比較しないでください。
 
@@ -131,9 +131,31 @@ uv run python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/
 | `results.txt.json` | 成功/失敗、成功率、ケース・実行監査・設定 |
 | `results.txt` | 人間向け設定と結果 |
 | `env_N.mp4` | 実行動画 |
+| `cem_audit.jsonl` | `--cem-audit`指定時の候補正規化前後・選択plan・予測costの診断 |
 | `checkpoint_object.ckpt` | 元checkpointへのリンク。複製ではない |
 
 `success_rate`は百分率で46.0なら46%。後述の比較ツールの`candidate_rate`等は0–1なので0.46が46%です。途中終了・結果未生成は**未測定**で、0%ではありません。全出力はGit対象外の`output/`。元checkpointを移動・削除するとリンクも使えなくなるので保持してください。
+
+### 動かない・極端に低い成功率を調べる
+
+同じ起動コマンドに`--cem-audit`を追加します。1ケースの完走は動作確認にすぎません。性能の確認には同じmanifest・offset・seed・標準予算で複数ケースを使い、公式重みと比較してください。
+
+- 起動ログの`reference_mean/reference_std`は参照データの`StandardScaler.mean_/scale_`です。`scale_`は分散でなく標準偏差（母分散の平方根）。checkpointの`training_mean/training_std`は学習manifest由来で、train-only・標本標準偏差を使用します。
+- CEM候補は参照統計で標準化した座標です。モデル入力では参照統計で逆変換してから学習統計で正規化し、環境実行時には参照統計で逆変換します。PushTの物理行動はXYの相対指令で、環境が100倍して目標変位へ変換します。絶対画面座標ではありません。
+- JSONの`action_path_diagnostics.cases`に実行行動のmin/max/mean/std/mean_abs・near-zero率（絶対値`1e-3`未満）、実step数、開始/終了状態、agent移動距離と累積移動、object移動距離を記録します。`physical_actions`には各stepのactive maskと前後状態も残ります。非ゼロ指令なのにagentが動かない場合は警告し、`performance_interpretation_valid=false`にします。この診断がtrueでも学習品質を保証しません。
+- `cem_audit.jsonl`では候補の正規化前後と選択planの分布を確認できます。ゼロ付近の候補・選択planと、非ゼロ行動に環境が反応しない問題を分けてください。動画は評価終了後に出力されます。
+
+Issue #20では、明示HDF5パス経路で画像列を落として指定Goal画像を渡せない問題と、動画が再利用バッファを参照する問題を修正しました。修正前の低成功率をモデル性能の証拠に使わず、既存ログ・結果は残して別出力先で再評価します。
+
+同じケース・設定のランダム行動対照は、完走した公式評価JSONを入力します。CPUで実環境を動かして動画も保存する検証コマンドです。開始/Goal画像・状態のhashを参照結果と照合し、不一致なら停止します。持続する乱数状態を使い、毎step異なる行動を標本化します。
+
+```bash
+CUDA_VISIBLE_DEVICES='' uv run python -m mylewm.tools.evaluate_pusht_random \
+  --reference-result output/pusht/eval_official_50/results.txt.json \
+  --output output/pusht/random_control_50
+```
+
+実行した範囲と失敗ログは[Issue #20の修正検証](reports/PUSHT_ISSUE20.ja.md)を参照してください。
 
 ## 7. 公式モデルと比較する
 
