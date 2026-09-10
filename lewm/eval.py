@@ -105,18 +105,9 @@ def run(cfg: DictConfig):
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_indices, _ = np.unique(stats_dataset.get_col_data(col_name), return_index=True)
 
-    process = {}
-    for col in cfg.dataset.keys_to_cache:
-        if col in ["pixels"]:
-            continue
-        processor = preprocessing.StandardScaler()
-        col_data = stats_dataset.get_col_data(col)
-        col_data = col_data[~np.isnan(col_data).any(axis=1)]
-        processor.fit(col_data)
-        process[col] = processor
-
-        if col != "action":
-            process[f"goal_{col}"] = process[col]
+    from mylewm.pusht_eval_data import fit_statistics
+    process = fit_statistics(stats_dataset, cfg.dataset.keys_to_cache)
+    print('HDF5 and action statistics ready', flush=True)
 
     # -- run evaluation
     policy = cfg.get("policy", "random")

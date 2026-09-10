@@ -6,6 +6,10 @@
 
 ## 実施済み
 
+### Issue #19：評価設定の列リスト変更（2026-09-10）
+
+Issue #17の修正がHDF5Datasetへ渡した列リストを共有し、episode/step列を追加した結果、統計計算へ識別子が混入してAxisErrorになった。アダプターでリストをコピーし、統計計算は識別子を除外、1D/2Dの有限行を扱う。元データの行は削除しない。回帰5件合格。実PushT HDF5と評価yamlで統計計算まで通過し、ローカルRaw 50,000更新checkpointのCPU読込・行動統計次元を確認。RTX側BT 10,000更新checkpointによる環境評価完走は未確認。以前の列読込テストだけでは設定の副作用を検出できなかった。
+
 ### 公式ライブラリへのPushT移行（2026-09-09）
 
 `mylewm/train.py` の新レシピ `pusht_spt_v1` を実装。SWMのHDF5Dataset、公式画像前処理・`lejepa_forward`・SIGReg、SPTの逆伝播／optimizer／scheduler、Lightningのループ・CSV・checkpointを使用する。エピソード分離・train-only統計を維持するが、クリップ末尾条件・抽出・LR添字は旧経路と異なる。[条件差と手順](TRAINING.ja.md)を参照。

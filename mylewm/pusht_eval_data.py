@@ -10,6 +10,9 @@ class EvaluationDataset(HDF5Dataset):
         from stable_worldmodel.data.utils import get_cache_dir
         path = Path(get_cache_dir(cache_dir, sub_folder='datasets'), f'{name}.h5')
         validate_schema(path)
+        # HDF5Dataset retains keys_to_load by reference; never mutate caller config.
+        if kwargs.get('keys_to_load') is not None:
+            kwargs['keys_to_load'] = list(kwargs['keys_to_load'])
         super().__init__(name, cache_dir=cache_dir, **kwargs)
         with h5py.File(self.h5_path, 'r') as f:
             lengths = np.asarray(f['ep_len'])
@@ -42,3 +45,24 @@ def validate_schema(path):
         missing = {'ep_len', 'ep_offset', 'action'} - set(f)
         if missing:
             raise ValueError(f'Unsupported PushT HDF5: missing {sorted(missing)}; available keys: {list(f)}')
+
+
+def fit_statistics(dataset, columns):
+    """Fit independent feature scalers without modifying dataset rows or IDs."""
+    from sklearn.preprocessing import StandardScaler
+    result = {}
+    for col in columns:
+        if col in ('pixels', 'episode_idx', 'ep_idx', 'step_idx'):
+            continue
+        values = np.asarray(dataset.get_col_data(col))
+        if values.dtype.kind not in 'iuf' or values.ndim not in (1, 2):
+            raise ValueError(f'Unsupported statistics column {col}: shape={values.shape}, dtype={values.dtype}')
+        if values.ndim == 1:
+            values = values[:, None]
+        clean = values[np.isfinite(values).all(axis=1)]
+        if not len(clean):
+            raise ValueError(f'No finite rows for statistics column {col}')
+        result[col] = StandardScaler().fit(clean)
+        if col != 'action':
+            result[f'goal_{col}'] = result[col]
+    return result

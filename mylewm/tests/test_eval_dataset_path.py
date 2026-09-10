@@ -34,6 +34,7 @@ def test_actual_loader_outside_cache(tmp_path):
     cfg = OmegaConf.create({'eval': {'dataset_path': str(path)},
                             'dataset': {'keys_to_cache': ['action']}})
     dataset = get_dataset(cfg, 'ignored_cache_name')
+    assert list(cfg.dataset.keys_to_cache) == ['action']
     assert dataset.h5_path == path
     assert dataset.get_col_data('action').shape == (41, 2)
     assert dataset.get_row_data([0, 40])['episode_idx'].tolist() == [0, 0]
@@ -52,6 +53,22 @@ def test_existing_episode_column_is_not_hidden(tmp_path):
     ds = get_dataset(cfg, 'unused')
     assert 'ep_idx' in ds.column_names
     assert ds.get_row_data([1, 2])['ep_idx'].tolist() == [0, 1]
+
+
+def test_statistics_1d_2d_and_identifiers():
+    from mylewm.pusht_eval_data import fit_statistics
+    columns = {'scalar': np.array([1., np.nan, 3.]),
+               'action': np.array([[1., 2.], [np.nan, 8.], [3., 4.]]),
+               'step_idx': np.arange(3)}
+    class Dataset:
+        def get_col_data(self, col):
+            assert col != 'step_idx'
+            return columns[col]
+    result = fit_statistics(Dataset(), list(columns))
+    np.testing.assert_allclose(result['scalar'].mean_, [2.])
+    np.testing.assert_allclose(result['action'].mean_, [2., 3.])
+    assert columns['action'].shape == (3, 2)
+    assert 'step_idx' not in result
 
 
 def test_unsupported_schema_has_actionable_error(tmp_path):
