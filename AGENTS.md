@@ -35,6 +35,8 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 
 ## コードと実験の扱い
 
+- 学習開始時のデータ検証はサイズ・mtimeの軽量確認を既定とする。新規prepareでSHA-256を一度記録し、全量再検証は学習CLIの`--verify-data`指定時だけ行う。旧manifestにhashが無くても通常起動時に全量走査しない。prepare時のhashと今回実測したhashを混同しない。過去runの再開は開始時のコード・環境を使用し、ソース・設定照合を解除しない。
+
 - `lewm/` は公式比較用に残す。既存のローカル評価修正があるため、完全無改変の上流コピーとは呼ばない。比較対象を提案側で上書きしない。
 - `mylewm/` は提案・比較・監査基盤。`training.py` 等はRaw/TCでも使う共有基盤なので、名前だけで不要と判断しない。
 - 現行仕様・手順は `mylewm/docs/`、実験・監査履歴は `mylewm/docs/reports/` に分ける。旧案はGit履歴で参照する。評価・監査CLIは `mylewm/tools/`、回帰テストは `mylewm/tests/`。旧方式の削除記録は `mylewm/docs/CLEANUP.ja.md`。削除前にimport、CLI、設定、checkpoint復元への依存を確認する。無関係な変更・プロセス・データを壊さない。

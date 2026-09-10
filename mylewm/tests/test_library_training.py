@@ -104,7 +104,8 @@ def native_manifest(tmp_path):
         f['ep_offset'] = [0, 41, 82]
         f['pixels'] = np.zeros((123, 4, 4, 3), dtype=np.uint8)
         f['action'] = np.arange(246, dtype=np.float32).reshape(123, 2)
-    return dict(dataset=str(path), history=3, frameskip=5,
+    return dict(dataset=str(path), dataset_size=path.stat().st_size,
+                dataset_mtime_ns=path.stat().st_mtime_ns, history=3, frameskip=5,
                 train_episodes=[0], validation_episodes=[1], test_episodes=[2],
                 action_mean=[2., 3.], action_std=[2., 4.])
 

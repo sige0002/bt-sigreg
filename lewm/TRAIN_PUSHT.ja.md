@@ -98,6 +98,8 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 
 ## B. BTと同条件で比較するRaw LeWM
 
+この共有比較経路の通常起動はデータのサイズ・更新時刻を確認し、全量ハッシュを読み直しません。必要なときだけ`--verify-data`を追加します。Aの公式trainerにはこの引数を渡しません。
+
 新しい比較には `pusht_spt_v1` を使います。分割作成、短期確認、CSVの見方、保存再開は[新しいPushT学習手順](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)に集約しています。
 
 ```bash

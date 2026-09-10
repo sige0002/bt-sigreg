@@ -53,6 +53,8 @@ def prepare(folder,path):
        'image_convention':'native opengl; do not flip training images independently of simulator',
        'task_names':[p.stem.removesuffix('_demo') for p in files],
        'initialization':'random','split_seed':20260906}
+    print('Preparing dataset SHA-256 (one-time full scan)', flush=True)
+    m['data_fingerprints'] = common.data_fingerprints(m)
     path.write_text(json.dumps(m,indent=2))
     print(json.dumps({'train_demos':len(train),'validation_demos':len(validation),'test_demos':len(test)}),flush=True)
 
@@ -117,6 +119,7 @@ def main():
     p.add_argument('--seed',type=int,default=3072)
     common.add_schedule_arguments(p)
     p.add_argument('--gaussian-weight',type=float,default=.09)
+    p.add_argument('--verify-data',action='store_true',help='Full dataset SHA-256 verification')
     p.add_argument('--resume',action='store_true')
     args=p.parse_args()
     if args.command=='prepare': prepare(args.dataset,args.manifest)

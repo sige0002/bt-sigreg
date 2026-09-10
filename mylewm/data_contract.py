@@ -35,6 +35,29 @@ def data_fingerprints(manifest):
     return result
 
 
+def verify_training_data(manifest, full=False):
+    """Check metadata on launch; optionally verify bytes against prepare evidence."""
+    entries = [{'path': manifest['dataset'], 'size': manifest['dataset_size'],
+                'mtime_ns': manifest['dataset_mtime_ns']}, *manifest.get('files', [])]
+    identity = {}
+    for entry in entries:
+        path = Path(entry['path']).resolve()
+        stat = path.stat()
+        if (stat.st_size, stat.st_mtime_ns) != (entry['size'], entry['mtime_ns']):
+            raise ValueError(f'Dataset changed since preparation: {path}')
+        identity[str(path)] = {'size': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
+    if full:
+        actual = data_fingerprints(manifest)
+        expected = manifest.get('data_fingerprints')
+        if expected is not None and actual != expected:
+            raise ValueError('Dataset SHA-256 differs from prepare evidence')
+        return actual
+    # Preserve prepare provenance without claiming a fresh byte verification.
+    return {'metadata': identity,
+            'prepared_sha256': manifest.get('data_fingerprints'),
+            'verification': 'size_mtime'}
+
+
 def training_budget(clips, updates, batch_size, world_size=1, accumulation=1):
     if min(clips, updates, batch_size, world_size, accumulation) < 1:
         raise ValueError('All budget quantities must be positive')

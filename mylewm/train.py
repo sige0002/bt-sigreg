@@ -31,7 +31,7 @@ from lewm.train import lejepa_forward
 from module import SIGReg
 from utils import get_img_preprocessor
 from mylewm.bt_sigreg import BoundedTransport, add_bt_arguments
-from mylewm.data_contract import file_sha256
+from mylewm.data_contract import file_sha256, verify_training_data
 from mylewm.training_state import capture_rng, restore_rng, tensor_state_hash
 
 
@@ -267,7 +267,9 @@ def run(args):
     pl.seed_everything(args.seed, workers=True)
     if args.accelerator == 'gpu':
         torch.cuda.init()
-    recipe['dataset_sha256'] = file_sha256(Path(manifest['dataset']))
+    full = getattr(args, 'verify_data', False)
+    print('Verifying dataset: ' + ('full SHA-256 scan' if full else 'size and mtime (no full scan)'), flush=True)
+    recipe['data_identity'] = verify_training_data(manifest, full=full)
     train_set, val_set = datasets(manifest)
     recipe.update(train_clips=len(train_set), validation_clips=len(val_set))
     batches = EpochBatches(train_set, args.batch_size, args.steps, args.seed)
@@ -313,6 +315,7 @@ def main():
     p.add_argument('--lr', type=float, default=5e-5)
     p.add_argument('--accelerator', choices=['cpu', 'gpu'], default='gpu')
     p.add_argument('--precision', choices=['32-true', 'bf16-mixed'], default='bf16-mixed')
+    p.add_argument('--verify-data', action='store_true', help='Scan all dataset bytes and verify prepare SHA-256 when available')
     p.add_argument('--resume', type=Path, help='Trusted new-recipe Lightning checkpoint only')
     p.add_argument('--execute', action='store_true')
     add_bt_arguments(p)

@@ -65,3 +65,8 @@ PushTだけでマルチタスク改善を証明しません。98%を論文の3�
 追加学習・評価は明示依頼時のみ。定期監視・自動評価予約は行いません。手動の進捗確認は `bash mylewm/tools/monitor_training.sh --once`、評価手順は[PushT](EVALUATE_PUSHT.ja.md)／[LIBERO](EVALUATE_LIBERO.ja.md)です。完了済み学習のログが増えないことを障害とは扱いません。
 
 今回の構成整理と回帰確認は[整理記録](CLEANUP.ja.md)へ記録します。新しい性能試験は行いません。
+# 学習起動時のデータ検証変更（2026-09-10）
+
+Issue #14対応：通常起動は存在・サイズ・mtimeの確認、新規prepareで全量SHA-256を保存、`--verify-data`で明示再走査。旧manifestは書き換えない。prepare時のhashを保持し、軽量検証を全量検証と呼ばない。ソース・設定・依存照合は継続し、過去runの厳密再開は開始時のGit版・環境を使う。
+
+CPU全回帰は108合格・5スキップ・1失敗。失敗は既存checkpoint読込時のTransformers 5系の`ViTEncoder`欠落であり、環境更新に伴う別件。今回の変更に関する軽量検証・改変検出・Raw/BT小型モデル実更新・再開テストは合格。RTX 6000 Adaでの起動時間は未測定で、HDF5読込・モデル初期化等の待ち時間まで無くなるとは主張しない。

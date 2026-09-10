@@ -23,7 +23,7 @@ from omegaconf import OmegaConf
 import torch
 from mylewm.objectives import GaussianSIGReg, one_step_objective
 from mylewm.bt_sigreg import BTSIGReg, add_bt_arguments
-from mylewm.data_contract import file_sha256, data_fingerprints, training_budget
+from mylewm.data_contract import file_sha256, data_fingerprints, training_budget, verify_training_data
 from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
 from mylewm.training_state import (UpdateSchedule, add_schedule_arguments, capture_rng,
     restore_rng, isolated_rng, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash)
@@ -62,6 +62,8 @@ def prepare(dataset, path):
                     'initialization':'random; official checkpoint not used',
                     'note':'Official published model may have seen held-out episodes.'}
     path.parent.mkdir(parents=True,exist_ok=True)
+    print('Preparing dataset SHA-256 (one-time full scan)', flush=True)
+    manifest['data_fingerprints'] = data_fingerprints(manifest)
     path.write_text(json.dumps(manifest,indent=2))
     print(json.dumps({'train':len(train),'val':len(val),'test':len(test)}),flush=True)
 
@@ -144,8 +146,9 @@ def train(args):
         raise ValueError('Dataset changed since split preparation')
     if min(m['action_std'])<=0:
         raise ValueError('invalid action scale')
-    print(json.dumps({'event':'hashing_data_for_training_contract'}),flush=True)
-    data_identity=data_fingerprints(m)
+    full = getattr(args, 'verify_data', False)
+    print(json.dumps({'event':'verifying_training_data', 'verification':'sha256' if full else 'size_mtime'}),flush=True)
+    data_identity=verify_training_data(m, full=full)
     model=build_model().to(device)
     initial_model_sha256=tensor_state_hash(model.state_dict())
     model.register_buffer('training_action_mean',torch.tensor(m['action_mean'],device=device,dtype=torch.float64))
@@ -292,6 +295,7 @@ def main():
     p.add_argument('--seed',type=int,default=3072)
     add_schedule_arguments(p)
     p.add_argument('--gaussian-weight',type=float,default=.09)
+    p.add_argument('--verify-data',action='store_true',help='Full dataset SHA-256 verification')
     p.add_argument('--resume',action='store_true')
     args=p.parse_args()
     if args.command=='prepare': prepare(args.dataset,args.manifest)

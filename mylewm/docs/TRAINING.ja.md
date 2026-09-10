@@ -21,7 +21,7 @@
 | validation | manifestにある固定validationケースを使用（既存PushTは256件）。無ければvalidationエピソードの全有効クリップ |
 | 推論 | 公式E/A/Fのみ。Tなし。訓練統計bufferを保持し、既存評価シェルで使用可能 |
 
-各runにmanifest・データ・初期モデル・ソース・主要依存ソースのhash、依存版、レシピを記録します。新Rawと新BTを比較し、旧10万BTとの違いをTだけの効果とは解釈しません。公式配布モデルの完全な学習再現とも呼びません。
+各runにmanifest・初期モデル・ソース・主要依存ソースのhash、依存版、レシピを記録します。データは通常起動時に存在・サイズ・更新時刻を確認し、新規prepareで保存したSHA-256を参照情報として残します。全量を再読込して検証する場合だけ学習コマンドに`--verify-data`を追加してください。旧manifestにSHA-256が無くても通常起動では走査しません。明示検証時はhashを計算して記録しますが、比較対象が無ければ過去との同一性確認にはなりません。新Rawと新BTを比較し、旧10万BTとの違いをTだけの効果とは解釈しません。
 
 ### 設定確認と実行
 
@@ -132,6 +132,8 @@ PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必�
 
 ### 3. 学習・検証の分割ファイルを作る（最初の1回だけ）
 
+新規prepareはPushT・LIBEROとも全量SHA-256を一度計算してmanifestの`data_fingerprints`へ保存するため、データ量に比例して時間がかかります。既存manifestの作り直しは不要です。以降の通常学習起動ではこの全量走査を繰り返しません。
+
 `manifest.json`はデータの場所、学習/検証/テストの分割、行動の正規化統計を記録するファイルです。データ本体を複製・生成する処理ではありません。新しいmanifestを**現在の実フォルダで**作り、旧フォルダ名の一時リンクに依存しないようにします。
 
 PushT用：
@@ -177,7 +179,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --save-every 50 --diagnostics-every 25 --deterministic
 ```
 
-最初に全データのハッシュを確認するので、すぐにstepが出なくても停止とは限りません。`hashing_data_for_training_contract`の後に`start`、`step`が出ることを確認します。最後にstep100と`resume.pt`があれば短期処理が終了しています。エラーで終了していないことも確認してください。loss低下だけでは制御性能やマルチタスク能力を評価できません。
+通常起動は全量ハッシュを走査しません。LIBEROでは`verifying_training_data`（`size_mtime`）の後に`start`、`step`を確認します。`--verify-data`指定時だけ全量走査で待ち時間が生じます。サイズ・更新時刻を保存したままの改変は軽量確認では検出できません。最後にPushTは`completed.json`と`step_100_object.ckpt`、LIBEROはstep100と`resume.pt`を確認してください。loss低下だけでは制御性能やマルチタスク能力を評価できません。
 
 ### 5. 本学習を開始する
 
