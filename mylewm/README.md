@@ -45,11 +45,11 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 
 `training.loop.TrainingAdapter`がデータ取得・前処理・モデル構築を共有ループへ渡します。LIBERO起動時に共有モジュールの関数を上書きしません。ファイルのSHA-256は`data.verification.file_sha256`へ集約し、ソースの移動や共通処理の変更も再開時の照合対象に含めます。
 
-このパッケージは、比較用`lewm/`と設定を同じcheckoutに持つ**editableインストール**で使用します。新しい専用環境を作る例です。使用中の環境には同期しません。
+このパッケージは、比較用`lewm/`と設定を同じcheckoutに持つ**editableインストール**で使用します。標準環境`.venv`を構築する例です。使用中の環境には同期しません。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training-new"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 uv sync --locked --group libero --group lerobot
 uv run --no-sync python -m mylewm.training.train --help
 uv run --no-sync python -m mylewm.training.train_libero --help

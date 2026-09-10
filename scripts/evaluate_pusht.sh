@@ -18,7 +18,7 @@ root = Path(sys.argv.pop(1))
 parser = argparse.ArgumentParser(description='Evaluate a trusted PushT inference checkpoint; default is dry-run.')
 parser.add_argument('--checkpoint', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True, help='New directory under repository output/')
-parser.add_argument('--manifest', type=Path, default=root/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
+parser.add_argument('--manifest', type=Path, default=root/'output/manifests/pusht/manifest.json')
 parser.add_argument('--num-eval', type=int, default=50)
 parser.add_argument('--dataset', type=Path, help='Relocated HDF5; otherwise use manifest dataset')
 parser.add_argument('--offset', type=int, default=0, help='Index into the fixed confirm cases')
@@ -91,6 +91,8 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
 if args.cem_audit:
     command.append('solver._target_=mylewm.evaluation.cem_audit.AuditedCEMSolver')
+else:
+    command.append('solver._target_=mylewm.evaluation.cached_cem.CachedCEMSolver')
 plan = {'checkpoint': str(checkpoint), 'dataset': str(dataset), 'output': str(output), 'cases': len(cases),
         'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
         'cem_audit': args.cem_audit,

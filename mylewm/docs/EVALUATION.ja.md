@@ -91,7 +91,7 @@ ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 - `resume.pt`は学習再開用なので評価へ渡しません。
 - `torch.load(weights_only=False)`を使います。自分で生成したものや信頼確認済み公式重みだけを使用してください。
 
-既定manifestは`.cache/stable-wm/pusht/rbg_v0/manifest.json`です。現run用で、内部に旧フォルダ名があるため一時互換リンクを依存整理なしに削除しないでください。新レシピ用の`output/manifests/pusht/manifest.json`がある場合は、上の新run手順どおり明示指定します。比較する二つの新runには同じmanifestを使い、既存runのmanifestは書き換えません。
+既定manifestは`output/manifests/pusht/manifest.json`です。現在の実パスでprepareしたmanifestを使用し、旧フォルダ名の互換リンクは不要です。比較する二つの新runには同じmanifestを使います。過去runの厳密再開には当時のmanifest・コード・環境を復元してください。[旧manifestの退避・復元](reports/CLEANUP.ja.md#旧manifest再作成と互換リンク削除2026-09-11)。
 
 <a id="pusht-4-既存checkpointの設定確認だけを行う"></a>
 
@@ -383,7 +383,9 @@ uv run python -m http.server 8000 --directory output/libero10/ui_raw_confirm50
 
 ### 実行前の確認
 
-`nvidia-smi -L`と`nvidia-smi`で学習GPUと空いている評価GPUを確認する。以下の`CUDA_VISIBLE_DEVICES=1`は物理GPU 1で評価する例で、実際の空きGPU番号またはUUIDに変更する。この指定で評価プロセス内では選んだGPUが`cuda:0`になる。別端末で実行し、学習側の設定は変えない。同じGPUでの同時実行は速度低下・OOMのおそれがあるため、この手順では別GPUを使う。GPUが1台なら学習終了後に評価するか、再開可能なcheckpointを確保して学習を正常に中断してから評価する。
+`nvidia-smi -L`と`nvidia-smi`で学習GPUと評価に使える余力を確認する。以下の`CUDA_VISIBLE_DEVICES=1`は物理GPU 1で評価する例で、実際のGPU番号またはUUIDに変更する。この指定で評価プロセス内では選んだGPUが`cuda:0`になる。別端末で実行し、学習側の設定は変えない。
+
+共有メモリ型GB10では、同じGPUでも、学習と評価を載せるRAMに余裕があれば併走できる。dry-runの後に評価を開始し、`nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader`、`ps -o pid,rss,cmd -p <評価PID>`、`free -h`で評価中のGPU・CPU常駐メモリとavailable RAMを記録する。高速化後のPushT固定50ケースでは、評価プロセスのGPU観測値341 MiB、CPU RSS約2.44〜2.66 GiB、PyTorch peak allocated約106 MiBだった。追加常駐量は数GiB規模だが、共有メモリの各指標は単純加算せず、起動時ピークを含む予約量とも扱わない。条件ごとにavailable RAMの余裕を確認する。計測条件と旧実装との比較は[高速化・メモリ実測](reports/CACHED_CEM.ja.md)を参照する。併走中は計算資源を共有するため速度は変動する。OOMやRAM不足が発生した場合は評価を停止してログを保持する。
 
 checkpointの保存完了と、学習が次の更新へ進んだことをログで確認する。ファイルが存在するだけでは書込み終了の証拠にならない。特にPushTの保存は実行環境によって直接書込みになる。以下の50,000は例で、保存完了した更新数へ変更する。入力checkpointは評価終了まで移動・削除・上書きしない。
 
@@ -392,6 +394,8 @@ checkpointの保存完了と、学習が次の更新へ進んだことをログ�
 <a id="intermediate-pusht"></a>
 
 ### PushT
+
+通常のlauncherは`CachedCEMSolver`を使います。候補300・反復30・elite30・seed・batch1・計画と実行の長さを維持し、同一探索内の観測／Goal埋め込みを再利用します。300候補へ展開した画像は転送前に1サンプルへ絞ります。キャッシュは環境batch・再計画ごとに破棄します。`--cem-audit`は従来の監査solverを使います。ソースとsolverクラスは結果へ記録されるため、旧評価と同一実装という意味ではありません。
 
 HDF5はmanifest内の任意パスを使う。移転先を指定する場合は以下の両コマンドへ`--dataset /absolute/path/to/pusht_expert_train.h5`を追加する。元manifestを書き換えず、サイズを確認し、`--verify-data`指定時は保存済みhash（存在する場合）とも照合する。
 

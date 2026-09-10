@@ -95,3 +95,29 @@ CPU限定回帰は **102合格・5スキップ**（15.02秒）。公式Rawのlos
 ## Issueの整理
 
 ユーザー承認により、旧issue #2・#4〜#13 の11件を `not planned` で閉じた。openは0件。実装・学習・検証の完了認定ではなく旧計画の廃止であり、未完了の同予算比較・LIBERO本評価等は[検証状況](../VALIDATION.ja.md)に残す。
+
+
+## ローカル仮想環境の統一（2026-09-11）
+
+ユーザー依頼で標準`.venv`を`uv sync --locked --group libero --group lerobot`から新規構築し、現在のsrcパッケージをeditable導入しました。旧`.venv-training`と検証用`.venv-refactor`を削除し、現行手順も`.venv`へ統一しました。過去の実験記録中の環境名は実行時の記録として保持します。
+
+このPCの`~/.zshrc`は、リポジトリ内で新しく起動した対話zshで`.venv`を有効化し、継承された旧環境パスを除去します。既に起動済みの親シェルの環境変数は子プロセスから変更できないため、端末を開き直す必要があります。設定の変更前コピーと削除環境のfreeze・pyvenv.cfgは`~/.local/state/bt-sigreg-env-migration/`に保存しました。依存一覧だけで過去runの厳密再開を保証するものではありません。
+
+この環境統一の時点では、旧名`/home/sadasue/task-centered-sigreg-lewm`への互換リンクは、`.cache/stable-wm/{pusht/trajectory_v1,pusht/rbg_v0,libero10/rbg_v0}/manifest.json`に依存が残るため保持しました。保存済みmanifestは変更していません。リンクを失った場合は、旧パスが存在しないことを確認し、`ln -s /home/sadasue/bt-sigreg /home/sadasue/task-centered-sigreg-lewm`で復元できます。新規処理では現在のリポジトリパスを使用します。
+
+検証：新`.venv`で全回帰182合格・スキップ0（53.32秒、既存警告629件）。既存checkpoint読込・GPU・コンパイルを含みます。元のBT設定（100000更新、batch256、workers8、validation500、保存10000、compile）でdry-run終了コード0。新しい対話zshのPython・uv・パッケージ参照先も確認しました。ログは`/tmp/bt-sigreg-env-{pytest,dry-run}.log`。長時間学習は開始していません。
+
+
+## 旧manifest再作成と互換リンク削除（2026-09-11）
+
+続くユーザー依頼で、PushTとLIBERO-10のprepareを現在の実データパスで実行しました。新規prepareの全量SHA-256を各データについて一度取得しています。PushTは`output/manifests/pusht/manifest.json`、LIBEROは`output/manifests/libero10/{manifest,files}.json`を使用します。PushTは直前の現行manifestと全フィールド一致し、旧rbg_v0とも分割・confirm・行動統計が一致しました。LIBEROは400/50/50デモに分割しています。
+
+旧trajectory_v1は異なる評価ケースを持つため、`output/manifests/pusht/legacy_trajectory/manifest.json`へ別途移行しました。元のケース・統計を保持したパス移行版であり、旧prepareの再実行ではありません。今回実測した同じPushTデータのhashとmtimeを追加し、参照する公式checkpointのSHA-256が旧記録と一致することを検証しました。
+
+旧3manifestとLIBEROの旧files.jsonを削除し、旧フォルダ名の互換リンクをunlinkしました。データ・重み・過去runのconfig・評価結果は変更していません。評価シェルの既定manifestも`output/manifests/pusht/manifest.json`へ変更しています。
+
+削除前の4ファイルと置換前の現行PushT manifestは`output/archives/manifest_migration_20260911/originals.tar.gz`へ元のバイト列で退避済みです。同ディレクトリの`migration.json`にSHA-256、移行対応表、旧パスが残る歴史的JSONの一覧を記録しました。退避ファイルを読み戻し、元ファイルとhash一致を確認しています。
+
+過去runを厳密再開する場合は、開始時のGit版・環境を別checkoutに用意し、このtarをそのcheckoutへ展開して元のmanifestを復元します（現行checkoutへ一括展開すると現行manifestを上書きするため避けます）。旧絶対パスを必要とする場合に限り、旧パスが未使用であることを確認してその復元checkoutへの一時リンクを作り、作業後にリンクだけを削除します。新manifestへの差し替えやhash照合解除で再開しません。通常運用では旧リンクは不要です。
+
+リンク削除後の検証：全3manifestのサイズ・mtime検証、LIBERO実サンプル1件読込、学習dry-run、評価シェル既定manifestのdry-runが成功。関連回帰17合格（2.26秒）、`git diff --check`合格。ログは`/tmp/bt-manifest-*.log`です。学習・環境評価は開始していません。

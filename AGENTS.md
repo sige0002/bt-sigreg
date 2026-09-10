@@ -10,7 +10,7 @@
 
 PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200（89%）、別条件の上流eval 50ケース49/50（98%）を記録済み。結果の条件差はレポートを参照。新規学習・再開・追加評価は明示依頼時のみ。定期監視・checkpoint到達待機・自動評価予約は行わない。
 
-実フォルダはリポジトリルート。旧ワークツリーへの一時互換リンクは恒久運用しない。ただし保存済みmanifestに依存が残るため、依存・復元方法を整理せず削除しない。新規処理で旧パス依存を増やさず、既存configやmanifestを改変してhash照合を回避しない。
+実フォルダはリポジトリルート。2026-09-11にユーザー依頼で現行manifestを実パスで再prepareし、旧manifestを退避して旧フォルダ名の互換リンクを削除済み。現行は`output/manifests/{pusht,libero10}/manifest.json`、旧trajectoryのケース保持版は`output/manifests/pusht/legacy_trajectory/manifest.json`。過去runの依存・退避・復元方法は`mylewm/docs/reports/CLEANUP.ja.md`の「旧manifest再作成と互換リンク削除」を参照する。新規処理で旧パス依存を増やさず、既存configやmanifestを改変してhash照合を回避しない。
 
 ## 最初に読むもの
 
@@ -55,7 +55,7 @@ PushT評価launcherも通常は全量データhashを走査しない。`--verify
 
 PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。固定cacheやsymlinkを要求しない。移転時はサイズを確認し、明示した全量検証時だけ新規prepareのSHA-256と照合する。評価のprovenanceとloaderに同じ解決済みパスを使用する。
 
-ユーザー指定の途中checkpoint評価は本学習終了前でも可能。`mylewm/docs/EVALUATION.ja.md`に従い、保存完了済み`step_N_object.ckpt`と別GPUを使用する。最終評価のcompleted.json条件を途中評価へ適用しない。文書更新だけを理由に評価は開始せず、共有学習環境の依存を同期しない。
+ユーザー指定の途中checkpoint評価は本学習終了前でも可能。`mylewm/docs/EVALUATION.ja.md`に従い、保存完了済み`step_N_object.ckpt`を使用する。共有メモリ型GB10ではRAMに余裕があれば同一GPUで学習と評価を併走できる。使用量の実測は`mylewm/docs/reports/CACHED_CEM.ja.md`を参照する。最終評価のcompleted.json条件を途中評価へ適用しない。文書更新だけを理由に評価は開始せず、共有学習環境の依存を同期しない。
 
 依存更新時は既存object checkpointの読込も検証する。現在はTransformers 4.57.6を固定（5系では旧ViTEncoderの復元失敗）。稼働中の学習用`.venv`にsyncせず、`UV_PROJECT_ENVIRONMENT`で隔離して検証する。CPU限定テストのCUDA5件スキップは理由と件数を報告し、GPU合格とは扱わない。
 

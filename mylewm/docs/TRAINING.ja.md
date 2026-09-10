@@ -12,7 +12,7 @@
 
 学習中のvalidationは予測損失などの確認です。環境を動かして測る制御成功率とは別です。LeRobot入力からの環境成功率評価は未対応です。
 
-PushT／LIBEROでは、保存済みの途中checkpointも評価できます。[途中checkpoint評価手順](EVALUATION.ja.md#intermediate)の別GPU指定・実行・結果確認に従ってください。途中評価に`completed.json`は不要です。
+PushT／LIBEROでは、保存済みの途中checkpointも評価できます。[途中checkpoint評価手順](EVALUATION.ja.md#intermediate)のGPU指定・実行・結果確認に従ってください。PushTは共有RAMに余裕があるGB10で同一GPUの学習と併走できます。途中評価に`completed.json`は不要です。
 
 一つのrunにHDF5とLeRobotを混ぜません。以下のコマンド例は必要なものだけを選び、学習を重複起動しないでください。`train.py`は既定dry-runで、`--execute`で学習を開始します。LIBEROの`train_libero.py train`はそのまま学習を開始します。
 
@@ -31,7 +31,7 @@ HDF5とLeRobot v3は同じ`src/mylewm/training/train.py`を使い、manifestの`
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-lerobot"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 uv sync --locked --group lerobot --group libero
 uv run --no-sync python -c 'import importlib.metadata as m; print({n: m.version(n) for n in ["lerobot", "torch", "transformers", "av"]})'
 ```
@@ -156,12 +156,12 @@ ckpt直接読込とLeRobot Policy形式のCEM行動一致は、[Policy変換・�
 
 ### 0. 実行フォルダと固定依存の環境を用意する
 
-以下はこのPC（GB10／CUDA 13）の具体例です。すべてリポジトリ直下で実行します。既存の`.venv`にはTransformers 5.17.0との不一致が見つかったため、ここでは固定4.57.6を使う別環境`.venv-training`を用意します。学習・評価で使用中の環境には同期しないでください。
+以下はこのPC（GB10／CUDA 13）の具体例です。すべてリポジトリ直下で実行します。標準環境はリポジトリ直下の`.venv`です。固定依存（Transformers 4.57.6）と現在のsrcパッケージを導入します。旧`.venv-training`・`.venv-refactor`は使用しません。学習・評価で使用中の環境には同期しないでください。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
-uv sync --locked --group libero
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+uv sync --locked --group libero --group lerobot
 uv run --no-sync python -c 'import torch, transformers; print("torch:", torch.__version__); print("transformers:", transformers.__version__)'
 ls -l "/usr/local/cuda-13.0/bin/ptxas"
 nvidia-smi
@@ -470,8 +470,8 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
-uv sync --locked --group libero
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+uv sync --locked --group libero --group lerobot
 uv run --no-sync python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worldmodel, torch; print("hydra", hydra.__version__, "torch", torch.__version__)'
 uv run --no-sync python -m mylewm.training.train --help
 ```
@@ -496,7 +496,7 @@ uv run --no-sync hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export LIBERO10_DATASET="/mnt/data/bt-sigreg-data/libero_10"
 uv run --no-sync python --version
 uv run --no-sync python -m mylewm.training.train_libero --help
@@ -548,7 +548,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train
 ```bash
 tmux new -s bt-training
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 ```
 
 短期学習のcheckpointは使わず、新規初期値から始めます。
@@ -599,7 +599,7 @@ bash scripts/monitor_training.sh --run output/libero10/bt_train
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train_libero train \
   --mode bt --manifest "output/manifests/libero10/manifest.json" \
   --output "output/libero10/bt_train" \

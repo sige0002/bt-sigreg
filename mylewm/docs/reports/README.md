@@ -10,6 +10,7 @@
 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md) | 途中・最終checkpoint、固定200ケースと上流50ケース、比較条件・失敗・hash |
 | [PushT失敗監査](PUSHT_FAILURE_AUDIT.ja.md) | 固定ケースの一段・5遷移誤差と、遷移／cost／探索の切り分け範囲 |
 | [PushT Issue #20](PUSHT_ISSUE20.ja.md) | 画像/Goal欠落・動画・CEM監査メモリ修正、複数ケースの実機確認と未確認範囲 |
+| [CEM評価高速化](CACHED_CEM.ja.md) | 探索設定を維持した画像キャッシュ、10k固定50ケースの一致確認、同一GPUの時間・メモリ実測 |
 
 ## データ形式・Policy・学習基盤
 
