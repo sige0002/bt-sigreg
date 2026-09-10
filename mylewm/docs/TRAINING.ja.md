@@ -73,6 +73,18 @@ Rawは `--mode raw --output output/pusht/spt_raw` に変え、その他は同じ
 
 PushTの100,000更新は完了済みです。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
 
+### 0. `hydra` が無い場合の環境準備
+
+これまでの手順は既存`.venv`を前提にしており、依存パッケージを導入するコマンドが欠けていました。`ModuleNotFoundError: No module named 'hydra'` が出た場合は、リポジトリルートで次を実行します。`hydra`という配布名ではなく、PyPI上のパッケージ名は`hydra-core`です。
+
+```bash
+test -x .venv/bin/python || uv venv --python 3.12
+uv pip install --python .venv/bin/python 'hydra-core==1.3.6'
+uv run python -c 'import hydra; print(hydra.__version__)'
+```
+
+最後が`1.3.6`を表示すればHydraは使えます。ただしこれはHydra不足だけを直す手順です。PushT/LIBEROを新しいPCで学習・評価できる完全な依存lockfile、LIBERO本体・OSMesa、データの取得手順はまだ提供していません。任意の最新版を一括導入して既存実験環境を上書きしないでください。
+
 ### 1. 作業フォルダ・環境・データを確認する
 
 全コマンドはリポジトリ直下で実行します。別の場所に置いた場合は、最初の`cd`だけ実際の場所に変更してください。仮想環境のactivateは不要です。
