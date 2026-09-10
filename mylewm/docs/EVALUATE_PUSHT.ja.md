@@ -26,7 +26,7 @@ HDF5は`--manifest`の`dataset`パスから読みます。リポジトリの`.ca
 
 この節は最終評価向けです。学習継続中の保存済み`step_N_object.ckpt`は[途中checkpoint評価手順](EVALUATE_INTERMEDIATE.ja.md)で別GPU評価できます。その場合は`completed.json`や本学習の終了を待つ必要はありません。
 
-新レシピ `pusht_spt_v1` のRaw/BTでは、**100,000更新が正常終了してから**評価します。稼働中の学習とCEM評価を同時に実行しないでください。次はRawの例です。BTでは`raw`を`bt`へ置き換えます。`--execute`なしは安全な設定確認だけで、GPU初期化・出力作成・評価はしません。
+新レシピ `pusht_spt_v1` のRaw/BTで**100,000更新の最終成績**を測る場合は、正常終了を確認してから評価します。保存済み途中重みの評価は前段の手順で可能です。以下は学習終了後の単独評価例です。RawはSIGRegを直接適用するモデルで、BTでは`raw`を`bt`へ置き換えます。`--execute`なしは安全な設定確認だけで、GPU初期化・出力作成・評価はしません。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -180,6 +180,8 @@ uv run python mylewm/tools/compare_paired.py \
 `difference`は提案−公式の成功率差、`candidate_only_success`は提案だけ成功したケース数。信頼下限と観測差は区別します。`observed_no_degradation=true`でも任意の状況で性能が落ちない保証ではありません。**ツールは学習予算の同一性を検証しません。** 同更新数での方式比較には、別途そろえた学習が必要です。
 
 `evaluation protocols differ`を無視したりJSONを改変して通してはいけません。ソース版・前処理・manifest・ケース・計画条件を確認し、必要ならそろえて再評価します。
+
+現状の比較CLIは開始/Goal観測hashを照合しますが、実物理初期状態の一致までは検査しません。2026-09-10の実評価ではobject初期位置・角度に微差が見つかりました。`action_path_diagnostics.cases[].initial_state`も比較し、CLI通過だけで厳密に同じ物理初期状態だったと主張しないでください。原因と影響は未解決です。[70k/100kの実測記録](reports/PUSHT_ISSUE20.ja.md)を参照してください。
 
 ## 8. 世界モデルrolloutの速度を測る
 

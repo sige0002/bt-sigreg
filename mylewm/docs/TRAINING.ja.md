@@ -4,11 +4,17 @@
 
 ## 新しいPushT経路：公式ライブラリへ委託（2026-09-09）
 
+`Raw`は**BTの写像TなしでSIGRegを直接適用するモデル**であり、正則化なしという意味ではありません。公式配布重みと、自分で学習したRaw/SIGRegの重みも区別します。
+
+2026-09-10の実測：新経路Rawは74,504更新でユーザー指示により停止し、最後の保存済みcheckpointは70,000更新です。同じ固定50ケースでRaw 70kは45/50、旧経路BT v2の70kは47/50。学習レシピ差と実物理初期状態の微差が残るため、方式の優位性とは断定しません。[実測・保存先・留保](reports/PUSHT_ISSUE20.ja.md)を参照してください。
+
 新規のRaw／BT比較には `mylewm/train.py` を使います。データ読込はstable-worldmodel、画像前処理と一段損失は公式LeWM、逆伝播・optimizer・schedulerはstable-pretraining、訓練ループ・CSVログ・checkpointはLightningへ委託します。BT固有の処理は学習専用Tと正則化分岐です。
 
 これは新レシピ `pusht_spt_v1` です。既存10万更新の再現経路と互換ではありません。重み・manifest・評価結果は保持しています。旧RBG専用処理は撤去し、共有ループを `training.py`、LIBERO入口を `train_libero.py` へ改名しました。過去runの厳密再開は開始時のGit版が必要です。LIBEROは後半の共有経路を使います。本学習・環境評価はユーザーの明示依頼時だけ実行します。
 
 ### 変更する条件・維持する条件
+
+旧経路と新経路でBT v2の基本方式・推論モデルが別物になったわけではありません。保存済み推論重みは同じ評価経路で扱えます。ただしデータ抽出などのレシピが違うため、旧経路のcheckpointから新経路への厳密な学習再開はできません。
 
 | 項目 | 新しいRaw／BTで共通の条件 |
 |---|---|
@@ -27,7 +33,7 @@
 
 ### 設定確認と実行
 
-このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「3. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスです。存在する場合は内容を変更せずに使い、保存済みBTの評価には使いません。
+このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「3. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`が既にある場合は内容を変更しません。保存済み重み同士の評価では、データ・学習時分割との対応を確認した同じmanifestを使います。別の分割を新規作成して、過去の評価と同条件だと扱わないでください。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -54,10 +60,12 @@ Rawは `--mode raw --output output/pusht/spt_raw` に変え、その他は同じ
 
 - `metrics/version_N/metrics.csv`：LightningのCSVログ。`update`は1始まりの更新番号、`lr_used`はその更新に使った学習率、`fit/loss`・`fit/pred_loss`・`fit/sigreg_loss`が損失。CSVの標準`step`は0始まりなので区別します。
 - `step_N.ckpt`／`last.ckpt`：Lightning形式のモデル・T・optimizer・scheduler・乱数・再開条件。既定5,000更新ごとと最終時点に保存。
-- `step_N_object.ckpt`：Tなしの推論専用モデル。従来の `evaluate_pusht.sh` に渡す形式です。新重みの実環境成功率はまだ未測定です。
+- `step_N_object.ckpt`：Tなしの推論専用モデル。`evaluate_pusht.sh`に渡します。新経路Rawの10k・70kは実環境評価済みです。保存完了した途中重みを選び、結果に更新数を明記します。
 - `completed.json`：訓練ループ正常完了後のみ生成。例外・途中停止を成功扱いしません。
 
 100,000更新を完走した後は、`completed.json`の`state=completed`と`step=100000`、`step_100000_object.ckpt`の両方を確認してから、[PushT評価手順](EVALUATE_PUSHT.ja.md#2-新しいrawbt-runを評価する)へ進みます。`last.ckpt`や途中の`step_N_object.ckpt`を最終成績として評価しないでください。評価は学習が終了してGPUを使っていないときに、別の新規出力先で実行します。
+
+これは100k最終成績の確認方法です。途中評価は`completed.json`なしで可能です。停止時のログ更新数と最後に保存された更新数は異なる場合があり、停止直前の重みが自動保存されたと仮定しないでください。
 
 現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
 
@@ -73,9 +81,11 @@ Rawは `--mode raw --output output/pusht/spt_raw` に変え、その他は同じ
 
 この手順は**このPCの既存`.venv`とダウンロード済みデータを使う手順**です。別PCへの環境構築・ダウンロードを自動化したものではありません。以下のコマンドを順番に実行しますが、PushTとLIBEROの学習は一方ずつにしてください。
 
-PushTの100,000更新は完了済みです。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
+旧経路PushT BT v2の100,000更新は完了済みです。新経路Rawの100k完了という意味ではありません。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
 
 ### 0. PushT用の`uv`環境を構築する
+
+以下は環境準備の工程です。学習・評価が稼働中の共有`.venv`では`uv sync`や自動同期を行わず、準備済み環境を`UV_NO_SYNC=1`で使うか、分離環境を用意します。[途中評価時の環境注意](EVALUATE_INTERMEDIATE.ja.md#実行前の確認)を参照してください。
 
 これまでの手順は既存`.venv`を前提にしており、依存パッケージを導入するコマンドが欠けていました。リポジトリ直下の`pyproject.toml`と`uv.lock`に、PushT用の公式世界モデル、PyTorch、Lightning、Hydra、HDF5周辺を固定しています。GB10/CUDA 13向けPyTorch indexも同ファイルで選択します。
 
@@ -85,7 +95,7 @@ uv run python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worl
 uv run python mylewm/train.py --help
 ```
 
-`ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、上の`train` extraに含まれます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCはこのlockfileをそのまま使わず、対応するPyTorch backendで別途lockを作成してください。
+`ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、`pyproject.toml`の依存`stable-worldmodel[env,train]`経由で導入されます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCはこのlockfileをそのまま使わず、対応するPyTorch backendで別途lockを作成してください。
 
 LIBEROのPython依存は`uv sync --locked --group libero`で追加します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
 

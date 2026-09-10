@@ -1,6 +1,6 @@
 # 公式LeWMをPushTで学習する：初心者向け手順
 
-この説明書はローカル比較用の補足です。上流の説明は[README](README.md)、参照commitは[UPSTREAM.md](UPSTREAM.md)に記録しています。対象は**既存`.venv`とダウンロード済みPushT HDF5がある、このPC**です。別PCへの完全な環境構築手順・依存lockfileはまだ整備していません。
+この説明書はローカル比較用の補足です。上流の説明は[README](README.md)、参照commitは[UPSTREAM.md](UPSTREAM.md)に記録しています。対象は**既存環境とダウンロード済みPushT HDF5がある、このPC**です。PushT用の`pyproject.toml`・`uv.lock`と[環境・データ導入手順](../mylewm/docs/TRAINING.ja.md)は整備済みです。ただし別PCの全ハードウェア構成やAの公式trainer完走まで保証するものではありません。
 
 2026-09-09時点でBTの100,000更新は完了しています。この説明書の更新では公式学習を開始していません。新規実行前にGPU上の既存プロセスを確認し、重複起動しないでください。
 
@@ -94,9 +94,11 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 
 途中再開について：公式コードは`run_dir/lewm_weights.ckpt`がある場合にManagerへ渡しますが、通常のLightning保存先とこの探索名の整合・完全再開をこの環境では未検証です。`weights_epoch_N.pt`をその名前に変更して代用してはいけません。確実な途中再開とBTとの比較を優先する場合はBを使います。
 
-公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/TRAINING.ja.md#4-本学習を開始する)が使えます。
+公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/TRAINING.ja.md#5-本学習を開始する)が使えます。
 
 ## B. BTと同条件で比較するRaw LeWM
+
+RawはTなしのSIGRegモデルです。ローカルの新Rawは74,504更新で停止し、保存済み70kで50ケース評価まで実施しています。公式配布重みの学習ステップが70kという意味ではありません。[実測結果と条件差](../mylewm/docs/reports/PUSHT_ISSUE20.ja.md)を参照してください。
 
 この共有比較経路の通常起動はデータのサイズ・更新時刻を確認し、全量ハッシュを読み直しません。必要なときだけ`--verify-data`を追加します。Aの公式trainerにはこの引数を渡しません。
 

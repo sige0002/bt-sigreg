@@ -33,6 +33,8 @@ CUDA_VISIBLE_DEVICES=1 UV_NO_SYNC=1 bash mylewm/tools/evaluate_pusht.sh \
 
 BTはcheckpointと出力名をBT runに変更する。GB10のcache解放フラグは学習データの再読込を増やし得るため、この同時評価例では付けていない。評価も通常は全量hashを走査せず、`--verify-data`指定時だけ走査する。
 
+`spt_raw`はSIGRegを直接適用するモデルで、公式配布checkpointとは別のローカル学習runである。70k同士を評価する場合は両方の入力を`step_70000_object.ckpt`にし、それぞれ未使用の出力名を指定する。学習ログの最新更新数でなく、実際に保存完了したcheckpointを選ぶ。
+
 終了コード0、出力先の`status.json`が`succeeded`、`results.txt.json`を確認する。詳細は[PushT評価手順](EVALUATE_PUSHT.ja.md)の終了確認を参照する。
 
 ## LIBERO-10
@@ -62,4 +64,4 @@ CUDA_VISIBLE_DEVICES=1 UV_NO_SYNC=1 bash mylewm/run_libero.sh mylewm/tools/evalu
 
 結果にはrun名と更新数を付け、「50,000更新時点の途中評価」等と記録する。比較は同じmanifest・ケース・seed・CEM予算で行う。繰り返し見たconfirm集合はモデル選択に影響するため、未使用の最終テスト成績とは呼ばない。
 
-この追記ではCLI引数と保存方式をコードで照合した。別GPUでの同時学習・環境評価の完走は未検証であり、文書更新を理由に評価は起動していない。
+2026-09-10、ユーザー依頼で学習停止後にGB10上で新Raw 10k・70k、旧BT 15k・70kなどの途中checkpointを実評価し、終了コード・status・結果・動画を確認した。70k同士の固定50ケースはSIGReg 45/50、BT 47/50。[実測と比較上の留保](reports/PUSHT_ISSUE20.ja.md)を参照。別GPUでの同時学習・環境評価の完走、RTX側の該当BT 10k、LIBEROのこの途中評価手順の実環境完走は未検証であり、PushTの実績で代用しない。
