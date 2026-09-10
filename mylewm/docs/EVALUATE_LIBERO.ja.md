@@ -67,6 +67,8 @@ BTは`--mode bt --output output/libero10/bt_train`に変えるだけにする。
 
 ## 4. 実環境CEM評価
 
+この節は最終評価向けです。学習継続中の保存済み`step_N_object.ckpt`については[途中checkpoint評価手順](EVALUATE_INTERMEDIATE.ja.md)の別GPU実行を使えます。途中評価には`completed.json`は不要です。
+
 既定はdry-runで、checkpointをロードせず環境も動かさずoutputも作らない。下はRaw最終checkpointの固定10タスク・各50初期状態評価である。BTもcheckpointとoutputだけを変え、同じmanifest・監査・CEM条件を使う。
 
 ```bash

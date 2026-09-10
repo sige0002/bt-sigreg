@@ -20,6 +20,8 @@
 
 ## 2. 新しいRaw/BT runを評価する
 
+この節は最終評価向けです。学習継続中の保存済み`step_N_object.ckpt`は[途中checkpoint評価手順](EVALUATE_INTERMEDIATE.ja.md)で別GPU評価できます。その場合は`completed.json`や本学習の終了を待つ必要はありません。
+
 新レシピ `pusht_spt_v1` のRaw/BTでは、**100,000更新が正常終了してから**評価します。稼働中の学習とCEM評価を同時に実行しないでください。次はRawの例です。BTでは`raw`を`bt`へ置き換えます。`--execute`なしは安全な設定確認だけで、GPU初期化・出力作成・評価はしません。
 
 ```bash

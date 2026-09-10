@@ -45,6 +45,8 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 
 ## 比較と検証
 
+ユーザー指定の途中checkpoint評価は本学習終了前でも可能。`mylewm/docs/EVALUATE_INTERMEDIATE.ja.md`に従い、保存完了済み`step_N_object.ckpt`と別GPUを使用する。最終評価のcompleted.json条件を途中評価へ適用しない。文書更新だけを理由に評価は開始せず、共有学習環境の依存を同期しない。
+
 依存更新時は既存object checkpointの読込も検証する。現在はTransformers 4.57.6を固定（5系では旧ViTEncoderの復元失敗）。稼働中の学習用`.venv`にsyncせず、`UV_PROJECT_ENVIRONMENT`で隔離して検証する。CPU限定テストのCUDA5件スキップは理由と件数を報告し、GPU合格とは扱わない。
 
 評価は起動だけで完了扱いしない。明示依頼された評価は終了コード・結果・launcherの`status.json`を照合して報告する。SIGKILL等ではstatus更新ができないため、実プロセスも確認する。廃止済みの`watch_evaluation.sh`は削除済みで、定期監視service・エージェントを起動しない。通知経路は未成立であり「無人でも必ず気付く」と主張しない。失敗時はログを保持して原因を確認し、無限再起動や他GPUサービス停止をしない。

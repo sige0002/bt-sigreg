@@ -1,5 +1,7 @@
 # PushT／LIBERO-10：初心者向け学習手順
 
+学習途中の保存済みcheckpointも評価できます。[途中checkpoint評価手順](EVALUATE_INTERMEDIATE.ja.md)にPushT／LIBEROの別GPU指定・実行・結果確認を記載しました。以下の100,000更新完了条件は最終評価向けです。途中評価では`completed.json`は不要です。
+
 ## 新しいPushT経路：公式ライブラリへ委託（2026-09-09）
 
 新規のRaw／BT比較には `mylewm/train.py` を使います。データ読込はstable-worldmodel、画像前処理と一段損失は公式LeWM、逆伝播・optimizer・schedulerはstable-pretraining、訓練ループ・CSVログ・checkpointはLightningへ委託します。BT固有の処理は学習専用Tと正則化分岐です。
