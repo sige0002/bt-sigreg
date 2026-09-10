@@ -34,8 +34,8 @@ This codebase builds on [stable-worldmodel](https://github.com/galilai-group/sta
 **Installation:**
 ```bash
 uv venv --python=3.10
-source .venv/bin/activate
 uv pip install stable-worldmodel[train,env]
+uv run python --version
 ```
 
 ## Data
