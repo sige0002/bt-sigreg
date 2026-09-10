@@ -75,19 +75,17 @@ PushTの100,000更新は完了済みです。以下は新規実験の手順で�
 
 ### 0. PushT用の`uv`環境を構築する
 
-これまでの手順は既存`.venv`を前提にしており、依存パッケージを導入するコマンドが欠けていました。PushT用の公式世界モデル、PyTorch、Lightning、Hydra、HDF5周辺は固定した上流commitの`train`/`env` extraから入れます。GB10/CUDA 13環境では`--torch-backend cu130`を使います。
+これまでの手順は既存`.venv`を前提にしており、依存パッケージを導入するコマンドが欠けていました。リポジトリ直下の`pyproject.toml`と`uv.lock`に、PushT用の公式世界モデル、PyTorch、Lightning、Hydra、HDF5周辺を固定しています。GB10/CUDA 13向けPyTorch indexも同ファイルで選択します。
 
 ```bash
-test -x .venv/bin/python || uv venv --python 3.12
-uv pip install --python .venv/bin/python --torch-backend cu130 \
-  'stable-worldmodel[train,env] @ git+https://github.com/galilai-group/stable-worldmodel.git@3693030085e7816e7fa2bf42125b3f66e432d272'
+uv sync --locked
 uv run python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worldmodel, torch; print("hydra", hydra.__version__, "torch", torch.__version__)'
 uv run python mylewm/train.py --help
 ```
 
-`ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、上の`train` extraに含まれます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCでは`--torch-backend cu130`を外し、対応するPyTorch backendを選びます。
+`ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、上の`train` extraに含まれます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCはこのlockfileをそのまま使わず、対応するPyTorch backendで別途lockを作成してください。
 
-LIBEROの実環境評価は別です。LIBERO本体（この作業木では`external/libero`）、`robosuite`、MuJoCo、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要で、公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
+LIBEROのPython依存は`uv sync --locked --group libero`で追加します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
 
 ### 1. 作業フォルダ・環境・データを確認する
 

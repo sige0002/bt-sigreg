@@ -1,0 +1,32 @@
+[project]
+name = "bt-sigreg"
+version = "0.1.0"
+description = "BT-SIGReg experiments on the Stable World Model stack"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "stable-worldmodel[env,train]",
+    "torch==2.9.1",
+    "torchvision==0.24.1",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+libero = [
+    "dm-control==1.0.45",
+    "gymnasium-robotics==1.4.2",
+    "mujoco==3.12.0",
+    "numba==0.67.0",
+    "robosuite==1.4.0",
+    "termcolor==3.3.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+stable-worldmodel = { git = "https://github.com/galilai-group/stable-worldmodel.git", rev = "3693030085e7816e7fa2bf42125b3f66e432d272" }
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
