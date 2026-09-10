@@ -154,7 +154,17 @@ uv run python mylewm/train_libero.py prepare \
 
 ### 4. まず100ステップだけ動作確認する
 
-PushTは冒頭の新経路で短期確認し、LIBEROは下のコマンドを実行します。`--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
+`--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
+
+PushT（BT例。Rawは`--mode raw --output output/pusht/spt_raw_smoke`だけを変更）：
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
+  --mode bt --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/spt_bt_smoke \
+  --steps 100 --batch-size 16 --workers 0 --seed 3072 \
+  --warmup-steps 10 --save-every 50 --execute
+```
 
 LIBERO-10：
 
@@ -178,7 +188,17 @@ tmux new -s bt-training
 cd "$(git rev-parse --show-toplevel)"
 ```
 
-その中で、PushTなら冒頭の新経路、LIBEROなら下のコマンドを実行してください。ここでの出力名`bt_train`は完了済みrunとは別です。短期学習のcheckpointは使わず、新規初期値から始めます。
+短期学習のcheckpointは使わず、新規初期値から始めます。
+
+PushT・10万ステップ（BT例。Rawは`--mode raw --output output/pusht/spt_raw`だけを変更）：
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
+  --mode bt --manifest output/manifests/pusht/manifest.json \
+  --output output/pusht/spt_bt \
+  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
+  --warmup-steps 500 --save-every 5000 --execute
+```
 
 LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証していません）：
 
