@@ -25,14 +25,25 @@ def protocol(config):
     return value
 
 
-def provenance(dataset,manifest,checkpoint,root):
+def provenance(dataset,manifest,checkpoint,root,verify_data=True):
     import stable_worldmodel as swm
     import stable_pretraining as spt
     sources=[root/'lewm/eval.py',root/'lewm/jepa.py',root/'lewm/module.py',
              root/'mylewm/evaluation_contract.py',root/'mylewm/planning_action_adapter.py',
              Path(inspect.getfile(swm.World)),Path(inspect.getfile(swm.solver.CEMSolver)),
              Path(inspect.getfile(swm.policy.WorldModelPolicy))]
-    return {'schema':'paired_eval_v2','dataset_sha256':file_sha256(dataset),
+    metadata = json.loads(Path(manifest).read_text())
+    stat = Path(dataset).stat()
+    if 'dataset_size' in metadata and stat.st_size != metadata['dataset_size']:
+        raise ValueError('Evaluation dataset size differs from manifest')
+    prepared = metadata.get('data_fingerprints', {}).get(str(Path(metadata['dataset']).resolve()))
+    sha = file_sha256(dataset) if verify_data else None
+    if verify_data and prepared and sha != prepared['sha256']:
+        raise ValueError('Evaluation dataset SHA-256 differs from prepare evidence')
+    return {'schema':'paired_eval_v2','dataset_sha256':sha,
+            'dataset_verification':'sha256' if verify_data else 'metadata_only',
+            'dataset_metadata':{'path':str(Path(dataset).resolve()),'size':stat.st_size,'mtime_ns':stat.st_mtime_ns},
+            'prepared_dataset_sha256':prepared['sha256'] if prepared else None,
             'manifest_sha256':file_sha256(manifest),'checkpoint_sha256':file_sha256(checkpoint),
             'source_sha256':{str(p):file_sha256(p) for p in sources},
             'versions':{name:importlib.metadata.version(name) for name in

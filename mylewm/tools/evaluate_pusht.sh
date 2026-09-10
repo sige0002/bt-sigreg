@@ -26,6 +26,7 @@ parser.add_argument('--seed', type=int, default=42, help='CEM/environment seed; 
 parser.add_argument('--gb10-cache-workaround', action='store_true', help='Release only the dataset clean file cache before CUDA initialization')
 parser.add_argument('--cem-audit', action='store_true', help='Record CEM convergence and selected-plan diagnostics')
 parser.add_argument('--execute', action='store_true', help='Actually run evaluation on GPU')
+parser.add_argument('--verify-data', action='store_true', help='Explicit full dataset SHA-256 scan')
 args = parser.parse_args()
 checkpoint = args.checkpoint.resolve()
 manifest = args.manifest.resolve()
@@ -80,6 +81,7 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            f'eval.num_eval={args.num_eval}', f'+eval.manifest={manifest}',
            '+eval.partition=confirm', f'+eval.offset={args.offset}',
            f'seed={args.seed}',
+           f'+eval.verify_data={str(args.verify_data).lower()}',
            '+eval.dataset_path=' + json.dumps(str(dataset)),
            '+eval.audit_provenance=true', '+eval.shared_physical_search=true',
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
@@ -88,6 +90,7 @@ if args.cem_audit:
 plan = {'checkpoint': str(checkpoint), 'dataset': str(dataset), 'output': str(output), 'cases': len(cases),
         'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
         'cem_audit': args.cem_audit,
+        'verify_data': args.verify_data,
         'gb10_cache_workaround': args.gb10_cache_workaround,
         'checkpoint_sha256': hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         'manifest_sha256': hashlib.sha256(manifest.read_bytes()).hexdigest(),
@@ -119,7 +122,24 @@ if args.cem_audit:
     env['BT_CEM_AUDIT_PATH'] = str(output/'cem_audit.jsonl')
 print(f"Running; follow progress with: tail -f {output/'console.log'}", flush=True)
 with (output/'console.log').open('x') as stream:
-    result = subprocess.run(command, cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
+    import threading
+    stopped = threading.Event()
+    def follow():
+        with (output/'console.log').open() as reader:
+            while not stopped.is_set():
+                text = reader.read()
+                if text:
+                    print(text, end='', flush=True)
+                stopped.wait(.2)
+            print(reader.read(), end='', flush=True)
+    follower = threading.Thread(target=follow, daemon=True)
+    follower.start()
+    try:
+        result = subprocess.run(command, cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
+    finally:
+        stream.flush()
+        stopped.set()
+        follower.join()
 if result.returncode:
     print(f"Evaluation failed; keep {output/'console.log'} for diagnosis. No success rate asserted.", file=sys.stderr)
     sys.exit(1)

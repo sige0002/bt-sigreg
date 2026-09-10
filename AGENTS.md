@@ -45,7 +45,9 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 
 ## 比較と検証
 
-PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。固定cacheやsymlinkを要求しない。移転時はサイズ、新規prepareのhashがあれば実行時にSHA-256を照合する。評価のprovenanceとloaderに同じ解決済みパスを使用する。
+PushT評価launcherも通常は全量データhashを走査しない。`--verify-data`指定時のみ再走査し、未計算hashはnull、prepare時hashは別フィールドに保存する。起動端末とconsole.logへ処理段階・CEM開始・環境step進捗を逐次出す。
+
+PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。固定cacheやsymlinkを要求しない。移転時はサイズを確認し、明示した全量検証時だけ新規prepareのSHA-256と照合する。評価のprovenanceとloaderに同じ解決済みパスを使用する。
 
 ユーザー指定の途中checkpoint評価は本学習終了前でも可能。`mylewm/docs/EVALUATE_INTERMEDIATE.ja.md`に従い、保存完了済み`step_N_object.ckpt`と別GPUを使用する。最終評価のcompleted.json条件を途中評価へ適用しない。文書更新だけを理由に評価は開始せず、共有学習環境の依存を同期しない。
 

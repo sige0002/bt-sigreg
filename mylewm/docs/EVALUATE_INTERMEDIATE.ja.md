@@ -12,7 +12,7 @@ checkpointの保存完了と、学習が次の更新へ進んだことをログ�
 
 ## PushT
 
-HDF5はmanifest内の任意パスを使う。移転先を指定する場合は以下の両コマンドへ`--dataset /absolute/path/to/pusht_expert_train.h5`を追加する。元manifestを書き換えず、サイズと保存済みhash（存在する場合）で照合する。
+HDF5はmanifest内の任意パスを使う。移転先を指定する場合は以下の両コマンドへ`--dataset /absolute/path/to/pusht_expert_train.h5`を追加する。元manifestを書き換えず、サイズを確認し、`--verify-data`指定時は保存済みhash（存在する場合）とも照合する。
 
 リポジトリ直下で、実際のrun名・保存済みmanifestに置き換える。各出力先は未使用名にする。
 
@@ -31,7 +31,7 @@ CUDA_VISIBLE_DEVICES=1 UV_NO_SYNC=1 bash mylewm/tools/evaluate_pusht.sh \
   --output "$PUSHT_EVAL_OUT" --num-eval 50 --seed 42 --execute
 ```
 
-BTはcheckpointと出力名をBT runに変更する。GB10のcache解放フラグは学習データの再読込を増やし得るため、この同時評価例では付けていない。評価器の全量データhash確認は残っており、学習側の`--verify-data`とは別仕様。
+BTはcheckpointと出力名をBT runに変更する。GB10のcache解放フラグは学習データの再読込を増やし得るため、この同時評価例では付けていない。評価も通常は全量hashを走査せず、`--verify-data`指定時だけ走査する。
 
 終了コード0、出力先の`status.json`が`succeeded`、`results.txt.json`を確認する。詳細は[PushT評価手順](EVALUATE_PUSHT.ja.md)の終了確認を参照する。
 

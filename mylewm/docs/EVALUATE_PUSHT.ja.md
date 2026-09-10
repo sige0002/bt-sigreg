@@ -8,7 +8,7 @@
 
 ## 1. 何を測るのか
 
-HDF5は`--manifest`の`dataset`パスから読みます。リポジトリの`.cache`内に置く必要はありません。別PCへ移した場合は`--dataset /absolute/path/to/pusht_expert_train.h5`を追加して上書きできます。manifestは編集しません。移転時はmanifestの`dataset_size`が必須で、サイズ不一致を拒否します。mtimeはコピーで変わるため評価では要求しません。新規prepareの`data_fingerprints`があれば実行時にSHA-256も照合します。旧manifestにhashが無い場合、サイズ・HDF5構造の確認だけでは同一内容を保証できません。解決したパスはdry-runと`launch.json`の`dataset`に出ます。
+HDF5は`--manifest`の`dataset`パスから読みます。リポジトリの`.cache`内に置く必要はありません。別PCへ移した場合は`--dataset /absolute/path/to/pusht_expert_train.h5`を追加して上書きできます。manifestは編集しません。移転時はmanifestの`dataset_size`が必須で、サイズ不一致を拒否します。mtimeはコピーで変わるため評価では要求しません。通常はサイズ確認のみで全量走査せず、`--verify-data`指定時だけ全量SHA-256を計算し、prepareのhashがあれば照合します。旧manifestにhashが無い場合、サイズ・HDF5構造の確認だけでは同一内容を保証できません。解決したパスはdry-runと`launch.json`の`dataset`に出ます。
 
 世界モデルとCEM計画器で行動を選び、PushT環境で実際に動かして成功数を数えます。lossから成功率を推測するものではありません。既定はmanifestの`confirm`先頭50ケースで、開始状態とデータセット由来Goalを固定します。固定T字目標の95%被覆率とは別の成功判定です。既に使った回帰評価集合であり、未使用の最終テストではありません。
 
@@ -86,6 +86,8 @@ bash mylewm/tools/evaluate_pusht.sh \
 `--gb10-cache-workaround`はこのGB10の起動OOM対処です。**実行時だけ**対象PushT HDF5の読み取りcacheへ解放ヒントを出し、データ読込より先にCUDAを初期化します。データ削除、全体の`drop_caches`、モデルや学習条件の変更はしません。学習側の再読込で一時的に遅くなる可能性はあります。通常の別GPUではこのフラグを外せます。
 
 ## 5. 評価を実行し、ログを見る
+
+起動端末にも`console.log`と同じログを逐次表示します。データ検証方式、HDF5・統計読込、評価開始、CEM計画開始、環境step呼出し完了とactiveケース数が表示されます。step呼出し数は成功ケース数や完了率ではありません。CEM計算中やHDF5読込中は更新間隔が空きます。`status.json=succeeded`まで評価完了とは扱いません。
 
 端末切断後も続けたいなら、先に`tmux new -s pusht-eval`を実行し、その中で次を実行します。設定確認と同じコマンドに`--execute`を追加します。
 

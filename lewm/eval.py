@@ -80,12 +80,10 @@ def run(cfg: DictConfig):
         root=Path(__file__).resolve().parents[1]
         base=Path(swm.data.utils.get_cache_dir())
         dataset_path = Path(cfg.eval.dataset_path) if cfg.eval.get('dataset_path') else base/'datasets'/f'{cfg.eval.dataset_name}.h5'
+        full = cfg.eval.get('verify_data', False)
+        print('Evaluation preflight: ' + ('full dataset SHA-256 scan' if full else 'metadata only; no full dataset scan'), flush=True)
         identity=provenance(dataset_path,
-            Path(cfg.eval.manifest),base/(cfg.policy+'_object.ckpt'),root)
-        manifest_data = json.loads(Path(cfg.eval.manifest).read_text())
-        prepared = manifest_data.get('data_fingerprints', {}).get(str(Path(manifest_data['dataset']).resolve()))
-        if prepared and identity['dataset_sha256'] != prepared['sha256']:
-            raise ValueError('Evaluation dataset SHA-256 differs from prepare evidence')
+            Path(cfg.eval.manifest),base/(cfg.policy+'_object.ckpt'),root,verify_data=full)
     assert (
         cfg.plan_config.horizon * cfg.plan_config.action_block <= cfg.eval.eval_budget
     ), "Planning horizon must be smaller than or equal to eval_budget"
@@ -100,6 +98,7 @@ def run(cfg: DictConfig):
         "goal": img_transform(cfg),
     }
 
+    print('Loading HDF5 and action statistics', flush=True)
     dataset = get_dataset(cfg, cfg.eval.dataset_name)
     stats_dataset = dataset  # get_dataset(cfg, cfg.dataset.stats)
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
@@ -226,6 +225,7 @@ def run(cfg: DictConfig):
         from mylewm.evaluation_contract import array_hash
         original_get_actions=world._get_actions
         def audited_get_actions():
+            print(f'CEM planning: environment step calls={len(physical_actions)}, cases={cfg.eval.num_eval}', flush=True)
             if not initial_runtime_hashes:
                 for index in range(cfg.eval.num_eval):
                     initial_runtime_hashes.append({key:array_hash(value[index]) for key,value in world.infos.items()
@@ -236,7 +236,9 @@ def run(cfg: DictConfig):
         def audited_env_step(actions,mask=None):
             physical_actions.append({'actions':np.asarray(actions).tolist(),
                 'mask':np.ones(cfg.eval.num_eval,dtype=bool).tolist() if mask is None else np.asarray(mask).tolist()})
-            return original_env_step(actions,mask=mask)
+            result = original_env_step(actions,mask=mask)
+            print(f'Environment step call {len(physical_actions)} completed; active cases={cfg.eval.num_eval if mask is None else int(np.asarray(mask).sum())}', flush=True)
+            return result
         world.envs.step=audited_env_step
 
     results_path.mkdir(parents=True, exist_ok=True)
@@ -244,6 +246,7 @@ def run(cfg: DictConfig):
         raise FileExistsError('Audited evaluation result already exists')
 
     start_time = time.time()
+    print(f'Starting evaluation: {cfg.eval.num_eval} cases, budget={cfg.eval.eval_budget} per case', flush=True)
     # Seed environment RNGs before the dataset evaluator's reset(seed=None).
     world.reset(seed=cfg.seed)
     # The upstream evaluation API changed after the HDF5 release.  Use the
