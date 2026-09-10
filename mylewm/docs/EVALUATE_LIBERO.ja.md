@@ -13,7 +13,7 @@ Raw/BTは同じ新規manifest、seed、batch、workers、更新数、optimizer�
 データを複製せず、分割とtrain-only行動統計をmanifestへ記録する。既にmanifestがあれば変更・再作成しない。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 ls .cache/libero-datasets/libero_10/*.hdf5
 uv run python mylewm/train_libero.py prepare \
   --dataset .cache/libero-datasets/libero_10 \
@@ -43,7 +43,7 @@ done
 ```bash
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode raw --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/raw_smoke_s3072 \
+  --output output/libero10/raw_smoke \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
   --warmup-steps 10 --lr 5e-5 --min-lr 0 \
   --save-every 50 --diagnostics-every 25 --deterministic
@@ -54,13 +54,13 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 ```bash
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode raw --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/raw_train_s3072 \
+  --output output/libero10/raw_train \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
   --warmup-steps 500 --lr 5e-5 --min-lr 0 \
   --save-every 5000 --diagnostics-every 1000 --deterministic
 ```
 
-BTは`--mode bt --output output/libero10/bt_train_s3072`に変えるだけにする。各runの`config.json`の`initial_model_sha256`を照合する。最終評価へ進めるのは`completed.json`が`{"step": 100000, "state": "completed", "recipe": "controlled_comparison"}`であり、`step_100000_object.ckpt`がある場合だけである。`resume.pt`は再開専用で評価に渡さない。
+BTは`--mode bt --output output/libero10/bt_train`に変えるだけにする。各runの`config.json`の`initial_model_sha256`を照合する。最終評価へ進めるのは`completed.json`が`{"step": 100000, "state": "completed", "recipe": "controlled_comparison"}`であり、`step_100000_object.ckpt`がある場合だけである。`resume.pt`は再開専用で評価に渡さない。
 
 ## 4. 実環境CEM評価
 
@@ -69,17 +69,17 @@ BTは`--mode bt --output output/libero10/bt_train_s3072`に変えるだけにす
 ```bash
 # 設定・監査・入力だけを確認する。
 bash mylewm/run_libero.sh mylewm/tools/evaluate_libero.py \
-  --checkpoint output/libero10/raw_train_s3072/step_100000_object.ckpt \
+  --checkpoint output/libero10/raw_train/step_100000_object.ckpt \
   --manifest output/manifests/libero10/manifest.json \
   --render-audit-dir output/libero10/render_audit \
-  --output output/libero10/eval_raw_s3072_confirm50
+  --output output/libero10/eval_raw_confirm50
 
 # dry-runを確認した後だけ環境を動かす。
 bash mylewm/run_libero.sh mylewm/tools/evaluate_libero.py \
-  --checkpoint output/libero10/raw_train_s3072/step_100000_object.ckpt \
+  --checkpoint output/libero10/raw_train/step_100000_object.ckpt \
   --manifest output/manifests/libero10/manifest.json \
   --render-audit-dir output/libero10/render_audit \
-  --output output/libero10/eval_raw_s3072_confirm50 --execute
+  --output output/libero10/eval_raw_confirm50 --execute
 ```
 
 評価中に学習を併走しない。成功は`env.check_success()`だけで決め、デモ状態距離やBCスコアと混ぜない。終了時は`status.json=succeeded`、`summary.json`、10×50行の`episodes.jsonl`、全`taskN_initM.npz`を確認する。途中終了は未測定であり0%ではない。
@@ -90,11 +90,11 @@ bash mylewm/run_libero.sh mylewm/tools/evaluate_libero.py \
 
 ```bash
 uv run python mylewm/tools/build_libero_ui.py \
-  --evaluation output/libero10/eval_raw_s3072_confirm50 \
-  --output output/libero10/ui_raw_s3072_confirm50
+  --evaluation output/libero10/eval_raw_confirm50 \
+  --output output/libero10/ui_raw_confirm50
 
 # ローカルブラウザで http://127.0.0.1:8000 を開く。Ctrl-Cは表示だけを停止する。
-uv run python -m http.server 8000 --directory output/libero10/ui_raw_s3072_confirm50
+uv run python -m http.server 8000 --directory output/libero10/ui_raw_confirm50
 ```
 
 `index.html`を直接開くこともできる。画面のsuccess/failureは固定実行結果であり、goalへの見た目の近さによる判定ではない。

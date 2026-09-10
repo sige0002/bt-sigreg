@@ -23,23 +23,23 @@
 新レシピ `pusht_spt_v1` のRaw/BTでは、**100,000更新が正常終了してから**評価します。稼働中の学習とCEM評価を同時に実行しないでください。次はRawの例です。BTでは`raw`を`bt`へ置き換えます。`--execute`なしは安全な設定確認だけで、GPU初期化・出力作成・評価はしません。
 
 ```bash
-cd /home/USER/bt-sigreg
-uv run python -c 'import json; d=json.load(open("output/pusht/spt_raw_s3072/completed.json")); assert d == {"step": 100000, "state": "completed", "recipe": "pusht_spt_v1"}; print(d)'
-ls -lh output/pusht/spt_raw_s3072/step_100000_object.ckpt
+cd "$(git rev-parse --show-toplevel)"
+uv run python -c 'import json; d=json.load(open("output/pusht/spt_raw/completed.json")); assert d == {"step": 100000, "state": "completed", "recipe": "pusht_spt_v1"}; print(d)'
+ls -lh output/pusht/spt_raw/step_100000_object.ckpt
 
 # まずdry-run。出力名は未使用にし、ディレクトリを先に作らない。
 bash mylewm/tools/evaluate_pusht.sh \
-  --checkpoint output/pusht/spt_raw_s3072/step_100000_object.ckpt \
+  --checkpoint output/pusht/spt_raw/step_100000_object.ckpt \
   --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/eval_spt_raw_s3072_confirm50 \
-  --gb10-cache-workaround
+  --output output/pusht/eval_spt_raw_confirm50 \
+  --seed 42 --gb10-cache-workaround
 
 # dry-runの内容を確認してから、この1回だけを実行する。
 bash mylewm/tools/evaluate_pusht.sh \
-  --checkpoint output/pusht/spt_raw_s3072/step_100000_object.ckpt \
+  --checkpoint output/pusht/spt_raw/step_100000_object.ckpt \
   --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/eval_spt_raw_s3072_confirm50 \
-  --gb10-cache-workaround --execute
+  --output output/pusht/eval_spt_raw_confirm50 \
+  --seed 42 --gb10-cache-workaround --execute
 ```
 
 `completed.json`がない、内容が一致しない、checkpointがない、または学習プロセスが残っている場合は評価を始めません。`resume.pt`と`last.ckpt`は学習再開用であり、評価へ渡しません。Raw/BT比較では、両方に**同じ新manifest、`--num-eval`、`--offset`、`--seed`、CEM設定**を使い、各評価の`status.json`が`succeeded`になった後で比較します。新しいrunの評価結果を、旧BT runや公式配布checkpointの数値と同じ条件の方式比較として混ぜません。
@@ -47,7 +47,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 ## 3. 既存checkpointを評価する前の確認
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 systemctl --user list-units --all 'bt-pusht*'
 tmux list-sessions 2>/dev/null || true
 nvidia-smi
@@ -86,7 +86,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 端末切断後も続けたいなら、先に`tmux new -s pusht-eval`を実行し、その中で次を実行します。設定確認と同じコマンドに`--execute`を追加します。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 bash mylewm/tools/evaluate_pusht.sh \
   --checkpoint output/pusht/bt_spectral_v2_100k_s3072/step_100000_object.ckpt \
   --output output/pusht/eval_bt_100000_50 \
@@ -98,7 +98,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 別端末で進捗を見るには：
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 tail -f output/pusht/eval_bt_100000_50/console.log
 ```
 

@@ -20,7 +20,7 @@
 リポジトリ直下で実行します。別の場所に置いた場合は`cd`を変更します。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 uv run python --version
 nvidia-smi
 ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
@@ -100,11 +100,11 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 新しい比較には `pusht_spt_v1` を使います。分割作成、短期確認、CSVの見方、保存再開は[新しいPushT学習手順](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)に集約しています。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 # 設定確認だけ。保存済み比較用manifestを指定し、出力先は未使用名にする
 uv run python mylewm/train.py --mode raw \
   --manifest .cache/stable-wm/pusht/rbg_v0/manifest.json \
-  --output output/pusht/spt_raw_s3072 --steps 100000
+  --output output/pusht/spt_raw --steps 100000 --seed 3072
 ```
 
 本当に学習を開始する場合だけ、上記へ `--execute` を付け、GPUでは `CUBLAS_WORKSPACE_CONFIG=:4096:8` を指定します。比較するBTは `--mode bt` と別の出力名に変え、それ以外は共通にします。両configの `initial_model_sha256`、データ・manifest・予算・前処理を確認してください。新経路に旧 `--initialization` や旧 `resume.pt` を渡しません。

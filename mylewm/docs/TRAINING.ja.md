@@ -28,12 +28,12 @@
 このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「2. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`は新規作成後だけ使えるパスです。存在する場合は内容を変更せずに使い、保存済みBTの評価には使いません。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 uv run python mylewm/train.py --help
 # 既定はdry-run。学習・GPU初期化・出力作成は行わない
 uv run python mylewm/train.py --mode bt \
   --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt_s3072
+  --output output/pusht/spt_bt --seed 3072
 ```
 
 dry-runは設定・ソース識別の確認までで、全データhash・重み・学習動作の保証ではありません。出力先は未使用名を指定し、先にmkdirしないでください。
@@ -43,10 +43,10 @@ dry-runは設定・ソース識別の確認までで、全データhash・重み
 ```bash
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
   --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt_s3072 --steps 100000 --execute
+  --output output/pusht/spt_bt --steps 100000 --seed 3072 --execute
 ```
 
-Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は同じにします。同時起動しません。まず短期動作確認をするなら、別出力名で `--steps 100 --warmup-steps 10 --batch-size 16 --workers 0 --save-every 50` を両方式に揃えて指定します。短期checkpointを10万更新へ延長する用途のresumeはできません。
+Rawは `--mode raw --output output/pusht/spt_raw` に変え、その他は同じにします。`3072`はここで明示した学習乱数seedで、run名から推測する値ではありません。実行後は各runの`config.json`にも記録されます。同時起動しません。まず短期動作確認をするなら、別出力名で `--steps 100 --warmup-steps 10 --batch-size 16 --workers 0 --save-every 50` を両方式に揃えて指定します。短期checkpointを10万更新へ延長する用途のresumeはできません。
 
 ### ログ・保存・再開
 
@@ -57,7 +57,7 @@ Rawは `--mode raw --output output/pusht/spt_raw_s3072` に変え、その他は
 
 100,000更新を完走した後は、`completed.json`の`state=completed`と`step=100000`、`step_100000_object.ckpt`の両方を確認してから、[PushT評価手順](EVALUATE_PUSHT.ja.md#2-新しいrawbt-runを評価する)へ進みます。`last.ckpt`や途中の`step_N_object.ckpt`を最終成績として評価しないでください。評価は学習が終了してGPUを使っていないときに、別の新規出力先で実行します。
 
-現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt_s3072/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
+現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
 
 中断後は**同じ設定・総更新数**で、`--resume 元run/last.ckpt --output 新しい未使用run --execute` を指定します。元のrunは上書きせず、ログは新runへ分離します。自己生成した信頼済みcheckpointだけを使ってください。旧 `resume.pt`、完了済みcheckpoint、変更したレシピでの再開は拒否します。
 
@@ -78,7 +78,7 @@ PushTの100,000更新は完了済みです。以下は新規実験の手順で�
 全コマンドはリポジトリ直下で実行します。別の場所に置いた場合は、最初の`cd`だけ実際の場所に変更してください。仮想環境のactivateは不要です。
 
 ```bash
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 uv run python --version
 uv run python mylewm/training.py --help
 uv run python mylewm/train_libero.py --help
@@ -122,7 +122,7 @@ LIBERO-10：
 ```bash
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/bt_smoke_s3072 \
+  --output output/libero10/bt_smoke \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
   --warmup-steps 10 --lr 5e-5 --min-lr 0 \
   --save-every 50 --diagnostics-every 25 --deterministic
@@ -136,17 +136,17 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 
 ```bash
 tmux new -s bt-training
-cd /home/USER/bt-sigreg
+cd "$(git rev-parse --show-toplevel)"
 ```
 
-その中で、PushTなら冒頭の新経路、LIBEROなら下のコマンドを実行してください。ここでの出力名`bt_train_s3072`は完了済みrunとは別です。短期学習のcheckpointは使わず、新規初期値から始めます。
+その中で、PushTなら冒頭の新経路、LIBEROなら下のコマンドを実行してください。ここでの出力名`bt_train`は完了済みrunとは別です。短期学習のcheckpointは使わず、新規初期値から始めます。
 
 LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証していません）：
 
 ```bash
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/bt_train_s3072 \
+  --output output/libero10/bt_train \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
   --warmup-steps 500 --lr 5e-5 --min-lr 0 \
   --bt-depth 2 --bt-kappa .2 --bt-hidden 192 \
@@ -162,10 +162,10 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 PushTの新経路は冒頭のCSVを確認します。LIBEROのJSONLログを見る場合は次を使います。
 
 ```bash
-bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train_s3072
+bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train
 ```
 
-100ステップ確認を見る場合は`bt_train_s3072`を`bt_smoke_s3072`に変更。`--once`を付けると1回表示、`--interval 10`で10秒間隔です。`--run`を省略した既定画面は**完了済みPushT run**なので、新規実験では必ず指定してください。tmuxで起動した学習にはsystemd serviceがないため、`--unit`は付けません。
+100ステップ確認を見る場合は`bt_train`を`bt_smoke`に変更。`--once`を付けると1回表示、`--interval 10`で10秒間隔です。`--run`を省略した既定画面は**完了済みPushT run**なので、新規実験では必ず指定してください。tmuxで起動した学習にはsystemd serviceがないため、`--unit`は付けません。
 
 | 表示・ファイル | 意味 |
 |---|---|
