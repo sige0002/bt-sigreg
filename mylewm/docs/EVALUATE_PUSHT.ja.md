@@ -24,7 +24,7 @@
 
 ```bash
 cd /home/USER/bt-sigreg
-.venv/bin/python -c 'import json; d=json.load(open("output/pusht/spt_raw_s3072/completed.json")); assert d == {"step": 100000, "state": "completed", "recipe": "pusht_spt_v1"}; print(d)'
+uv run python -c 'import json; d=json.load(open("output/pusht/spt_raw_s3072/completed.json")); assert d == {"step": 100000, "state": "completed", "recipe": "pusht_spt_v1"}; print(d)'
 ls -lh output/pusht/spt_raw_s3072/step_100000_object.ckpt
 
 # まずdry-run。出力名は未使用にし、ディレクトリを先に作らない。
@@ -112,7 +112,7 @@ tail -f output/pusht/eval_bt_100000_50/console.log
 
 ```bash
 tail -n 12 output/pusht/eval_bt_100000_50/console.log
-.venv/bin/python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/results.txt.json")); print(sum(d["successes"]), "/", len(d["successes"]), "successes;", d["success_rate"], "%")'
+uv run python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/results.txt.json")); print(sum(d["successes"]), "/", len(d["successes"]), "successes;", d["success_rate"], "%")'
 ```
 
 | ファイル | 内容 |
@@ -141,7 +141,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 両方の正常終了後に比較します。比較レポートも未使用名を使ってください（比較CLI自体に上書き拒否機能はありません）。
 
 ```bash
-.venv/bin/python mylewm/tools/compare_paired.py \
+uv run python mylewm/tools/compare_paired.py \
   --baseline output/pusht/eval_official_50/results.txt.json \
   --candidate output/pusht/eval_bt_100000_50/results.txt.json \
   --output output/pusht/comparison_bt100000_official_50.json
@@ -156,7 +156,7 @@ bash mylewm/tools/evaluate_pusht.sh \
 制御成功率とは別に、環境・CEM反復・Goal encoder・I/Oを除いたE/A/Fのrollout時間を測れます。既定のCEM候補数300を一つのbatchにし、観測3フレームから予測器を1回または20回呼ぶ時間をCUDA eventで測ります。入力は乱数なので、この値は精度・実環境の総制御時間ではありません。
 
 ```bash
-.venv/bin/python mylewm/tools/benchmark_pusht_rollout.py \
+uv run python mylewm/tools/benchmark_pusht_rollout.py \
   --checkpoint output/pusht/bt_spectral_v2_100k_s3072/step_100000_object.ckpt \
   --checkpoint .cache/stable-wm/pusht/lewm_object.ckpt \
   --output output/pusht/rollout_latency_bt_official.json

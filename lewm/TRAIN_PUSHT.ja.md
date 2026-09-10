@@ -21,7 +21,7 @@
 
 ```bash
 cd /home/USER/bt-sigreg
-.venv/bin/python --version
+uv run python --version
 nvidia-smi
 ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 ```
@@ -46,7 +46,7 @@ export STABLEWM_HOME="$PWD/output/pusht/official_native_trial"
 ### A2. 学習せずに設定を確認する
 
 ```bash
-.venv/bin/python lewm/train.py \
+uv run python lewm/train.py \
   data=pusht data.dataset.name=pusht_expert_train.h5 \
   subdir=lewm output_model_name=lewm wandb.enabled=false \
   hydra.run.dir=output/pusht/official_native_trial/hydra \
@@ -60,7 +60,7 @@ export STABLEWM_HOME="$PWD/output/pusht/official_native_trial"
 BTの稼働終了後、上の環境変数を設定した端末で実行します。
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
   data=pusht data.dataset.name=pusht_expert_train.h5 \
   subdir=lewm output_model_name=lewm wandb.enabled=false \
   hydra.run.dir=output/pusht/official_native_trial/hydra \
@@ -82,7 +82,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
 
 ```bash
 export STABLEWM_HOME="$PWD/output/pusht/official_native_100k"
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
   data=pusht data.dataset.name=pusht_expert_train.h5 \
   subdir=lewm output_model_name=lewm wandb.enabled=false \
   hydra.run.dir=output/pusht/official_native_100k/hydra \
@@ -102,7 +102,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python lewm/train.py \
 ```bash
 cd /home/USER/bt-sigreg
 # 設定確認だけ。保存済み比較用manifestを指定し、出力先は未使用名にする
-.venv/bin/python mylewm/train.py --mode raw \
+uv run python mylewm/train.py --mode raw \
   --manifest .cache/stable-wm/pusht/rbg_v0/manifest.json \
   --output output/pusht/spt_raw_s3072 --steps 100000
 ```

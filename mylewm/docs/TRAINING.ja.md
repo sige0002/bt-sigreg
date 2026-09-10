@@ -29,9 +29,9 @@
 
 ```bash
 cd /home/USER/bt-sigreg
-.venv/bin/python mylewm/train.py --help
+uv run python mylewm/train.py --help
 # 既定はdry-run。学習・GPU初期化・出力作成は行わない
-.venv/bin/python mylewm/train.py --mode bt \
+uv run python mylewm/train.py --mode bt \
   --manifest output/manifests/pusht/manifest.json \
   --output output/pusht/spt_bt_s3072
 ```
@@ -41,7 +41,7 @@ dry-runは設定・ソース識別の確認までで、全データhash・重み
 実際に新規学習する場合だけ、同じコマンドに `--execute` を追加します。GPUの決定論設定も指定します。
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train.py \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
   --mode bt --manifest output/manifests/pusht/manifest.json \
   --output output/pusht/spt_bt_s3072 --steps 100000 --execute
 ```
@@ -79,15 +79,15 @@ PushTの100,000更新は完了済みです。以下は新規実験の手順で�
 
 ```bash
 cd /home/USER/bt-sigreg
-.venv/bin/python --version
-.venv/bin/python mylewm/training.py --help
-.venv/bin/python mylewm/train_libero.py --help
+uv run python --version
+uv run python mylewm/training.py --help
+uv run python mylewm/train_libero.py --help
 nvidia-smi
 ls -lh .cache/stable-wm/datasets/pusht_expert_train.h5
 ls .cache/libero-datasets/libero_10/*.hdf5
 ```
 
-PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必要です。対象benchmarkのデータが見つからなければ先へ進まないでください。`.venv/bin/python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。別PCの完全な再現環境用lockfileは現状ありません。
+PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必要です。対象benchmarkのデータが見つからなければ先へ進まないでください。`uv run python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。別PCの完全な再現環境用lockfileは現状ありません。
 
 学習では実画像・実行行動から一段先の潜在状態を予測します。LIBEROは2つの実カメラを使い、10タスクで1つのモデルを共有します。HDF5からの学習にはMuJoCo/OSMesaの起動は不要です。シミュレータが必要なのは後述の制御評価です。
 
@@ -98,7 +98,7 @@ PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必�
 PushT用：
 
 ```bash
-.venv/bin/python mylewm/training.py prepare \
+uv run python mylewm/training.py prepare \
   --dataset .cache/stable-wm/datasets/pusht_expert_train.h5 \
   --manifest output/manifests/pusht/manifest.json
 ```
@@ -106,7 +106,7 @@ PushT用：
 LIBERO-10用：
 
 ```bash
-.venv/bin/python mylewm/train_libero.py prepare \
+uv run python mylewm/train_libero.py prepare \
   --dataset .cache/libero-datasets/libero_10 \
   --manifest output/manifests/libero10/manifest.json
 ```
@@ -120,7 +120,7 @@ PushTは冒頭の新経路で短期確認し、LIBEROは下のコマンドを実
 LIBERO-10：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_smoke_s3072 \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
@@ -144,7 +144,7 @@ cd /home/USER/bt-sigreg
 LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証していません）：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_train_s3072 \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \

@@ -52,7 +52,7 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 ```bash
 bash mylewm/tools/monitor_training.sh --once
 bash mylewm/tools/evaluate_pusht.sh --help
-CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm/tests -q
+CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm uv run python -m pytest mylewm/tests -q
 ```
 
 CPU限定の回帰確認ではCUDA専用テストはスキップされます。環境での成功率評価や追加学習は行いません。全実験出力はGit対象外の `output/` 以下へ保存します。

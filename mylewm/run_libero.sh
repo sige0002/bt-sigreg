@@ -12,4 +12,5 @@ export MUJOCO_GL=osmesa
 export PYOPENGL_PLATFORM=osmesa
 export LIBERO_CONFIG_PATH="$research_root/.cache/libero-config"
 export PYTHONPATH="$research_root/.cache/libero-runtime:$research_root/external/libero:$research_root${PYTHONPATH:+:$PYTHONPATH}"
-exec "$research_root/.venv/bin/python" "$@"
+cd "$research_root"
+exec uv run python "$@"

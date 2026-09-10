@@ -2,7 +2,8 @@
 # Audited single-checkpoint evaluation. Dry-run unless --execute is supplied.
 set -euo pipefail
 EVAL_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-exec "$EVAL_ROOT/.venv/bin/python" - "$EVAL_ROOT" "$@" <<'PY'
+cd "$EVAL_ROOT"
+exec uv run python - "$EVAL_ROOT" "$@" <<'PY'
 import argparse
 import hashlib
 import json

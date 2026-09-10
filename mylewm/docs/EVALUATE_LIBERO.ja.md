@@ -15,7 +15,7 @@ Raw/BTは同じ新規manifest、seed、batch、workers、更新数、optimizer�
 ```bash
 cd /home/USER/bt-sigreg
 ls .cache/libero-datasets/libero_10/*.hdf5
-.venv/bin/python mylewm/train_libero.py prepare \
+uv run python mylewm/train_libero.py prepare \
   --dataset .cache/libero-datasets/libero_10 \
   --manifest output/manifests/libero10/manifest.json
 ```
@@ -41,7 +41,7 @@ done
 先に短期接続確認をする。下はRaw例で、BTは`--mode bt`だけを変え、その他をそろえる。短期checkpointを本学習へ延長しない。
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode raw --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/raw_smoke_s3072 \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
@@ -52,7 +52,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
 本比較は新規outputで逐次実行する。RawとBTを同時起動しない。
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
   --mode raw --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/raw_train_s3072 \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
@@ -89,12 +89,12 @@ bash mylewm/run_libero.sh mylewm/tools/evaluate_libero.py \
 保存済み評価から、初期・goal・最終の2カメラ（agent view | wrist view）を静的HTMLにまとめる。UIは記録を読むだけで、CEM・環境・checkpointを再実行しない。
 
 ```bash
-.venv/bin/python mylewm/tools/build_libero_ui.py \
+uv run python mylewm/tools/build_libero_ui.py \
   --evaluation output/libero10/eval_raw_s3072_confirm50 \
   --output output/libero10/ui_raw_s3072_confirm50
 
 # ローカルブラウザで http://127.0.0.1:8000 を開く。Ctrl-Cは表示だけを停止する。
-.venv/bin/python -m http.server 8000 --directory output/libero10/ui_raw_s3072_confirm50
+uv run python -m http.server 8000 --directory output/libero10/ui_raw_s3072_confirm50
 ```
 
 `index.html`を直接開くこともできる。画面のsuccess/failureは固定実行結果であり、goalへの見た目の近さによる判定ではない。

@@ -18,7 +18,7 @@ for seed in 42 43 44 45 46; do
         --seed "$seed" --gb10-cache-workaround --execute --output "$fixed"
     fi
     if [[ ! -f "$upstream/status.json" ]] || ! grep -q '"state": "succeeded"' "$upstream/status.json"; then
-      .venv/bin/python mylewm/tools/evaluate_upstream_pusht.py --checkpoint "$checkpoint" --seed "$seed" \
+      uv run python mylewm/tools/evaluate_upstream_pusht.py --checkpoint "$checkpoint" --seed "$seed" \
         --output "$upstream"
     fi
   done
