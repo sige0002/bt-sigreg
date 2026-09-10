@@ -33,6 +33,8 @@ LIBERO-10は100更新の動作確認まで。同予算Raw/TC比較、複数学�
 |---|---|
 | `bt_sigreg.py` | 現行BTの有界変換・正則化 |
 | `train.py` | 新規PushT Raw／BT用。SWMデータ読込・公式forward・SPT更新・Lightning管理への接続 |
+| `prepare_dataset.py` / `lerobot_data.py` | HDF5／LeRobot v3の選択・Hub取得・分割・公式LeRobot読込 |
+| `input_contract.py` / `tools/infer_trajectories.py` | 保存形式をまたぐ入力条件の照合と訓練統計によるオフライン推論。[手順](docs/DATA_FORMATS.ja.md) |
 | `training.py` | LIBERO用共有ループ、PushTの分割作成・比較検査用の参照経路 |
 | `train_libero.py` | LIBERO-10のRaw／TC／BT学習・分割作成 |
 | `objectives.py` | 全次元Gaussian正則化・Raw／TC／BTの一段損失 |

@@ -14,6 +14,7 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest==9.1.1"]
+lerobot = ["lerobot==0.4.4"]
 libero = [
     "dm-control==1.0.45",
     "gymnasium-robotics==1.4.2",

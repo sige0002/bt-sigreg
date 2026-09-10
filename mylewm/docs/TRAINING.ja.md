@@ -2,6 +2,94 @@
 
 学習途中の保存済みcheckpointも評価できます。[途中checkpoint評価手順](EVALUATE_INTERMEDIATE.ja.md)にPushT／LIBEROの別GPU指定・実行・結果確認を記載しました。以下の100,000更新完了条件は最終評価向けです。途中評価では`completed.json`は不要です。
 
+## LeRobot v3で学習する
+
+HDF5とLeRobot v3は同じ`mylewm/train.py`を使い、manifestの`data_format`でローダーを選びます。一つのrunに両形式を混ぜません。以下は公式`lerobot/pusht`を取得し、BTを100更新する完全な例です。既存HDF5の手順は後続節に残しています。入力契約付きの新HDF5 prepareと、HDF5で学習したcheckpointをLeRobotデータへ適用する例は[データ形式と推論](DATA_FORMATS.ja.md)を参照してください。
+
+まず専用環境を構築します。稼働中の環境には同期しません。
+
+```bash
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-lerobot"
+uv sync --locked --group lerobot --group libero
+uv run --no-sync python -c 'import importlib.metadata as m; print({n: m.version(n) for n in ["lerobot", "torch", "transformers", "av"]})'
+```
+
+Hubのコミットを固定して取得し、新規manifestを作成します。`--download-root`はまだ存在しないディレクトリを指定します。保存先に空白がある場合も引用符で囲みます。取得後の学習・推論はローカルファイルだけを使います。
+
+```bash
+export LEROBOT_DATASET="$PWD/output/datasets/lerobot/pusht_v3"
+export LEROBOT_MANIFEST="$PWD/output/manifests/pusht/lerobot_v3/manifest.json"
+uv run --no-sync python -m mylewm.prepare_dataset \
+  --format lerobot \
+  --repo-id lerobot/pusht \
+  --revision 7628202a2180972f291ba1bc6723834921e72c19 \
+  --download-root "$LEROBOT_DATASET" \
+  --camera-key observation.image \
+  --contract mylewm/configs/lerobot_pusht_input.json \
+  --manifest "$LEROBOT_MANIFEST"
+```
+
+この契約JSONはPushTの絶対位置行動x/y・10 Hz・俯瞰RGB用です。別ロボットには流用せず、その行動の意味・単位・カメラ・FPSを確認して専用の契約を用意します。メタデータのFPS・行動次元と契約が異なる場合はprepareを拒否します。Hubの全体統計は使わず、分割後の訓練エピソードから平均・標準偏差を計算します。
+
+既にローカルへ保存してあるLeRobot v3を使う場合は、上の取得コマンドの代わりに次の例を使います。
+
+```bash
+uv run --no-sync python -m mylewm.prepare_dataset \
+  --format lerobot \
+  --dataset "/mnt/data/robot datasets/pusht_v3" \
+  --camera-key observation.image \
+  --contract mylewm/configs/lerobot_pusht_input.json \
+  --manifest "$PWD/output/manifests/pusht/lerobot_local/manifest.json"
+```
+
+Hub取得のmanifestで、学習設定だけを確認するdry-run：
+
+```bash
+uv run --no-sync python -m mylewm.train \
+  --manifest "$LEROBOT_MANIFEST" \
+  --output "$PWD/output/pusht/lerobot_bt_100_s3072" \
+  --mode bt --steps 100 --warmup-steps 10 --batch-size 32 --workers 2 \
+  --save-every 50 --val-every 10 --seed 3072 \
+  --accelerator gpu --precision bf16-mixed
+```
+
+BTを100更新する実行例。画像encoder・行動encoder・予測器・BTを実際に学習します。検証は10更新ごと、checkpointは50更新ごとです。100更新は動作確認の予算で、長期収束・制御性能の評価ではありません。
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.train \
+  --manifest "$LEROBOT_MANIFEST" \
+  --output "$PWD/output/pusht/lerobot_bt_100_s3072" \
+  --mode bt --steps 100 --warmup-steps 10 --batch-size 32 --workers 2 \
+  --save-every 50 --val-every 10 --seed 3072 \
+  --accelerator gpu --precision bf16-mixed --execute
+```
+
+100,000更新の新規本学習を選ぶ場合の例。上の100更新から予算だけを変えてresumeすることはできません。必要なrunだけを開始し、他の学習と重複させないでください。
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.train \
+  --manifest "$LEROBOT_MANIFEST" \
+  --output "$PWD/output/pusht/lerobot_bt_100k_s3072" \
+  --mode bt --steps 100000 --warmup-steps 500 --batch-size 32 --workers 2 \
+  --save-every 5000 --val-every 500 --seed 3072 \
+  --accelerator gpu --precision bf16-mixed --execute
+```
+
+途中で停止した100更新runを50更新の訓練checkpointから再開する例。開始時と同じコード・依存・manifest・条件を使い、出力先だけを新しくします。`*_object.ckpt`は推論用なのでresumeには使いません。
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.train \
+  --manifest "$LEROBOT_MANIFEST" \
+  --output "$PWD/output/pusht/lerobot_bt_100_s3072_resume1" \
+  --mode bt --steps 100 --warmup-steps 10 --batch-size 32 --workers 2 \
+  --save-every 50 --val-every 10 --seed 3072 \
+  --accelerator gpu --precision bf16-mixed \
+  --resume "$PWD/output/pusht/lerobot_bt_100_s3072/step_50.ckpt" --execute
+```
+
+実行後は`completed.json`の`step: 100`と終了コードを確認します。ログは`metrics/version_0/metrics.csv`、推論用モデルは`step_100_object.ckpt`、最終訓練状態は`last.ckpt`です。学習時の入力契約と行動統計も保存されます。今回実行済みの保存先・検証結果は[LeRobot対応レポート](reports/LEROBOT_V3.ja.md)に記録しています。
+
 ## 新しいPushT経路：公式ライブラリへ委託（2026-09-09）
 
 `Raw`は**BTの写像TなしでSIGRegを直接適用するモデル**であり、正則化なしという意味ではありません。公式配布重みと、自分で学習したRaw/SIGRegの重みも区別します。

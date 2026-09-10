@@ -38,15 +38,15 @@ PushT BT v2は単一seedで100,000更新を完了しました。
 | 成功率を評価する | [PushT](mylewm/docs/EVALUATE_PUSHT.ja.md)／[LIBERO-10](mylewm/docs/EVALUATE_LIBERO.ja.md) |
 | 実験結果を確認する | [レポート一覧](mylewm/docs/reports/README.md) |
 
-## 今後の対応：LeRobot Dataset
+## HDF5／LeRobot Dataset v3
 
-LeRobot Dataset形式の画像・行動軌道を、ローカル保存先またはHugging Face Hubから読み込み、既存のSIGReg／BTの世界モデルを学習できるようにする予定です。**現時点では未実装・未検証**で、新規PushT学習はHDF5入力です。
+HDF5とLeRobot Dataset v3を選択して、同じRaw／BTの学習ループを使えます。一つのrunで両形式は混ぜません。LeRobotは公式ローダーで直接読み、Hubからの取得はprepare時に明示します。[具体的な学習例](mylewm/docs/TRAINING.ja.md#lerobot-v3で学習する)・[形式間のモデル利用](mylewm/docs/DATA_FORMATS.ja.md)。
 
-- モデルと損失を維持してデータ読み込みを接続し、カメラ選択、FPS、画像・行動の時刻対応、エピソード境界を検証する。
-- 行動の次元・単位・絶対／相対座標を明示し、エピソード単位で学習／検証を分離して、学習側だけから正規化統計を計算する。
-- 対象データと対応するLeRobotの版を決め、実データの読み込み、短期学習、checkpoint保存・復元を実行確認してから手順を掲載する。
+- 選択した1カメラのRGB画像を使用し、行動次元は入力に合わせる。FPS・行動の意味・単位・カメラの対応を入力契約に記録する。
+- エピソード単位で分割し、正規化統計は学習エピソードのみから計算する。推論時はcheckpointの訓練統計を使う。
+- HDF5学習→LeRobot推論も、保存形式を除く入力条件が一致すれば可能。旧checkpointに入力契約が無い場合は、確認済みの訓練条件を明示する。
 
-データ入力の対応と、LeRobotのpolicyとして世界モデル＋CEMを統合する作業は別です。safetensorsによる重みの配布も別途扱います。また、データセットを読めることだけでは、環境での成功率評価まで対応したことにはしません。[LeRobot Dataset公式仕様](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)。
+公式`lerobot/pusht`の実データでBTを100更新し、検証・checkpoint保存を完了しました。長期収束や制御性能の実証ではありません。複数カメラ融合、LeRobot policyとしての実機制御、環境成功率評価の接続は別の作業です。[LeRobot Dataset公式仕様](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)。
 
 ## 構成
 

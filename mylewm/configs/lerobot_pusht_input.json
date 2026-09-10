@@ -1,0 +1,11 @@
+{
+  "domain": "pusht",
+  "camera": "overhead_rgb",
+  "action_names": ["target_x", "target_y"],
+  "action_units": ["pusht_pixel", "pusht_pixel"],
+  "action_convention": "absolute_agent_target_xy",
+  "fps": 10,
+  "frameskip": 5,
+  "history": 3,
+  "preprocessing": "lewm_imagenet_resize224_v1"
+}

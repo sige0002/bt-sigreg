@@ -2,6 +2,8 @@
 
 ## 現在の運用（2026-09-09）
 
+2026-09-10追記：HDF5／LeRobot Dataset v3は`mylewm/prepare_dataset.py`で形式を選択し、`mylewm/train.py`の共通Raw／BT経路で学習する。新契約付きは`trajectory_spt_v1`、旧manifestは従来経路。一つのrunで形式は混ぜない。LeRobotは公式0.4.4・単一選択カメラ・明示prepare時のHub取得を使用する。形式間のオフライン推論は`mylewm/tools/infer_trajectories.py`。入力契約（行動の意味・成分順・単位・FPS・カメラ等）を照合し、checkpointの訓練統計を使う。旧checkpointに契約が無ければ確認済みの訓練条件を別ファイルで明示し、既存成果物を書き換えない。実データBT100更新・保存再開・推論まで確認済みで、実機・多カメラ融合・制御成功率評価は未実施。[手順](mylewm/docs/DATA_FORMATS.ja.md)・[検証記録](mylewm/docs/reports/LEROBOT_V3.ja.md)。
+
 新規PushT Raw／BT用は `mylewm/train.py`（`pusht_spt_v1`）。既定dry-runで、`--execute`だけが学習を開始する。LIBEROの入口は `mylewm/train_libero.py`、共有ループは `mylewm/training.py`、損失は `mylewm/objectives.py`。評価は `mylewm/tools/evaluate_libero.py`。旧RBG方式・専用引数・重複ツールを撤去し、旧名の互換shimは置かない。Raw/TC/BTだけを共有経路で扱う（新PushT経路はRaw/BTのみ）。削除・改名・復元方法は `mylewm/docs/CLEANUP.ja.md`。過去のmanifest・重み・config・評価証拠を変更しない。ソースhashが変わるため過去runの厳密再開は開始時のGit版を使い、照合を無効化しない。LIBEROのライブラリ経路への移行は未実施。新しい本学習・環境評価は今回未開始。
 
 PushT BT v2は100,000更新で正常終了。固定confirm 200ケース178/200（89%）、別条件の上流eval 50ケース49/50（98%）を記録済み。結果の条件差はレポートを参照。新規学習・再開・追加評価は明示依頼時のみ。定期監視・checkpoint到達待機・自動評価予約は行わない。

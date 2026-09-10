@@ -33,6 +33,7 @@ from utils import get_img_preprocessor
 from mylewm.bt_sigreg import BoundedTransport, add_bt_arguments
 from mylewm.data_contract import file_sha256, verify_training_data
 from mylewm.training_state import capture_rng, restore_rng, tensor_state_hash
+from mylewm.input_contract import validate_contract
 
 
 class GaussianBranch(torch.nn.Module):
@@ -81,21 +82,42 @@ class Preprocess:
         self.image = get_img_preprocessor(source='pixels', target='pixels', img_size=224)
         self.mean = torch.tensor(manifest['action_mean'], dtype=torch.float64)
         self.std = torch.tensor(manifest['action_std'], dtype=torch.float64)
-        if self.mean.shape != (2,) or self.std.shape != (2,):
-            raise ValueError('PushT requires two-dimensional physical actions')
+        c = manifest.get('input_contract')
+        self.canonical = c is not None
+        dim = len(validate_contract(c)['action_names']) if c else 2
+        self.context_actions = 3 * manifest['frameskip']
+        if self.mean.shape != (dim,) or self.std.shape != (dim,):
+            raise ValueError('Action dimensions disagree with the input contract')
         if not torch.isfinite(self.mean).all() or not torch.isfinite(self.std).all() or (self.std <= 0).any():
             raise ValueError('Invalid frozen action statistics')
 
     def __call__(self, batch):
         # SWM applies transforms before grouping the 20 physical actions into 4x10.
         batch = self.image(batch)
-        if not torch.isfinite(batch['action'][:15]).all():
+        if not torch.isfinite(batch['action'][:self.context_actions]).all():
             raise ValueError('Non-finite action in prediction context')
         batch['action'] = ((batch['action'].double() - self.mean) / self.std).float()
+        if self.canonical:
+            batch = {k: v.contiguous() for k, v in batch.items()}
         return batch
 
 
 def datasets(manifest):
+    ds = clip_dataset(manifest)
+    return split_datasets(ds, manifest)
+
+
+def clip_dataset(manifest):
+    if manifest.get('input_contract'):
+        c = validate_contract(manifest['input_contract'])
+        if c['history'] != manifest['history'] or c['frameskip'] != manifest['frameskip']:
+            raise ValueError('Manifest time sampling disagrees with input contract')
+    data_format = manifest.get('data_format', 'hdf5')
+    if data_format == 'lerobot':
+        from mylewm.lerobot_data import LeRobotClips
+        return LeRobotClips(manifest, Preprocess(manifest))
+    if data_format != 'hdf5':
+        raise ValueError(f'Unsupported data format: {data_format}')
     path = Path(manifest['dataset']).resolve()
     if not path.is_file() or path.suffix != '.h5':
         raise ValueError('Existing local .h5 required; downloads are not supported')
@@ -103,12 +125,16 @@ def datasets(manifest):
                         ('dataset_mtime_ns', path.stat().st_mtime_ns)]:
         if key in manifest and manifest[key] != actual:
             raise ValueError('Dataset changed since manifest preparation')
-    if manifest.get('history') != 3 or manifest.get('frameskip') != 5:
+    if not manifest.get('input_contract') and (manifest.get('history') != 3 or manifest.get('frameskip') != 5):
         raise ValueError('This recipe requires history=3, frameskip=5')
     # Absolute name is intentional: HDF5Dataset joins it without copying data.
     ds = swm.data.HDF5Dataset(name=str(path.with_suffix('')), cache_dir=ROOT / '.cache/stable-wm',
-                             num_steps=4, frameskip=5, keys_to_load=['pixels', 'action'],
+                             num_steps=4, frameskip=manifest['frameskip'], keys_to_load=['pixels', 'action'],
                              transform=Preprocess(manifest))
+    return ds
+
+
+def split_datasets(ds, manifest):
     groups = [manifest[k] for k in ('train_episodes', 'validation_episodes', 'test_episodes')]
     flat = [e for g in groups for e in g]
     if len(flat) != len(set(flat)) or any(not isinstance(e, int) or e < 0 or e >= len(ds.lengths) for e in flat):
@@ -238,10 +264,10 @@ def make_trainer(**kwargs):
     return trainer
 
 
-def build_model():
+def build_model(input_dim=10):
     cfg = OmegaConf.create({'embed_dim': 192, 'history_size': 3, 'img_size': 224,
                            'model': OmegaConf.load(ROOT / 'lewm/config/train/model/lewm.yaml')})
-    cfg.model.action_encoder.input_dim = 10
+    cfg.model.action_encoder.input_dim = input_dim
     return hydra.utils.instantiate(cfg.model)
 
 
@@ -277,6 +303,8 @@ def run(args):
     if compiled and args.accelerator != 'gpu':
         raise ValueError('--compile-encoder is supported only with --accelerator gpu')
     manifest = json.loads(args.manifest.read_text())
+    if manifest.get('purpose', 'train') != 'train':
+        raise ValueError('Training requires a training manifest')
     recipe = {k: v for k, v in vars(args).items() if k not in ('output', 'execute', 'resume', 'manifest')}
     recipe.update(schema='pusht_spt_v1', manifest_sha256=file_sha256(args.manifest),
                   pin_memory=getattr(args, 'pin_memory', True),
@@ -287,15 +315,29 @@ def run(args):
                   source_sha256={str(p.relative_to(ROOT)): file_sha256(p) for p in
                     [Path(__file__), ROOT/'mylewm/bt_sigreg.py', ROOT/'mylewm/training_state.py',
                      ROOT/'mylewm/data_contract.py', ROOT/'lewm/train.py', ROOT/'lewm/utils.py',
+                     ROOT/'mylewm/input_contract.py', ROOT/'mylewm/lerobot_data.py',
+                     ROOT/'mylewm/prepare_dataset.py',
                      ROOT/'lewm/module.py', ROOT/'lewm/jepa.py', ROOT/'lewm/config/train/model/lewm.yaml']},
                   versions={n: importlib.metadata.version(n) for n in
                     ('torch', 'lightning', 'stable-pretraining', 'stable-worldmodel', 'numpy', 'h5py', 'transformers')})
+    if manifest.get('input_contract'):
+        recipe['input_contract'] = validate_contract(manifest['input_contract'])
+        recipe['schema'] = 'trajectory_spt_v1'
+    recipe['data_format'] = manifest.get('data_format', 'hdf5')
+    if recipe['data_format'] == 'lerobot':
+        recipe['versions'].update({n: importlib.metadata.version(n) for n in
+                                   ('lerobot', 'av', 'datasets', 'huggingface-hub', 'pyarrow')})
     # Versions alone do not identify locally modified installed libraries.
     import inspect
     from stable_pretraining.optim.lr_scheduler import LinearWarmupCosineAnnealingLR
     recipe['dependency_sources'] = {name: file_sha256(Path(inspect.getfile(obj))) for name, obj in
         [('spt_module', spt.Module), ('swm_dataset', swm.data.HDF5Dataset),
          ('spt_scheduler', LinearWarmupCosineAnnealingLR), ('lightning_trainer', pl.Trainer)]}
+    if recipe['data_format'] == 'lerobot':
+        from lerobot.datasets import lerobot_dataset, video_utils, utils as lerobot_utils
+        recipe['dependency_sources'].update({name: file_sha256(Path(inspect.getfile(obj)))
+            for name, obj in [('lerobot_dataset', lerobot_dataset), ('lerobot_video', video_utils),
+                              ('lerobot_utils', lerobot_utils)]})
     if compiled:
         recipe['compiler'] = compiler_identity()
     if not args.execute:
@@ -319,7 +361,10 @@ def run(args):
     val_loader = DataLoader(val_set, batch_size=args.batch_size, num_workers=0,
                             pin_memory=recipe['pin_memory'] and args.accelerator == 'gpu',
                             generator=torch.Generator().manual_seed(args.seed + 101))
-    model = build_model()
+    input_dim = len(manifest['action_mean']) * manifest['frameskip']
+    model = build_model() if input_dim == 10 else build_model(input_dim)
+    if manifest.get('input_contract'):
+        model.input_contract = copy.deepcopy(recipe['input_contract'])
     recipe['initial_model_sha256'] = tensor_state_hash(model.state_dict())
     for name in ('mean', 'std'):
         model.register_buffer('training_action_' + name, torch.tensor(manifest['action_' + name], dtype=torch.float64))
@@ -343,7 +388,7 @@ def run(args):
                 ckpt_path=str(args.resume.resolve()) if args.resume else None, weights_only=False)
     trainer.save_checkpoint(args.output/'last.ckpt')
     (args.output/'completed.json').write_text(json.dumps({'step': trainer.global_step,
-        'state': 'completed', 'recipe': 'pusht_spt_v1'}))
+        'state': 'completed', 'recipe': recipe['schema']}))
 
 
 def main():
