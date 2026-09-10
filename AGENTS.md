@@ -45,6 +45,8 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 
 ## 比較と検証
 
+PushT評価のepisode列は`mylewm/pusht_eval_data.py`で正規化する。ロード対象の列一覧だけから保存済みepisode列の有無を推測しない。SWMのep_len/ep_offsetからの補完はメモリ上で行い、保存済みHDF5へ列を書き足さない。
+
 PushT評価launcherも通常は全量データhashを走査しない。`--verify-data`指定時のみ再走査し、未計算hashはnull、prepare時hashは別フィールドに保存する。起動端末とconsole.logへ処理段階・CEM開始・環境step進捗を逐次出す。
 
 PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。固定cacheやsymlinkを要求しない。移転時はサイズを確認し、明示した全量検証時だけ新規prepareのSHA-256と照合する。評価のprovenanceとloaderに同じ解決済みパスを使用する。

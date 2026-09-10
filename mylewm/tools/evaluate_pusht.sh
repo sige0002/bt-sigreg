@@ -59,6 +59,10 @@ bootstrap = '''
 import os, sys, runpy
 from pathlib import Path
 root, dataset, release = sys.argv[1:4]
+sys.path.insert(0, root)
+from mylewm.pusht_eval_data import validate_schema
+print('Checking PushT HDF5 schema', flush=True)
+validate_schema(dataset)
 import torch
 if release == '1':
     with open(dataset, 'rb') as stream:

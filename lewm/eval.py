@@ -41,18 +41,19 @@ def get_episodes_length(dataset, episodes):
 
 
 def get_dataset(cfg, dataset_name):
+    from mylewm.pusht_eval_data import EvaluationDataset
     explicit_path = cfg.eval.get('dataset_path')
     if explicit_path:
         path = Path(explicit_path).expanduser().resolve()
         if path.suffix != '.h5':
             raise ValueError('PushT evaluator requires a .h5 file')
-        return swm.data.HDF5Dataset(str(path.with_suffix('')), cache_dir=path.parent,
+        return EvaluationDataset(str(path.with_suffix('')), cache_dir=path.parent,
                                     keys_to_load=cfg.dataset.keys_to_cache)
     dataset_path = Path(cfg.cache_dir or swm.data.utils.get_cache_dir())
     # stable-worldmodel >=0.1 resolves datasets through its format registry.
     # Older LeWM revisions exposed HDF5Dataset directly; retain compatibility
     # with both APIs so the evaluation entry point remains usable.
-    hdf5_cls = getattr(swm.data, "HDF5Dataset", None)
+    hdf5_cls = EvaluationDataset
     if hdf5_cls is not None:
         dataset = hdf5_cls(
             dataset_name,

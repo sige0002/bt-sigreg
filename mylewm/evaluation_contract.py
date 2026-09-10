@@ -30,6 +30,7 @@ def provenance(dataset,manifest,checkpoint,root,verify_data=True):
     import stable_pretraining as spt
     sources=[root/'lewm/eval.py',root/'lewm/jepa.py',root/'lewm/module.py',
              root/'mylewm/evaluation_contract.py',root/'mylewm/planning_action_adapter.py',
+             root/'mylewm/pusht_eval_data.py',
              Path(inspect.getfile(swm.World)),Path(inspect.getfile(swm.solver.CEMSolver)),
              Path(inspect.getfile(swm.policy.WorldModelPolicy))]
     metadata = json.loads(Path(manifest).read_text())

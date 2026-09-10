@@ -8,6 +8,8 @@
 
 ## 1. 何を測るのか
 
+対応HDF5はSWMの`ep_len`・`ep_offset`境界形式です。保存された`episode_idx`または`ep_idx`と`step_idx`を利用し、列がない場合は境界からメモリ上で補完します。データ自体は変更しません。必要な境界列がない場合はCUDA初期化前に不足列と利用可能なキーを表示して停止します。
+
 HDF5は`--manifest`の`dataset`パスから読みます。リポジトリの`.cache`内に置く必要はありません。別PCへ移した場合は`--dataset /absolute/path/to/pusht_expert_train.h5`を追加して上書きできます。manifestは編集しません。移転時はmanifestの`dataset_size`が必須で、サイズ不一致を拒否します。mtimeはコピーで変わるため評価では要求しません。通常はサイズ確認のみで全量走査せず、`--verify-data`指定時だけ全量SHA-256を計算し、prepareのhashがあれば照合します。旧manifestにhashが無い場合、サイズ・HDF5構造の確認だけでは同一内容を保証できません。解決したパスはdry-runと`launch.json`の`dataset`に出ます。
 
 世界モデルとCEM計画器で行動を選び、PushT環境で実際に動かして成功数を数えます。lossから成功率を推測するものではありません。既定はmanifestの`confirm`先頭50ケースで、開始状態とデータセット由来Goalを固定します。固定T字目標の95%被覆率とは別の成功判定です。既に使った回帰評価集合であり、未使用の最終テストではありません。
