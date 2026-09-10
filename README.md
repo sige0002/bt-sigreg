@@ -38,6 +38,16 @@ PushT BT v2は単一seedで100,000更新を完了しました。
 | 成功率を評価する | [PushT](mylewm/docs/EVALUATE_PUSHT.ja.md)／[LIBERO-10](mylewm/docs/EVALUATE_LIBERO.ja.md) |
 | 実験結果を確認する | [レポート一覧](mylewm/docs/reports/README.md) |
 
+## 今後の対応：LeRobot Dataset
+
+LeRobot Dataset形式の画像・行動軌道を、ローカル保存先またはHugging Face Hubから読み込み、既存のSIGReg／BTの世界モデルを学習できるようにする予定です。**現時点では未実装・未検証**で、新規PushT学習はHDF5入力です。
+
+- モデルと損失を維持してデータ読み込みを接続し、カメラ選択、FPS、画像・行動の時刻対応、エピソード境界を検証する。
+- 行動の次元・単位・絶対／相対座標を明示し、エピソード単位で学習／検証を分離して、学習側だけから正規化統計を計算する。
+- 対象データと対応するLeRobotの版を決め、実データの読み込み、短期学習、checkpoint保存・復元を実行確認してから手順を掲載する。
+
+データ入力の対応と、LeRobotのpolicyとして世界モデル＋CEMを統合する作業は別です。safetensorsによる重みの配布も別途扱います。また、データセットを読めることだけでは、環境での成功率評価まで対応したことにはしません。[LeRobot Dataset公式仕様](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)。
+
 ## 構成
 
 - `lewm/`：公式LeWMの比較用コード。ローカル評価修正があり、上流の完全無改変コピーではありません。
