@@ -57,4 +57,4 @@ bash mylewm/tools/evaluate_pusht.sh --help
 CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm uv run python -m pytest mylewm/tests -q
 ```
 
-CPU限定の回帰確認ではCUDA専用テストはスキップされます。環境での成功率評価や追加学習は行いません。全実験出力はGit対象外の `output/` 以下へ保存します。
+CPU限定の回帰確認ではCUDA専用の5ケースがスキップされます：共有ループの連続学習と再開の一致（worker 0/2の2ケース）、BTの再開・推論出力（1/2カメラの2ケース）、CPU履歴とGPU候補を混ぜた入力の処理（1ケース）。GPUで検証する場合は学習終了後に`CUDA_VISIBLE_DEVICES=''`を外し、`CUBLAS_WORKSPACE_CONFIG=:4096:8`を指定します。公式checkpointが無い環境では、その読込テストも別途スキップされます。全実験出力はGit対象外の `output/` 以下へ保存します。
