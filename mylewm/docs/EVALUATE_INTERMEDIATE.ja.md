@@ -12,6 +12,8 @@ checkpointの保存完了と、学習が次の更新へ進んだことをログ�
 
 ## PushT
 
+HDF5はmanifest内の任意パスを使う。移転先を指定する場合は以下の両コマンドへ`--dataset /absolute/path/to/pusht_expert_train.h5`を追加する。元manifestを書き換えず、サイズと保存済みhash（存在する場合）で照合する。
+
 リポジトリ直下で、実際のrun名・保存済みmanifestに置き換える。各出力先は未使用名にする。
 
 ```bash

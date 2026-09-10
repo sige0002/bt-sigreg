@@ -45,6 +45,8 @@ BT-SIGReg（Bounded-Transport SIGReg）は仮称。現行はCayley特異値制�
 
 ## 比較と検証
 
+PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。固定cacheやsymlinkを要求しない。移転時はサイズ、新規prepareのhashがあれば実行時にSHA-256を照合する。評価のprovenanceとloaderに同じ解決済みパスを使用する。
+
 ユーザー指定の途中checkpoint評価は本学習終了前でも可能。`mylewm/docs/EVALUATE_INTERMEDIATE.ja.md`に従い、保存完了済み`step_N_object.ckpt`と別GPUを使用する。最終評価のcompleted.json条件を途中評価へ適用しない。文書更新だけを理由に評価は開始せず、共有学習環境の依存を同期しない。
 
 依存更新時は既存object checkpointの読込も検証する。現在はTransformers 4.57.6を固定（5系では旧ViTEncoderの復元失敗）。稼働中の学習用`.venv`にsyncせず、`UV_PROJECT_ENVIRONMENT`で隔離して検証する。CPU限定テストのCUDA5件スキップは理由と件数を報告し、GPU合格とは扱わない。

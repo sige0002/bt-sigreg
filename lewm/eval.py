@@ -41,6 +41,13 @@ def get_episodes_length(dataset, episodes):
 
 
 def get_dataset(cfg, dataset_name):
+    explicit_path = cfg.eval.get('dataset_path')
+    if explicit_path:
+        path = Path(explicit_path).expanduser().resolve()
+        if path.suffix != '.h5':
+            raise ValueError('PushT evaluator requires a .h5 file')
+        return swm.data.HDF5Dataset(str(path.with_suffix('')), cache_dir=path.parent,
+                                    keys_to_load=cfg.dataset.keys_to_cache)
     dataset_path = Path(cfg.cache_dir or swm.data.utils.get_cache_dir())
     # stable-worldmodel >=0.1 resolves datasets through its format registry.
     # Older LeWM revisions exposed HDF5Dataset directly; retain compatibility
@@ -72,8 +79,13 @@ def run(cfg: DictConfig):
         from mylewm.evaluation_contract import provenance
         root=Path(__file__).resolve().parents[1]
         base=Path(swm.data.utils.get_cache_dir())
-        identity=provenance(base/'datasets'/f'{cfg.eval.dataset_name}.h5',
+        dataset_path = Path(cfg.eval.dataset_path) if cfg.eval.get('dataset_path') else base/'datasets'/f'{cfg.eval.dataset_name}.h5'
+        identity=provenance(dataset_path,
             Path(cfg.eval.manifest),base/(cfg.policy+'_object.ckpt'),root)
+        manifest_data = json.loads(Path(cfg.eval.manifest).read_text())
+        prepared = manifest_data.get('data_fingerprints', {}).get(str(Path(manifest_data['dataset']).resolve()))
+        if prepared and identity['dataset_sha256'] != prepared['sha256']:
+            raise ValueError('Evaluation dataset SHA-256 differs from prepare evidence')
     assert (
         cfg.plan_config.horizon * cfg.plan_config.action_block <= cfg.eval.eval_budget
     ), "Planning horizon must be smaller than or equal to eval_budget"

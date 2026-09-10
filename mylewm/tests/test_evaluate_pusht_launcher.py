@@ -66,6 +66,28 @@ def test_rejects_other_dataset(launch_fixture):
     assert not output.exists()
 
 
+def test_external_dataset_and_relocation(launch_fixture):
+    root, manifest, output, command = launch_fixture
+    data = json.loads(manifest.read_text())
+    old = Path(data['dataset'])
+    external = root.parent / 'external data.h5'
+    old.rename(external)
+    data.update(dataset=str(external), dataset_size=external.stat().st_size)
+    manifest.write_text(json.dumps(data))
+    result = subprocess.run(command, cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert str(external) in result.stdout
+    relocated = root.parent / 'relocated.h5'
+    external.rename(relocated)
+    result = subprocess.run(command + ['--dataset', str(relocated)], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    relocated.write_bytes(b'wrong size')
+    result = subprocess.run(command + ['--dataset', str(relocated)], cwd=root, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert 'size differs' in result.stderr
+    assert not output.exists()
+
+
 @pytest.mark.parametrize('returncode',[0,1])
 def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,returncode,capsys):
     # Exercise launch/log/result handling without starting a real GPU process.
@@ -77,6 +99,7 @@ def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,re
         assert cmd[1] == '-c'
         assert '+eval.audit_provenance=true' in cmd
         assert '+eval.shared_physical_search=true' in cmd
+        assert any(arg.startswith('+eval.dataset_path=') for arg in cmd)
         assert kwargs['cwd'] == root
         assert kwargs['env']['STABLEWM_HOME'] == str(root/'.cache/stable-wm')
         assert (output/'checkpoint_object.ckpt').resolve() == root/'fixture_object.ckpt'

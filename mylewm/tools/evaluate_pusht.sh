@@ -20,6 +20,7 @@ parser.add_argument('--checkpoint', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True, help='New directory under repository output/')
 parser.add_argument('--manifest', type=Path, default=root/'.cache/stable-wm/pusht/rbg_v0/manifest.json')
 parser.add_argument('--num-eval', type=int, default=50)
+parser.add_argument('--dataset', type=Path, help='Relocated HDF5; otherwise use manifest dataset')
 parser.add_argument('--offset', type=int, default=0, help='Index into the fixed confirm cases')
 parser.add_argument('--seed', type=int, default=42, help='CEM/environment seed; confirm cases stay fixed')
 parser.add_argument('--gb10-cache-workaround', action='store_true', help='Release only the dataset clean file cache before CUDA initialization')
@@ -29,18 +30,22 @@ args = parser.parse_args()
 checkpoint = args.checkpoint.resolve()
 manifest = args.manifest.resolve()
 output = args.output.resolve()
-dataset = root/'.cache/stable-wm/datasets/pusht_expert_train.h5'
 if not checkpoint.is_file() or not checkpoint.name.endswith('_object.ckpt'):
     parser.error('--checkpoint must be an existing trusted *_object.ckpt, not resume.pt')
-if not manifest.is_file() or not dataset.is_file():
-    parser.error('Manifest or local PushT HDF5 is missing')
+if not manifest.is_file():
+    parser.error(f'Manifest is missing: {manifest}')
 if output == root/'output' or not output.is_relative_to((root/'output').resolve()):
     parser.error('--output must be a new subdirectory of repository output/')
 if output.exists() or args.output.is_symlink():
     parser.error('Output already exists; use a new name (no overwrite or implicit resume)')
 data = json.loads(manifest.read_text())
-if Path(data['dataset']).resolve() != dataset.resolve():
-    parser.error('Manifest dataset differs from the evaluator dataset')
+dataset = (args.dataset or Path(data['dataset'])).expanduser().resolve()
+if not dataset.is_file():
+    parser.error(f'PushT HDF5 is missing: {dataset}')
+if args.dataset and 'dataset_size' not in data:
+    parser.error('--dataset relocation requires dataset_size in manifest')
+if 'dataset_size' in data and dataset.stat().st_size != data['dataset_size']:
+    parser.error(f'Dataset size differs from manifest: {dataset}')
 cases = data['confirm'][args.offset:args.offset + args.num_eval]
 if args.offset < 0 or args.num_eval < 1 or len(cases) != args.num_eval:
     parser.error('Requested cases are outside the confirm partition')
@@ -75,11 +80,12 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            f'eval.num_eval={args.num_eval}', f'+eval.manifest={manifest}',
            '+eval.partition=confirm', f'+eval.offset={args.offset}',
            f'seed={args.seed}',
+           '+eval.dataset_path=' + json.dumps(str(dataset)),
            '+eval.audit_provenance=true', '+eval.shared_physical_search=true',
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
 if args.cem_audit:
     command.append('solver._target_=mylewm.cem_audit.AuditedCEMSolver')
-plan = {'checkpoint': str(checkpoint), 'output': str(output), 'cases': len(cases),
+plan = {'checkpoint': str(checkpoint), 'dataset': str(dataset), 'output': str(output), 'cases': len(cases),
         'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
         'cem_audit': args.cem_audit,
         'gb10_cache_workaround': args.gb10_cache_workaround,
