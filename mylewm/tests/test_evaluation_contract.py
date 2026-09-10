@@ -6,8 +6,8 @@ import os
 import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lewm'))
-from mylewm.planning_action_adapter import PlanningActionAdapter
-from mylewm.evaluation_contract import protocol,validate_result
+from mylewm.environments.planning_action_adapter import PlanningActionAdapter
+from mylewm.evaluation.contract import protocol,validate_result
 
 
 def test_comparison_cli_works_without_pythonpath():
@@ -15,7 +15,7 @@ def test_comparison_cli_works_without_pythonpath():
     root = Path(__file__).resolve().parents[2]
     env = dict(os.environ)
     env.pop('PYTHONPATH', None)
-    result = subprocess.run([sys.executable, str(root/'mylewm/tools'/script), '--help'],
+    result = subprocess.run([sys.executable, '-m', 'mylewm.evaluation.compare_paired', '--help'],
                             cwd=root, env=env, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert 'usage:' in result.stdout

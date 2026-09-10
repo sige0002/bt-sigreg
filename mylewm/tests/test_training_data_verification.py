@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from mylewm import data_contract as dc
+from mylewm.data import verification as dc
 
 
 def manifest_for(path):

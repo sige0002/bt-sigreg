@@ -10,10 +10,10 @@ import json
 import pytest
 import torch
 
-from mylewm.bt_sigreg import BoundedResidual, BoundedTransport, BTSIGReg, SpectralLinear
-from mylewm.objectives import GaussianSIGReg, one_step_objective
-from mylewm import training
-from mylewm.tests.test_training_state import assert_tree_equal
+from mylewm.algorithms.bt_sigreg import BoundedResidual, BoundedTransport, BTSIGReg, SpectralLinear
+from mylewm.algorithms.objectives import GaussianSIGReg, one_step_objective
+from mylewm.training import loop as training
+from test_training_state import assert_tree_equal
 
 
 @pytest.mark.parametrize('kwargs', [dict(kappa=-.1), dict(kappa=1), dict(kappa=float('nan')),
@@ -280,7 +280,7 @@ def test_real_architecture_update_and_native_planning_export(benchmark):
     from types import SimpleNamespace
     from train import lejepa_forward
     from module import SIGReg
-    from mylewm.train_libero import build_model as build_libero
+    from mylewm.training.train_libero import build_model as build_libero
     torch.set_num_threads(4); torch.manual_seed(55)
     model = (training.build_model() if benchmark == 'pusht' else build_libero()).train()
     raw = copy.deepcopy(model)
@@ -330,14 +330,14 @@ def test_shared_and_libero_cli_adapters():
     import os
     import subprocess
     import sys
-    for name in ('training.py', 'train_libero.py'):
-        result = subprocess.run([sys.executable, str(training.ROOT/'mylewm'/name), '--help'],
+    for name in ('mylewm.training.loop', 'mylewm.training.train_libero'):
+        result = subprocess.run([sys.executable, '-m', name, '--help'],
                                 capture_output=True, text=True, timeout=30,
                                 env={k:v for k,v in os.environ.items() if k != 'PYTHONPATH'})
         assert result.returncode == 0, result.stderr
         assert '--bt-kappa' in result.stdout and '{raw,tc,bt}' in result.stdout
         assert '--cross-weight' not in result.stdout and '--blocks' not in result.stdout
-        rejected = subprocess.run([sys.executable, str(training.ROOT/'mylewm'/name),
+        rejected = subprocess.run([sys.executable, '-m', name,
                                    'train', '--mode', 'rbg'], capture_output=True, text=True, timeout=30)
         assert rejected.returncode == 2 and 'invalid choice' in rejected.stderr
 

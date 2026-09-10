@@ -41,7 +41,7 @@ def get_episodes_length(dataset, episodes):
 
 
 def get_dataset(cfg, dataset_name):
-    from mylewm.pusht_eval_data import EvaluationDataset
+    from mylewm.data.pusht_eval_data import EvaluationDataset
     explicit_path = cfg.eval.get('dataset_path')
     if explicit_path:
         path = Path(explicit_path).expanduser().resolve()
@@ -77,7 +77,7 @@ def run(cfg: DictConfig):
     random.seed(cfg.seed)
     identity=None
     if cfg.eval.get('audit_provenance',False):
-        from mylewm.evaluation_contract import provenance
+        from mylewm.evaluation.contract import provenance
         root=Path(__file__).resolve().parents[1]
         base=Path(swm.data.utils.get_cache_dir())
         dataset_path = Path(cfg.eval.dataset_path) if cfg.eval.get('dataset_path') else base/'datasets'/f'{cfg.eval.dataset_name}.h5'
@@ -107,7 +107,7 @@ def run(cfg: DictConfig):
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_indices, _ = np.unique(stats_dataset.get_col_data(col_name), return_index=True)
 
-    from mylewm.pusht_eval_data import fit_statistics
+    from mylewm.data.pusht_eval_data import fit_statistics
     process = fit_statistics(stats_dataset, cfg.dataset.keys_to_cache)
     print('reference_mean:', process['action'].mean_.tolist(), 'reference_std (StandardScaler.scale_):', process['action'].scale_.tolist(), flush=True)
     print('HDF5 and action statistics ready', flush=True)
@@ -141,7 +141,7 @@ def run(cfg: DictConfig):
             if mean.shape != process['action'].mean_.shape or std.shape != mean.shape:
                 raise ValueError('Checkpoint action statistics do not match environment')
             if cfg.eval.get('shared_physical_search',False):
-                from mylewm.planning_action_adapter import PlanningActionAdapter
+                from mylewm.environments.planning_action_adapter import PlanningActionAdapter
                 model=PlanningActionAdapter(model,process['action'].mean_,process['action'].scale_,mean,std).eval()
                 print('action_statistics_source: checkpoint via common physical CEM search')
             else:
@@ -216,14 +216,14 @@ def run(cfg: DictConfig):
 
     world.set_policy(policy)
 
-    from mylewm.pusht_action_audit import EnvironmentAudit
+    from mylewm.evaluation.pusht_action_audit import EnvironmentAudit
     environment_audit = EnvironmentAudit(world.envs)
     # Snapshot observations even without provenance logging: video must never
     # retain mutable EnvPool buffers in either entry path.
     world.envs.step = environment_audit.step
     physical_actions=environment_audit.records; initial_runtime_hashes=[]
     if identity is not None:
-        from mylewm.evaluation_contract import array_hash
+        from mylewm.evaluation.contract import array_hash
         original_get_actions=world._get_actions
         def audited_get_actions():
             print(f'CEM planning: environment step calls={len(physical_actions)}, cases={cfg.eval.num_eval}', flush=True)

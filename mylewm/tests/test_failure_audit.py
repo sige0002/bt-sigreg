@@ -1,4 +1,4 @@
-from mylewm.tools.audit_pusht_failure_modes import failure_class, summarize
+from mylewm.evaluation.audit_pusht_failure_modes import failure_class, summarize
 
 
 def test_failure_classes():

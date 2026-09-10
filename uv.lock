@@ -198,7 +198,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/dd/5a/ad8d3ef9c13d5afcc
 [[package]]
 name = "bt-sigreg"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "stable-worldmodel", extra = ["env", "train"] },
     { name = "torch" },

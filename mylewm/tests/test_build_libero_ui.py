@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pytest
 
-from mylewm.tools.build_libero_ui import build
+from mylewm.evaluation.build_libero_ui import build
 
 
 def test_builds_static_report_from_complete_evaluation(tmp_path):

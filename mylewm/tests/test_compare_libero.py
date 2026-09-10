@@ -1,6 +1,6 @@
 import json
 import pytest
-from mylewm.tools.compare_libero import compare
+from mylewm.evaluation.compare_libero import compare
 
 
 def fixture_run(path,successes):

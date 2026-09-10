@@ -20,7 +20,7 @@ OOM再確認では対象データのclean cache解放だけで最小CUDA割当�
 
 ## 初心者向けPushT評価手順とlauncher（2026-09-08）
 
-[評価手順](../EVALUATE_PUSHT.ja.md)と`tools/evaluate_pusht.sh`を追加。既定dry-run、実行時だけ新規output作成・CUDA先行初期化・監査付き既存評価を行う。対象データclean cache解放は明示フラグ。チェックポイント/manifest/launcherのhashと起動引数を残し、正常終了後にケース・成功率の整合性を確認する。途中再開・上書きはしない。
+[評価手順](../EVALUATION.ja.md#pusht)と`tools/evaluate_pusht.sh`を追加。既定dry-run、実行時だけ新規output作成・CUDA先行初期化・監査付き既存評価を行う。対象データclean cache解放は明示フラグ。チェックポイント/manifest/launcherのhashと起動引数を残し、正常終了後にケース・成功率の整合性を確認する。途中再開・上書きはしない。
 
 検証は`bash -n`、実20,000更新checkpointのdry-run、ヘルプ、仮データによる入力拒否と模擬subprocessでの成功/失敗処理。全回帰は`CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm -q`で**102合格・5スキップ**。稼働中の学習・評価との競合を避け、今回の全体再確認はCPUのみ。新launcherから実50ケースは追加起動しておらず、模擬結果を実制御成功率に数えない。先のGPU混在テスト14件合格とは実行範囲を区別する。
 
@@ -49,7 +49,7 @@ lunaサブエージェントを10分間隔の監視へ割り当て、NaN/Inf・�
 
 ## BT v2修正・相互レビュー・実データ短期診断（2026-09-08）
 
-今回依頼された段階1–3を完了。旧Frobenius試作をCayley特異値構成へ置換し、学習bias付き中心化half-linear/half-tanhを使用する。原点固定・距離境界を維持して旧奇関数・総核ノルム予算制限を外した。[現行数式](../BT_SIGREG.ja.md#6-現行実装cayley特異値制約v2)。新しい実装担当と独立数学・安全監査担当の2体が手順・所見を直接交換した。実在Google DeepMind研究者ではなくAIレビュー。今回、利用可能な一覧に学習実装用skillはなく、使っていない。
+今回依頼された段階1–3を完了。旧Frobenius試作をCayley特異値構成へ置換し、学習bias付き中心化half-linear/half-tanhを使用する。原点固定・距離境界を維持して旧奇関数・総核ノルム予算制限を外した。[現行数式](../research/BT_SIGREG.ja.md#6-現行実装cayley特異値制約v2)。新しい実装担当と独立数学・安全監査担当の2体が手順・所見を直接交換した。実在Google DeepMind研究者ではなくAIレビュー。今回、利用可能な一覧に学習実装用skillはなく、使っていない。
 
 全回帰 **97件合格**（BT27＋既存69＋追加診断1、13.15秒）。公式forwardの恒等時一致、CPU/CUDA再開、原点・距離・ヤコビアン・逆写像、矩形行列の作用素ノルム、非奇関数性・全方向の変形、gradcheckを確認した。診断hookも再開一致テストに含む。PyTorchのGB10対応範囲・fork・非推奨API等の警告は残る。
 
@@ -224,7 +224,7 @@ SWMの既定`env_N.mp4`が次の50ケースで上書きされる問題を発見�
 ## 付録：旧Frobenius試作
 
 
-本節は旧Frobenius試作の履歴。現行コードは[BT v2](../BT_SIGREG.ja.md#6-現行実装cayley特異値制約v2)へ置換した。
+本節は旧Frobenius試作の履歴。現行コードは[BT v2](../research/BT_SIGREG.ja.md#6-現行実装cayley特異値制約v2)へ置換した。
 
 `mylewm/bt_sigreg.py` の各ブロックを次で構成した。
 

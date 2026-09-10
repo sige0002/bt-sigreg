@@ -5,7 +5,7 @@ import gymnasium as gym
 import torch
 import weakref
 
-from mylewm.cem_audit import AuditedCEMSolver
+from mylewm.evaluation.cem_audit import AuditedCEMSolver
 
 
 class Cost(torch.nn.Module):

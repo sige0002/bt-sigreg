@@ -8,7 +8,7 @@ from lewm.eval import get_dataset
 def test_metadata_provenance_does_not_hash_dataset(tmp_path, monkeypatch):
     import json
     from pathlib import Path
-    from mylewm import evaluation_contract as contract
+    from mylewm.evaluation import contract as contract
     path = tmp_path / 'data.h5'
     path.write_bytes(b'data')
     manifest = tmp_path / 'manifest.json'
@@ -65,7 +65,7 @@ def test_existing_episode_column_is_not_hidden(tmp_path):
 
 
 def test_statistics_1d_2d_and_identifiers():
-    from mylewm.pusht_eval_data import fit_statistics
+    from mylewm.data.pusht_eval_data import fit_statistics
     columns = {'scalar': np.array([1., np.nan, 3.]),
                'action': np.array([[1., 2.], [np.nan, 8.], [3., 4.]]),
                'step_idx': np.arange(3)}
@@ -82,7 +82,7 @@ def test_statistics_1d_2d_and_identifiers():
 
 def test_unsupported_schema_has_actionable_error(tmp_path):
     import pytest
-    from mylewm.pusht_eval_data import validate_schema
+    from mylewm.data.pusht_eval_data import validate_schema
     path = tmp_path / 'unsupported.h5'
     with h5py.File(path, 'w') as f:
         f['other'] = [1]

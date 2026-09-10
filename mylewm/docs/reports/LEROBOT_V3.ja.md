@@ -1,6 +1,6 @@
 # LeRobot v3対応と実データ100更新（2026-09-10）
 
-ユーザー依頼により、HDF5とLeRobot v3を選択する学習入力と、形式をまたぐオフライン推論を実装した。学習ループ・一段予測・Raw／BTの目的は共通。一つのrunで形式は混ぜない。LeRobotは公式0.4.4のreaderとPyAVで直接読み、HDF5へ変換しない。手順は[TRAINING](../TRAINING.ja.md#lerobot-v3で学習する)と[データ形式・推論](../DATA_FORMATS.ja.md)。
+ユーザー依頼により、HDF5とLeRobot v3を選択する学習入力と、形式をまたぐオフライン推論を実装した。学習ループ・一段予測・Raw／BTの目的は共通。一つのrunで形式は混ぜない。LeRobotは公式0.4.4のreaderとPyAVで直接読み、HDF5へ変換しない。手順は[TRAINING](../TRAINING.ja.md#lerobot-v3で学習する)と[データ形式・推論](../MODEL_USAGE.ja.md#data)。
 
 ## 実データの取得と分割
 

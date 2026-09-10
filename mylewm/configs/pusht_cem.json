@@ -1,0 +1,9 @@
+{
+  "horizon": 4,
+  "samples": 32,
+  "elites": 8,
+  "iterations": 3,
+  "seed": 3072,
+  "action_low": [0.0, 0.0],
+  "action_high": [512.0, 512.0]
+}

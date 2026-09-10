@@ -29,3 +29,9 @@ wandb/
 
 # Legacy/local upstream checkout; the committed comparison copy is lewm/
 external/
+
+# Editable package builds and isolated validation environments
+.venv-*/
+*.egg-info/
+build/
+dist/

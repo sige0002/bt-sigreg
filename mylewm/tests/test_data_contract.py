@@ -3,8 +3,8 @@ import h5py
 import numpy as np
 import pytest
 
-from mylewm.data_contract import data_fingerprints, training_budget
-from mylewm.training import Clips
+from mylewm.data.verification import data_fingerprints, training_budget
+from mylewm.training.loop import Clips
 
 
 def test_clip_budget_from_synthetic_episode_lengths(tmp_path):

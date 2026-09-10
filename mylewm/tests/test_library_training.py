@@ -11,9 +11,9 @@ import torch
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from mylewm import train as new
-from mylewm.objectives import one_step_objective, GaussianSIGReg
-from mylewm.tests.test_training_state import assert_tree_equal
+from mylewm.training import train as new
+from mylewm.algorithms.objectives import one_step_objective, GaussianSIGReg
+from test_training_state import assert_tree_equal
 
 
 class TinyModel(torch.nn.Module):

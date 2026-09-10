@@ -1,7 +1,7 @@
 import numpy as np
 import stable_worldmodel as swm
 
-from mylewm.pusht_action_audit import EnvironmentAudit, action_summary
+from mylewm.evaluation.pusht_action_audit import EnvironmentAudit, action_summary
 
 
 def test_nonzero_commands_move_multiple_real_pusht_environments_and_preserve_frames():
@@ -43,7 +43,7 @@ def test_invalid_or_ineffective_actions_are_not_valid_performance():
 
 
 def test_random_control_advances_rng_and_is_reproducible():
-    from mylewm.tools.evaluate_pusht_random import RandomControl
+    from mylewm.evaluation.evaluate_pusht_random import RandomControl
     world = swm.World(env_name='swm/PushT-v1', num_envs=3, max_episode_steps=50, image_shape=(224, 224))
     try:
         a, b = RandomControl(42), RandomControl(42)

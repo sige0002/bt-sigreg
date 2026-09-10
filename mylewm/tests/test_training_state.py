@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import torch
 
-from mylewm import training
-from mylewm.training_state import UpdateSchedule, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash
+from mylewm.training import loop as training
+from mylewm.training.state import UpdateSchedule, check_resume_config, reconcile_metrics, IndependentRegularizer,tensor_state_hash
 
 
 class TinyModel(torch.nn.Module):
@@ -98,10 +98,9 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
     # CUBLAS workspace must be set before CUDA initialization in the test process.
     deterministic = torch.are_deterministic_algorithms_enabled()
     torch.use_deterministic_algorithms(True)
-    monkeypatch.setattr(training, 'build_model', TinyModel)
     monkeypatch.setattr(training, 'GaussianSIGReg', TinyRegularizer)
-    monkeypatch.setattr(training, 'Clips', TinyClips)
-    monkeypatch.setattr(training, 'preprocess', lambda batch, m, d: tuple(x.to(d) for x in batch))
+    adapter = training.TrainingAdapter(TinyClips,
+        lambda batch, m, d: tuple(x.to(d) for x in batch), TinyModel)
     dataset = tmp_path / 'data.identity'
     dataset.write_bytes(b'fixed synthetic dataset')
     manifest = tmp_path / 'manifest.json'
@@ -129,7 +128,7 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
         gaussian_weight=.09, save_every=2, resume=False,
         output=tmp_path/'full',deterministic=True)
     try:
-        training.train(args)
+        training.train(args, adapter=adapter)
         full_batches = seen.copy()
         full = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
         full_rows = [json.loads(line) for line in (args.output/'metrics.jsonl').read_text().splitlines()]
@@ -138,10 +137,10 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
         seen.clear(); calls = 0; interrupt = True
         args.output = tmp_path/'resumed'
         with pytest.raises(InterruptedError):
-            training.train(args)
+            training.train(args, adapter=adapter)
         interrupt = False
         args.resume = True
-        training.train(args)
+        training.train(args, adapter=adapter)
         resumed = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
         resumed_rows = [json.loads(line) for line in (args.output/'metrics.jsonl').read_text().splitlines()]
         assert_tree_equal(full_batches, seen)

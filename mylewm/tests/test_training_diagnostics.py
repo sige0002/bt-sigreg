@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 import torch
-from mylewm.training_diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
+from mylewm.training.diagnostics import encoder_gradient_norms,action_diagnostics,transport_statistics
 
 
 def test_monitor_shell_handles_missing_and_partial_logs(tmp_path):
     import json
     import subprocess
     from pathlib import Path
-    script=Path(__file__).resolve().parents[1]/'tools/monitor_training.sh'
+    script=Path(__file__).resolve().parents[2]/'scripts/monitor_training.sh'
     command=['bash',str(script),'--once','--run',str(tmp_path)]
     result=subprocess.run(command,capture_output=True,text=True,timeout=10)
     assert result.returncode==0 and 'Waiting for complete metrics' in result.stdout

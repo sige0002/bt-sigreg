@@ -12,9 +12,9 @@ import pytest
 @pytest.fixture
 def launch_fixture(tmp_path):
     root=tmp_path/'repo'
-    script=root/'mylewm/tools/evaluate_pusht.sh'
+    script=root/'scripts/evaluate_pusht.sh'
     script.parent.mkdir(parents=True)
-    shutil.copyfile(Path(__file__).resolve().parents[1]/'tools/evaluate_pusht.sh',script)
+    shutil.copyfile(Path(__file__).resolve().parents[2]/'scripts/evaluate_pusht.sh',script)
     (root/'.venv/bin').mkdir(parents=True)
     (root/'.venv/bin/python').symlink_to(sys.executable)
     dataset=root/'.cache/stable-wm/datasets/pusht_expert_train.h5'

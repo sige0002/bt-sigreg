@@ -33,3 +33,15 @@ explicit = true
 stable-worldmodel = { git = "https://github.com/galilai-group/stable-worldmodel.git", rev = "3693030085e7816e7fa2bf42125b3f66e432d272" }
 torch = { index = "pytorch-cu130" }
 torchvision = { index = "pytorch-cu130" }
+
+[build-system]
+requires = ["setuptools==80.10.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mylewm*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", ".", "lewm"]
+testpaths = ["mylewm/tests"]

@@ -2,6 +2,7 @@
 import argparse
 import copy
 import json
+from mylewm.paths import CONFIGS
 from pathlib import Path
 
 import h5py
@@ -9,18 +10,18 @@ import numpy as np
 import pytest
 import torch
 
-from mylewm import train
-from mylewm.data_contract import verify_training_data
-from mylewm.input_contract import inference_manifest, validate_contract
-from mylewm.prepare_dataset import prepare
-from mylewm.tests.test_library_training import TinyModel
-from mylewm.tests.test_training_state import assert_tree_equal
-from mylewm.tools.infer_trajectories import inference_dataset, predict
+from mylewm.training import train
+from mylewm.data.verification import verify_training_data
+from mylewm.data.contract import inference_manifest, validate_contract
+from mylewm.data.prepare_dataset import prepare
+from test_library_training import TinyModel
+from test_training_state import assert_tree_equal
+from mylewm.policy.infer_trajectories import inference_dataset, predict
 
 
 @pytest.fixture
 def contract():
-    return json.loads((Path(__file__).parents[1] / 'configs/lerobot_pusht_input.json').read_text())
+    return json.loads((CONFIGS / 'lerobot_pusht_input.json').read_text())
 
 
 @pytest.fixture

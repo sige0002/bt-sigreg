@@ -1,12 +1,16 @@
 # 検証状況と未完了事項
 
+2026-09-11：srcへの構成整理後、隔離環境の全回帰182合格・スキップ0。GPU・保存再開・LeRobot Policy・CLI・旧LIBERO object checkpointの読込を確認しました。長時間学習・制御成功率評価ではありません。[移行内容・検証記録](reports/CLEANUP.ja.md#src移行共通処理整理2026-09-11)。
+
+2026-09-10追記（Policy変換）：ckpt直接読込／LeRobot Policyの共通CEMと別CLIのコンバーターを追加。既存の実データBT100更新重みをconfig・safetensors・前後処理込みで変換。公式LeRobot PushTの保持2episode・計22時刻で、推論用／訓練用ckptとLeRobot形式の行動が完全一致し、実履歴更新と再計画まで確認した。標準processorで時刻が落ちる等の実行時問題も修正。全回帰171合格・スキップ0。オフライン記録データでの接続確認であり、実機I/O・環境での提案行動実行・制御成功率は未実施。[実データの結果と失敗記録](reports/POLICY_EXPORT.ja.md)・[利用手順](MODEL_USAGE.ja.md#policy)。
+
 2026-09-10追記（LeRobot v3）：HDF5／LeRobotを選択するRaw／BT入力と、訓練統計・入力条件を維持する形式間のオフライン推論を追加。公式`lerobot/pusht`の実データで実モデルBTの100更新、10更新ごとのvalidation、50／100更新保存、test由来32clip推論を完了。50更新から再開した100更新時点の全state・optimizer・scheduler・乱数状態も連続実行と完全一致。固定依存の隔離環境でGPU・compile・既存重み読込を含む160件合格・スキップ0。単一カメラ入力とオフライン予測の対応であり、実機・多カメラ融合・長期収束・制御成功率の検証ではない。[条件・証拠](reports/LEROBOT_V3.ja.md)・[実行手順](TRAINING.ja.md#lerobot-v3で学習する)。
 
 2026-09-10追記（validation間隔）：新PushTに`--val-every`を追加し、`--save-every`から分離した。省略時は従来と同じ間隔。CPU小型モデルでvalidationを2／4／6更新、checkpointを3／6更新に実行し、3更新checkpointからの再開でloss・全state・optimizer・schedulerが連続実行と一致した。間隔変更での再開拒否と不正値拒否も確認。固定依存の隔離環境でGPU・コンパイルを含む全回帰140件合格・スキップ0件（25.73秒、警告601件）。ログは`output/benchmarks/validation_intervals_20260910/pytest.log`。本学習は開始していない。[指定方法](TRAINING.ja.md#ログ保存再開)。
 
 2026-09-10追記：学習高速化のユーザー依頼により、新PushTのGPU転送・射影乱数カウンタ・BTのCayley一括計算を改善し、任意の`--compile-encoder`を追加。固定依存の隔離環境とGB10による32更新比較で、通常stepはRaw／BTとも既定設定で約5%、コンパイル有効時は約33%短縮（初回コンパイル待ちを除く）。GPU・コンパイルを含む全回帰139件合格・スキップ0件。元の`.venv`はTransformers 5.17.0で公式checkpoint読込が1件失敗したため、変更せず隔離環境の固定4.57.6で検証した。BT一括計算・コンパイルの前後で学習軌跡はビット一致せず、変更後コード内の短期保存・再開一致を確認した。本学習・成功率評価ではない。[計測条件と詳細](reports/TRAINING_SPEED_20260910.ja.md)。
 
-更新日：2026-09-09。不要な独立診断・旧比較準備CLIと専用テスト13ファイルはユーザー承認で削除した。[削除一覧・復元方法](CLEANUP.ja.md)を参照。以下の旧診断実績は当時のコードでの結果である。
+更新日：2026-09-09。不要な独立診断・旧比較準備CLIと専用テスト13ファイルはユーザー承認で削除した。[削除一覧・復元方法](reports/CLEANUP.ja.md)を参照。以下の旧診断実績は当時のコードでの結果である。
 
 実験の現在地をまとめる文書です。個別の数値・ハッシュ・失敗記録は[レポート一覧](reports/README.md)から参照してください。
 
@@ -28,7 +32,7 @@ Issue #17の修正がHDF5Datasetへ渡した列リストを共有し、episode/s
 
 ### 公式ライブラリへのPushT移行（2026-09-09）
 
-`mylewm/train.py` の新レシピ `pusht_spt_v1` を実装。SWMのHDF5Dataset、公式画像前処理・`lejepa_forward`・SIGReg、SPTの逆伝播／optimizer／scheduler、Lightningのループ・CSV・checkpointを使用する。エピソード分離・train-only統計を維持するが、クリップ末尾条件・抽出・LR添字は旧経路と異なる。[条件差と手順](TRAINING.ja.md)を参照。
+`src/mylewm/training/train.py` の新レシピ `pusht_spt_v1` を実装。SWMのHDF5Dataset、公式画像前処理・`lejepa_forward`・SIGReg、SPTの逆伝播／optimizer／scheduler、Lightningのループ・CSV・checkpointを使用する。エピソード分離・train-only統計を維持するが、クリップ末尾条件・抽出・LR添字は旧経路と異なる。[条件差と手順](TRAINING.ja.md)を参照。
 
 追加の9テストで次を確認した。性能実験ではない。
 
@@ -42,7 +46,7 @@ Issue #17の修正がHDF5Datasetへ渡した列リストを共有し、episode/s
 
 新経路追加時点では旧コード・manifest・既存100k重み・評価結果は変更しなかった。その後の今回のコード整理は下記のとおりで、重み・manifest・評価結果は引き続き保持している。新経路の本学習・PushT成功率・GPU長期再開・LIBERO移行は未実施で、旧checkpointからの互換resumeも許可しない。
 
-全回帰は `CUDA_VISIBLE_DEVICES='' PYTHONPATH=.:lewm .venv/bin/python -m pytest mylewm/tests -q` で **111合格・5スキップ**（14.35秒）。CUDA専用5件は未実行。fork/LanceとLightningのログ・再開に関する警告は残るが、上記CPU再開の実測一致を別途確認した。実manifestでの新CLI dry-run、Markdownリンク・見出し参照、Python構文、`git diff --check`も確認した。
+全回帰は `CUDA_VISIBLE_DEVICES='' PYTHONPATH=src:.:lewm .venv/bin/python -m pytest mylewm/tests -q` で **111合格・5スキップ**（14.35秒）。CUDA専用5件は未実行。fork/LanceとLightningのログ・再開に関する警告は残るが、上記CPU再開の実測一致を別途確認した。実manifestでの新CLI dry-run、Markdownリンク・見出し参照、Python構文、`git diff --check`も確認した。
 
 実PushTデータでも学習を起動せずnative loaderを確認し、train 1,585,717クリップ、固定validation 256件、取得画像4×3×224×224・行動4×10を確認した。旧train 1,645,509クリップとは末尾条件が異なる。実データの確認は1クリップの読込までで、全クリップの内容監査・実データ学習・成功率試験ではない。
 
@@ -50,7 +54,7 @@ Issue #17の修正がHDF5Datasetへ渡した列リストを共有し、episode/s
 
 旧RBGのブロック分割・交差共分散・専用引数とテストを撤去し、共有処理・CLI・テスト6ファイルを改名した。重複するLIBERO環境smoke、旧公式専用PushT評価launcherと専用テスト2件、旧テクスチャ書出しオプションも撤去。全次元SIGReg、Raw/TC/BTの一段予測、学習条件、公式評価の成功判定は維持した。
 
-CPU回帰は **102合格・5スキップ**（15.02秒）。公式Rawとのloss・勾配一致、恒等BT、TCの適用座標、再開一致、旧方式の拒否を確認。CUDA専用5件は未実行で、長期学習・制御評価を行ったという意味ではない。詳細と互換性の境界は[整理記録](CLEANUP.ja.md)を参照。
+CPU回帰は **102合格・5スキップ**（15.02秒）。公式Rawとのloss・勾配一致、恒等BT、TCの適用座標、再開一致、旧方式の拒否を確認。CUDA専用5件は未実行で、長期学習・制御評価を行ったという意味ではない。詳細と互換性の境界は[整理記録](reports/CLEANUP.ja.md)を参照。
 
 ### 既存経路での実績
 
@@ -82,9 +86,9 @@ PushTだけでマルチタスク改善を証明しません。98%を論文の3�
 
 2026-09-09、ユーザーの明示依頼で残っていた旧issue #2・#4〜#13 の11件をすべて `not planned` としてクローズした。#1・#3は以前にclose済み。現在openは0件。これは旧計画の整理であり、上記の未完了実験を達成済みに変更するものではない。本文・コメントはGitHubに保持し、現行の未完了事項は本書へ集約する。
 
-追加学習・評価は明示依頼時のみ。定期監視・自動評価予約は行いません。手動の進捗確認は `bash mylewm/tools/monitor_training.sh --once`、評価手順は[PushT](EVALUATE_PUSHT.ja.md)／[LIBERO](EVALUATE_LIBERO.ja.md)です。完了済み学習のログが増えないことを障害とは扱いません。
+追加学習・評価は明示依頼時のみ。定期監視・自動評価予約は行いません。手動の進捗確認は `bash scripts/monitor_training.sh --once`、評価手順は[PushT](EVALUATION.ja.md#pusht)／[LIBERO](EVALUATION.ja.md#libero)です。完了済み学習のログが増えないことを障害とは扱いません。
 
-今回の構成整理と回帰確認は[整理記録](CLEANUP.ja.md)へ記録します。新しい性能試験は行いません。
+今回の構成整理と回帰確認は[整理記録](reports/CLEANUP.ja.md)へ記録します。新しい性能試験は行いません。
 ## 学習起動時のデータ検証変更（2026-09-10）
 
 Issue #14対応：通常起動は存在・サイズ・mtimeの確認、新規prepareで全量SHA-256を保存、`--verify-data`で明示再走査。旧manifestは書き換えない。prepare時のhashを保持し、軽量検証を全量検証と呼ばない。ソース・設定・依存照合は継続し、過去runの厳密再開は開始時のGit版・環境を使う。

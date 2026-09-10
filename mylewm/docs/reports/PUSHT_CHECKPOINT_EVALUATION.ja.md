@@ -21,7 +21,7 @@
 - 前半：固定confirm先頭50ケースの推移・共通条件・保存物。
 - 後半：80k／90k／100kの200ケース評価、および上流evalの別トラック。
 - 障害・hash・削除記録は再現性の根拠として保持。時刻付きの運用状態は当時の記録であり、現在の起動指示ではない。
-- [学習設定](PUSHT_TRAINING_100K.ja.md)、[アルゴリズム](../BT_SIGREG.ja.md)、[実行手順](../EVALUATE_PUSHT.ja.md)は別文書。
+- [学習設定](PUSHT_TRAINING_100K.ja.md)、[アルゴリズム](../research/BT_SIGREG.ja.md)、[実行手順](../EVALUATION.ja.md#pusht)は別文書。
 
 ## 固定confirm：先頭50ケースの成績
 

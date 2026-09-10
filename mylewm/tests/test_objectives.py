@@ -5,7 +5,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lewm'))
 from module import SIGReg
-from mylewm.objectives import GaussianSIGReg, one_step_objective
+from mylewm.algorithms.objectives import GaussianSIGReg, one_step_objective
 
 
 def test_raw_loss_and_gradient_exact():
@@ -63,7 +63,7 @@ def test_targets_are_next_frame_and_future_not_predictor_input():
 
 
 def test_stateless_sampler_resumes_and_changes_batches():
-    from mylewm.training import StepBatches
+    from mylewm.training.loop import StepBatches
     full = list(StepBatches(1000, 16, 12, 31))
     resumed = list(StepBatches(1000, 16, 12, 31, start=7))
     assert full[7:] == resumed
