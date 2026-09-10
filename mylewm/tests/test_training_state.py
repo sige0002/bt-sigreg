@@ -133,6 +133,8 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
         full_batches = seen.copy()
         full = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
         full_rows = [json.loads(line) for line in (args.output/'metrics.jsonl').read_text().splitlines()]
+        assert json.loads((args.output/'completed.json').read_text()) == {
+            'step': 6, 'state': 'completed', 'recipe': 'controlled_comparison'}
         seen.clear(); calls = 0; interrupt = True
         args.output = tmp_path/'resumed'
         with pytest.raises(InterruptedError):

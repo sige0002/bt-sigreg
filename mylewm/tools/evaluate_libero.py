@@ -1,9 +1,11 @@
 """Native LIBERO-10 fixed-init CEM evaluation, not the TC paper's BC track."""
 import argparse
+import atexit
 import hashlib
 import json
 import os
 import random
+from datetime import datetime,timezone
 from pathlib import Path
 import sys
 import time
@@ -41,9 +43,16 @@ def main():
     p.add_argument('--seed',type=int,default=42)
     p.add_argument('--device',default='cuda')
     p.add_argument('--render-audit-dir',type=Path,default=ROOT/'output/libero10/render_audit')
+    p.add_argument('--execute',action='store_true',help='Run the environment; default only validates the plan')
     args=p.parse_args()
     if os.environ['MUJOCO_GL']!='osmesa':
         raise RuntimeError('EGL imagery failed local audit. Use bash mylewm/run_libero.sh for verified OSMesa rendering.')
+    args.checkpoint=args.checkpoint.resolve(); args.manifest=args.manifest.resolve(); args.output=args.output.resolve()
+    if not args.checkpoint.is_file() or not args.checkpoint.name.endswith('_object.ckpt'):
+        raise ValueError('--checkpoint must be a trusted *_object.ckpt')
+    if not args.manifest.is_file(): raise FileNotFoundError(args.manifest)
+    if args.output == ROOT/'output' or not args.output.is_relative_to((ROOT/'output').resolve()):
+        raise ValueError('--output must be a fresh subdirectory of repository output/')
     if args.output.exists(): raise FileExistsError(args.output)
     if args.offset<0 or args.episodes<1 or args.budget<1 or len(set(args.task_ids))!=len(args.task_ids):
         raise ValueError('Invalid fixed cases')
@@ -55,15 +64,12 @@ def main():
     audits={}
     for task_id in args.task_ids:
         task_name=suite.get_task(task_id).name
-        task_index=m['task_names'].index(task_name)
-        path=args.render_audit_dir/f'task_{task_index}'/'report.json'
+        path=args.render_audit_dir/f'task_{task_id}'/'report.json'
         audit=json.loads(path.read_text())
         if not (audit['passed'] and audit['task']==task_name and
                 audit['mujoco']==mujoco.__version__ and audit['render_backend']==os.environ['MUJOCO_GL']):
             raise RuntimeError(f'Render audit missing or incompatible for {task_name}')
         audits[task_name]=hashlib.sha256(path.read_bytes()).hexdigest()
-    model=torch.load(args.checkpoint,map_location=args.device,weights_only=False).eval()
-    args.output.mkdir(parents=True)
     metadata={**vars(args),'checkpoint_sha256':hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
               'manifest_sha256':hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
               'mujoco':mujoco.__version__,'render_backend':os.environ['MUJOCO_GL'],
@@ -71,6 +77,22 @@ def main():
               'initial_history':'repeat initial measured observation three times; raw previous actions zero',
               'goal':'last image of first held-out successful demonstration for each task; fixed across methods',
               'metric':'native env.check_success(); not demonstration state distance or TC BC score'}
+    if not args.execute:
+        print(json.dumps({key:value for key,value in metadata.items() if key not in ('render_audit_sha256',)},default=str,indent=2))
+        print('Dry-run only: no checkpoint load, environment rollout, or output creation.')
+        return
+    args.output.mkdir(parents=True)
+    terminal=False
+    def record_status(state,**details):
+        record={'state':state,'updated_at':datetime.now(timezone.utc).isoformat(),'pid':os.getpid(),
+                'checkpoint':str(args.checkpoint),**details}
+        temporary=args.output/'status.json.tmp'
+        temporary.write_text(json.dumps(record,indent=2)); temporary.replace(args.output/'status.json')
+    def unfinished_exit():
+        if not terminal: record_status('failed',reason='Evaluation exited before summary completion; inspect episodes.jsonl')
+    atexit.register(unfinished_exit)
+    record_status('running')
+    model=torch.load(args.checkpoint,map_location=args.device,weights_only=False).eval()
     (args.output/'config.json').write_text(json.dumps(metadata,default=str,indent=2))
     results=[]
     with (args.output/'episodes.jsonl').open('x') as log:
@@ -137,6 +159,9 @@ def main():
     task_rates={str(t):float(np.mean([r['success'] for r in results if r['task_id']==t])) for t in args.task_ids}
     (args.output/'summary.json').write_text(json.dumps({'task_rates':task_rates,
         'macro_success':float(np.mean(list(task_rates.values()))),'episodes':len(results)},indent=2))
+    record_status('succeeded',episodes=len(results),macro_success=float(np.mean(list(task_rates.values()))))
+    terminal=True
+    atexit.unregister(unfinished_exit)
 
 
 if __name__=='__main__': main()

@@ -273,6 +273,8 @@ def train(args):
                     'initialization_sha256':initialization_sha256},args.output/'resume.pt')
             log.write(json.dumps(row)+'\n'); log.flush()
             if step==1 or step%10==0 or step==args.steps: print(json.dumps(row),flush=True)
+    (args.output/'completed.json').write_text(json.dumps({'step':args.steps,
+        'state':'completed','recipe':'controlled_comparison'}))
 
 
 def main():

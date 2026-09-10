@@ -12,7 +12,7 @@ os.environ.setdefault('MUJOCO_GL','egl')
 import h5py
 import numpy as np
 from PIL import Image
-from libero.libero import get_libero_path
+from libero.libero import benchmark,get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
 from libero.libero.utils.utils import postprocess_model_xml
 
@@ -20,11 +20,22 @@ from libero.libero.utils.utils import postprocess_model_xml
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--output',type=Path,default=ROOT/'output/libero10/image_audit')
-    parser.add_argument('--task-index',type=int,default=0,choices=range(10))
+    group=parser.add_mutually_exclusive_group()
+    group.add_argument('--task-id',type=int,choices=range(10),
+                       help='Official LIBERO-10 task ID; use this for evaluation audits')
+    group.add_argument('--task-index',type=int,choices=range(10),
+                       help='Legacy index into lexically sorted local HDF5 files')
     parser.add_argument('--max-mae',type=float,default=10.)
     args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=False)
-    p=sorted((ROOT/'.cache/libero-datasets/libero_10').glob('*.hdf5'))[args.task_index]
+    files=sorted((ROOT/'.cache/libero-datasets/libero_10').glob('*.hdf5'))
+    if args.task_id is not None:
+        name=benchmark.get_benchmark_dict()['libero_10']().get_task(args.task_id).name
+        matches=[p for p in files if p.stem.removesuffix('_demo')==name]
+        if len(matches)!=1: raise FileNotFoundError(f'Expected one HDF5 for task ID {args.task_id}: {name}')
+        p=matches[0]
+    else:
+        p=files[0 if args.task_index is None else args.task_index]
     with h5py.File(p) as f:
         demo=f['data/demo_0']
         name=p.stem.removesuffix('_demo')
