@@ -31,92 +31,283 @@
 
 各runにmanifest・初期モデル・ソース・主要依存ソースのhash、依存版、レシピを記録します。データは通常起動時に存在・サイズ・更新時刻を確認し、新規prepareで保存したSHA-256を参照情報として残します。全量を再読込して検証する場合だけ学習コマンドに`--verify-data`を追加してください。旧manifestにSHA-256が無くても通常起動では走査しません。明示検証時はhashを計算して記録しますが、比較対象が無ければ過去との同一性確認にはなりません。新Rawと新BTを比較し、旧10万BTとの違いをTだけの効果とは解釈しません。
 
-### 設定確認と実行
+2026-09-10の高速化：新PushTのGPU用DataLoaderは既定で`pin_memory`を使います。無効化する場合は`--no-pin-memory`を指定し、Raw／BTで設定を揃えてください。射影乱数のカウンタはCPUの整数としてcheckpointに保存し、毎更新のGPU同期を減らします。BTはCUDA上で同じ次元のCayley行列を一括計算します。バッチサイズ・射影数・損失・決定論設定・ログ頻度は変更しません。
 
-このPCの既存環境を前提とします。新規実験用manifestが無い場合だけ、後半の「3. 学習・検証の分割ファイルを作る」を実施してください。`output/manifests/pusht/manifest.json`が既にある場合は内容を変更しません。保存済み重み同士の評価では、データ・学習時分割との対応を確認した同じmanifestを使います。別の分割を新規作成して、過去の評価と同条件だと扱わないでください。
+ソースと乱数カウンタの保存形式が変わるため、**変更前runの厳密再開は変更前のコードで行います**。保存済みconfigや照合条件を変更して再開しないでください。[高速化の計測・検証記録](reports/TRAINING_SPEED_20260910.ja.md)を参照してください。
 
-```bash
-cd "$(git rev-parse --show-toplevel)"
-uv run python mylewm/train.py --help
-# 既定はdry-run。学習・GPU初期化・出力作成は行わない
-uv run python mylewm/train.py --mode bt \
-  --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt --seed 3072
-```
+### 0. 実行フォルダと固定依存の環境を用意する
 
-dry-runは設定・ソース識別の確認までで、全データhash・重み・学習動作の保証ではありません。出力先は未使用名を指定し、先にmkdirしないでください。
-
-実際に新規学習する場合だけ、同じコマンドに `--execute` を追加します。GPUの決定論設定も指定します。
+以下はこのPC（GB10／CUDA 13）の具体例です。すべてリポジトリ直下で実行します。既存の`.venv`にはTransformers 5.17.0との不一致が見つかったため、ここでは固定4.57.6を使う別環境`.venv-training`を用意します。学習・評価で使用中の環境には同期しないでください。
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
-  --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt --steps 100000 --seed 3072 --execute
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+uv sync --locked --group libero
+uv run --no-sync python -c 'import torch, transformers; print("torch:", torch.__version__); print("transformers:", transformers.__version__)'
+ls -l "/usr/local/cuda-13.0/bin/ptxas"
+nvidia-smi
 ```
 
-Rawは `--mode raw --output output/pusht/spt_raw` に変え、その他は同じにします。`3072`はここで明示した学習乱数seedで、run名から推測する値ではありません。実行後は各runの`config.json`にも記録されます。同時起動しません。まず短期動作確認をするなら、別出力名で `--steps 100 --warmup-steps 10 --batch-size 16 --workers 0 --save-every 50` を両方式に揃えて指定します。短期checkpointを10万更新へ延長する用途のresumeはできません。
+以後の例も同じ端末で実行します。新しい端末やtmuxへ移った場合は、同じ`cd`と`export UV_PROJECT_ENVIRONMENT`、次節のデータ／manifestの`export`を設定し直してください。同期済み環境を使う各コマンドは`uv run --no-sync`としており、起動のたびに依存を変更しません。ここにあるコード例をまとめて実行する必要はありません。短期確認・本学習・再開は、それぞれ目的のrunだけを実行します。
+
+### 1. データセットのパスを指定する
+
+**PushTでは、prepareコマンドの`--dataset`にHDF5ファイルのパスを渡します。学習コマンドは`--manifest`を受け取り、そのJSON内の`dataset`に保存された絶対パスから読み込みます。`mylewm/train.py`に`--dataset`を渡す形式ではありません。**
+
+このPCにある既存PushTデータと既存manifestを使う例：
+
+```bash
+export PUSHT_HDF5="/home/sadasue/bt-sigreg/.cache/stable-wm/datasets/pusht_expert_train.h5"
+export PUSHT_MANIFEST="$PWD/output/manifests/pusht/manifest.json"
+ls -lh -- "$PUSHT_HDF5"
+```
+
+別ストレージに置いたデータで新規実験を始める例。空白を含むパスも必ず引用符で囲みます。こちらを使う場合は、上の2変数の代わりに以下を設定します。
+
+```bash
+export PUSHT_HDF5="/mnt/data/robot datasets/pusht_expert_train.h5"
+export PUSHT_MANIFEST="$PWD/output/manifests/pusht/external/manifest.json"
+ls -lh -- "$PUSHT_HDF5"
+```
+
+`/mnt/data/robot datasets/pusht_expert_train.h5`は外部ストレージの書き方の例なので、実際のファイルの場所に合わせます。ファイル名まで指定し、フォルダだけは渡しません。相対パスなら`export PUSHT_HDF5="./.cache/stable-wm/datasets/pusht_expert_train.h5"`とも書けます。`./`はリポジトリ直下が基準で、prepareが絶対パスに変換して記録します。データ未取得の場合は、後半の「データを任意の保存先へ取得する」を先に実施します。
+
+### 2. manifestを作成し、記録されたデータの場所を確認する
+
+新規manifestを作る完全な例です。既存manifestがある場合は作り直さず、その下の確認コマンドへ進みます。prepareは分割・学習側の正規化統計・絶対パス・サイズ・更新時刻を記録し、このときだけ全データのSHA-256を一度計算します。データ本体を複製・生成する処理ではありません。
+
+```bash
+uv run --no-sync python mylewm/training.py prepare \
+  --dataset "$PUSHT_HDF5" \
+  --manifest "$PUSHT_MANIFEST"
+```
+
+既存・新規のどちらも、学習前に記録された場所を確認します。下のコマンドはJSONとパスを確認するだけで、全量データhashは走査しません。
+
+```bash
+uv run --no-sync python - "$PUSHT_MANIFEST" "$PUSHT_HDF5" <<'PYCODE'
+import json
+import sys
+from pathlib import Path
+manifest_path = Path(sys.argv[1])
+manifest = json.loads(manifest_path.read_text())
+dataset = Path(manifest["dataset"])
+print("manifest:", manifest_path)
+print("dataset:", dataset)
+assert dataset.is_file(), "manifestに記録されたデータが見つかりません"
+assert dataset.resolve() == Path(sys.argv[2]).resolve(), "指定したデータとmanifestのパスが異なります"
+PYCODE
+```
+
+`PUSHT_HDF5`の変数だけを変更しても、既存manifestの読込先は変わりません。場所が違う場合、移転後の新規実験には別名の新しいmanifestを作ります。過去runを再開する目的で、元のmanifestや保存済みconfigを書き換えないでください。
+
+### 3. 学習を開始せず、設定を確認する
+
+BT本学習の設定確認例です。validationは500更新ごと、保存は5,000更新ごと、画像エンコーダのコンパイルを有効にしています。`--execute`がないため、学習・GPU初期化・runフォルダの作成は行いません。
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode bt \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/bt_compiled_100k_s3072" \
+  --steps 100000 --warmup-steps 500 \
+  --batch-size 128 --workers 4 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 500 --save-every 5000 \
+  --pin-memory --compile-encoder
+```
+
+出力の`val_every`が500、`save_every`が5000、`compile_encoder`がtrueであることを確認します。dry-runは設定・ソース識別の確認までで、学習動作や全データの内容まで検証するものではありません。
+
+### 4. 100更新の短期確認を実行する
+
+本学習とは別の新規runとして、batch16・warmup10・validation10更新ごと・保存50更新ごとに100更新だけ実行する例です。以下のBTとRawは別々のrunです。同時に起動しません。出力先は未使用の名前にし、runフォルダ自体を先にmkdirしないでください。
+
+BTの短期確認：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode bt \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/bt_compiled_smoke_s3072" \
+  --steps 100 --warmup-steps 10 \
+  --batch-size 16 --workers 0 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 10 --save-every 50 \
+  --pin-memory --compile-encoder --execute
+```
+
+Rawの短期確認：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode raw \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/raw_compiled_smoke_s3072" \
+  --steps 100 --warmup-steps 10 \
+  --batch-size 16 --workers 0 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 10 --save-every 50 \
+  --pin-memory --compile-encoder --execute
+```
+
+正常終了後、選んだrunの`completed.json`と`step_100_object.ckpt`を確認します。短期確認のcheckpointを10万更新へ延長する用途のresumeはできません。次の本学習は新規初期値から開始します。
+
+### 5. 100,000更新の本学習を実行する
+
+短期確認が終わり、他の学習が動いていない状態で、目的の方式の例を実行します。端末切断に備える場合はtmuxを使用し、新しい端末内でも節0・1のフォルダと環境変数を設定してください。両方式ともbatch128・warmup500・seed3072・validation500更新ごと・保存5,000更新ごとです。
+
+BTの本学習：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode bt \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/bt_compiled_100k_s3072" \
+  --steps 100000 --warmup-steps 500 \
+  --batch-size 128 --workers 4 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 500 --save-every 5000 \
+  --pin-memory --compile-encoder --execute
+```
+
+Rawの本学習：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode raw \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/raw_compiled_100k_s3072" \
+  --steps 100000 --warmup-steps 500 \
+  --batch-size 128 --workers 4 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 500 --save-every 5000 \
+  --pin-memory --compile-encoder --execute
+```
+
+`3072`はこの例で指定する学習seedです。Raw／BTの比較では、manifest・seed・batch・更新数・コンパイル・validation間隔等を揃え、出力configの初期モデルhashも照合します。
+
+このPCのコンパイルには`/usr/local/cuda-13.0/bin/ptxas`を使います。同梱TritonのCUDA 12.8コンパイラはGB10に未対応です。他のPCへこのパスや速度の結果をそのまま一般化しないでください。固定依存のTransformers 4.57.6とGB10では通常stepが約0.79〜0.80秒から約0.53〜0.54秒へ短縮しましたが、初回の学習・validationにはコンパイル待ちがあります。推論exportにはコンパイルを含めません。演算融合による丸め差があるため、コンパイルなしとの学習軌跡はビット一致しません。[計測・検証記録](reports/TRAINING_SPEED_20260910.ja.md)。
 
 ### ログ・保存・再開
 
-- `metrics/version_N/metrics.csv`：LightningのCSVログ。`update`は1始まりの更新番号、`lr_used`はその更新に使った学習率、`fit/loss`・`fit/pred_loss`・`fit/sigreg_loss`が損失。CSVの標準`step`は0始まりなので区別します。
-- `step_N.ckpt`／`last.ckpt`：Lightning形式のモデル・T・optimizer・scheduler・乱数・再開条件。既定5,000更新ごとと最終時点に保存。
-- `step_N_object.ckpt`：Tなしの推論専用モデル。`evaluate_pusht.sh`に渡します。新経路Rawの10k・70kは実環境評価済みです。保存完了した途中重みを選び、結果に更新数を明記します。
-- `completed.json`：訓練ループ正常完了後のみ生成。例外・途中停止を成功扱いしません。
+上の本学習例はvalidation500更新ごと、checkpoint保存5,000更新ごとです。`--val-every`と`--save-every`はそれぞれ正の整数で指定します。CLIで`--val-every`を省略した場合だけ、従来どおり保存間隔と同じになります。validationを頻繁にすると、その計算時間は増えます。
 
-100,000更新を完走した後は、`completed.json`の`state=completed`と`step=100000`、`step_100000_object.ckpt`の両方を確認してから、[PushT評価手順](EVALUATE_PUSHT.ja.md#2-新しいrawbt-runを評価する)へ進みます。`last.ckpt`や途中の`step_N_object.ckpt`を最終成績として評価しないでください。評価は学習が終了してGPUを使っていないときに、別の新規出力先で実行します。
+- `metrics/version_N/metrics.csv`：`update`は1始まりの更新番号、`lr_used`はその更新に使った学習率、`fit/loss`・`fit/pred_loss`・`fit/sigreg_loss`が学習損失。CSVの標準`step`は0始まりです。
+- `step_N.ckpt`／`last.ckpt`：Lightning形式のモデル・T・optimizer・scheduler・乱数・再開条件。上の本学習例では5,000更新ごとと最終時点に保存します。
+- `step_N_object.ckpt`：Tなし・非コンパイルの推論専用モデル。再開用ではありません。
+- `completed.json`：訓練ループの正常完了後に生成します。
 
-これは100k最終成績の確認方法です。途中評価は`completed.json`なしで可能です。停止時のログ更新数と最後に保存された更新数は異なる場合があり、停止直前の重みが自動保存されたと仮定しないでください。
+本学習のCSVを別端末から確認する例：
 
-現在の `monitor_training.sh` は旧JSONL形式用で、新CSVのloss表示には使いません。端末ログ、または `tail -f output/pusht/spt_bt/metrics/version_0/metrics.csv` で確認します。定期監視サービス・外部trackerは起動しません。ログ・出力はGit対象外です。
+```bash
+cd "/home/sadasue/bt-sigreg"
+tail -f "output/pusht/bt_compiled_100k_s3072/metrics/version_0/metrics.csv"
+```
 
-中断後は**同じ設定・総更新数**で、`--resume 元run/last.ckpt --output 新しい未使用run --execute` を指定します。元のrunは上書きせず、ログは新runへ分離します。自己生成した信頼済みcheckpointだけを使ってください。旧 `resume.pt`、完了済みcheckpoint、変更したレシピでの再開は拒否します。
+```bash
+cd "/home/sadasue/bt-sigreg"
+tail -f "output/pusht/raw_compiled_100k_s3072/metrics/version_0/metrics.csv"
+```
 
-再開位置だけは薄い補助処理で補完します。PyTorchのepochシャッフルから消費済みバッチを読み飛ばし、prefetch位置ではなくLightningの完了更新数で復元します。CPU小型モデル・worker0/2で連続6更新と3更新＋再開が一致しましたが、実LeWM全体のGPU長期再開まで保証したものではありません。
+この`tail`のCtrl-Cは表示だけを終了します。学習画面のCtrl-Cは学習そのものを中断します。旧JSONL用`monitor_training.sh`は新PushTのCSV表示には使いません。
 
-## 共通のデータ準備とLIBERO学習
+以下は**この文書の本学習例で新規開始し、その後中断したrun**を再開する完全な例です。まず元の学習プロセスが終了していることと、指定した`last.ckpt`が保存済みであることを確認します。開始時と同じソース・固定依存環境・manifest・総更新数・保存間隔・validation間隔・コンパイラを使います。新しい端末でも節0・1の環境変数を同じ値で設定してください。出力は元runを上書きせず、新規フォルダへ分離します。
 
-新規PushTの学習は冒頭の `train.py` に統一します。以下の `training.py prepare` は分割作成だけです。LIBEROは `train_libero.py` から共有ループを使用します。旧RBG、`--blocks`、`--cross-weight`、廃止済み初期値ファイルの読込引数 `--initialization` はありません。Raw/TC/BTは同じseedから初期化し、記録された初期モデルhashで照合します。過去の完全な手順・再開は[整理記録](CLEANUP.ja.md)のGit履歴を参照してください。
+BT本学習の再開：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode bt \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/bt_compiled_100k_s3072_resume1" \
+  --steps 100000 --warmup-steps 500 \
+  --batch-size 128 --workers 4 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 500 --save-every 5000 \
+  --pin-memory --compile-encoder \
+  --resume "output/pusht/bt_compiled_100k_s3072/last.ckpt" --execute
+```
+
+Raw本学習の再開：
+
+```bash
+TRITON_PTXAS_PATH="/usr/local/cuda-13.0/bin/ptxas" \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+uv run --no-sync python mylewm/train.py \
+  --mode raw \
+  --manifest "$PUSHT_MANIFEST" \
+  --output "output/pusht/raw_compiled_100k_s3072_resume1" \
+  --steps 100000 --warmup-steps 500 \
+  --batch-size 128 --workers 4 --seed 3072 \
+  --lr 5e-5 --accelerator gpu --precision bf16-mixed \
+  --val-every 500 --save-every 5000 \
+  --pin-memory --compile-encoder \
+  --resume "output/pusht/raw_compiled_100k_s3072/last.ckpt" --execute
+```
+
+`--steps 100000`は残り更新数ではなく開始時に決めた総更新数です。保存以前の未確定分はやり直します。既存の過去100k BTや停止済みRaw 70kなど、**変更前コードで始めたrunへこの再開例を適用しません**。開始時のGit版・環境を使い、照合を解除しないでください。旧`resume.pt`と新Lightning checkpointも互換ではありません。
+
+完走時は`completed.json`の`state=completed`と`step=100000`、`step_100000_object.ckpt`を確認します。成功率評価は別工程です。途中checkpointの評価では`completed.json`を必須とせず、[途中評価手順](EVALUATE_INTERMEDIATE.ja.md)に従います。[PushT評価手順](EVALUATE_PUSHT.ja.md)も参照してください。
+
+## データの取得とLIBERO-10の学習
+
+新規PushTの学習は冒頭の `train.py` に統一します。PushTのパス指定・prepare・学習・再開は前半の完全な例を使います。LIBEROは `train_libero.py` から共有ループを使用します。旧RBG、`--blocks`、`--cross-weight`、廃止済み初期値ファイルの読込引数 `--initialization` はありません。Raw/TC/BTは同じseedから初期化し、記録された初期モデルhashで照合します。過去の完全な手順・再開は[整理記録](CLEANUP.ja.md)のGit履歴を参照してください。
 
 公式LeWM側を学習したい場合は[公式PushT学習の説明書](../../lewm/TRAIN_PUSHT.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
 
-この手順は**このPCの既存`.venv`とダウンロード済みデータを使う手順**です。別PCへの環境構築・ダウンロードを自動化したものではありません。以下のコマンドを順番に実行しますが、PushTとLIBEROの学習は一方ずつにしてください。
+以下はデータ未取得時の取得例とLIBERO-10の手順です。PushTの学習は前半の例を使い、ここでは重ねて起動しません。LIBEROには新PushT用の`--val-every`と`--compile-encoder`はありません。PushTとLIBEROの学習は一方ずつ実行してください。
 
 旧経路PushT BT v2の100,000更新は完了済みです。新経路Rawの100k完了という意味ではありません。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
 
-### 0. PushT用の`uv`環境を構築する
+### 0. 固定依存の環境を用意する
 
 以下は環境準備の工程です。学習・評価が稼働中の共有`.venv`では`uv sync`や自動同期を行わず、準備済み環境を`UV_NO_SYNC=1`で使うか、分離環境を用意します。[途中評価時の環境注意](EVALUATE_INTERMEDIATE.ja.md#実行前の確認)を参照してください。
 
-これまでの手順は既存`.venv`を前提にしており、依存パッケージを導入するコマンドが欠けていました。リポジトリ直下の`pyproject.toml`と`uv.lock`に、PushT用の公式世界モデル、PyTorch、Lightning、Hydra、HDF5周辺を固定しています。GB10/CUDA 13向けPyTorch indexも同ファイルで選択します。
+前半で固定依存の環境を準備済みなら、同期を繰り返す必要はありません。別端末では`cd`と環境変数を同じ値で設定します。以下はLIBEROのPython依存も含めて環境を新規準備する例です。`pyproject.toml`と`uv.lock`はGB10/CUDA 13向けです。
 
 ```bash
-uv sync --locked
-uv run python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worldmodel, torch; print("hydra", hydra.__version__, "torch", torch.__version__)'
-uv run python mylewm/train.py --help
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+uv sync --locked --group libero
+uv run --no-sync python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worldmodel, torch; print("hydra", hydra.__version__, "torch", torch.__version__)'
+uv run --no-sync python mylewm/train.py --help
 ```
 
 `ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、`pyproject.toml`の依存`stable-worldmodel[env,train]`経由で導入されます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCはこのlockfileをそのまま使わず、対応するPyTorch backendで別途lockを作成してください。
 
-LIBEROのPython依存は`uv sync --locked --group libero`で追加します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
+上の環境準備例はLIBEROのPython依存も導入します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
 
 ### 1. データを任意の保存先へ取得する
 
-データはGitに入れません。次の例では`BT_SIGREG_DATA_ROOT`だけを自分の大容量ストレージへ変更します。PushTの公式データは圧縮済みで約13.1GB、展開後は約46.3GBです。LIBERO-10は10個で約13.7GBです。必要な空き容量とネットワークを確認してから実行してください。
+データはGitに入れません。以下は未取得のデータを`/mnt/data/bt-sigreg-data`へ保存する例です。このディレクトリは実際の大容量ストレージに合わせます。既にデータがある場合はこの取得例を実行せず、前半の既存データのパス指定へ進みます。PushTの公式データは圧縮済みで約13.1GB、展開後は約46.3GBです。LIBERO-10は10個で約13.7GBです。必要な空き容量とネットワークを確認してから実行してください。
 
 ```bash
-export BT_SIGREG_DATA_ROOT=/absolute/path/to/bt-sigreg-data
+export BT_SIGREG_DATA_ROOT="/mnt/data/bt-sigreg-data"
 export PUSHT_HDF5="$BT_SIGREG_DATA_ROOT/pusht/pusht_expert_train.h5"
 export LIBERO10_DATASET="$BT_SIGREG_DATA_ROOT/libero_10"
 mkdir -p "$(dirname "$PUSHT_HDF5")"
 
 # PushT: 公式 LeWM dataset を取得して HDF5 を展開する。
-uv run hf download quentinll/lewm-pusht --repo-type dataset \
+uv run --no-sync hf download quentinll/lewm-pusht --repo-type dataset \
   --local-dir "$BT_SIGREG_DATA_ROOT/pusht-source"
-zstd -d --stdout "$BT_SIGREG_DATA_ROOT/pusht-source/pusht_expert_train.h5.zst" \
-  > "$PUSHT_HDF5"
+zstd -d --keep "$BT_SIGREG_DATA_ROOT/pusht-source/pusht_expert_train.h5.zst" \
+  -o "$PUSHT_HDF5"
 
 # LIBERO-10: 公式 LIBERO dataset の必要な10ファイルだけを取得する。
-uv run hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
+uv run --no-sync hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
   --include 'libero_10/*' --local-dir "$BT_SIGREG_DATA_ROOT"
 ```
 
@@ -127,18 +318,16 @@ uv run hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
 全コマンドはリポジトリ直下で実行します。別の場所に置いた場合は、最初の`cd`だけ実際の場所に変更してください。仮想環境のactivateは不要です。
 
 ```bash
-cd "$(git rev-parse --show-toplevel)"
-export PUSHT_HDF5=/absolute/path/to/pusht_expert_train.h5
-export LIBERO10_DATASET=/absolute/path/to/libero_10
-uv run python --version
-uv run python mylewm/training.py --help
-uv run python mylewm/train_libero.py --help
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+export LIBERO10_DATASET="/mnt/data/bt-sigreg-data/libero_10"
+uv run --no-sync python --version
+uv run --no-sync python mylewm/train_libero.py --help
 nvidia-smi
-ls -lh "$PUSHT_HDF5"
-ls "$LIBERO10_DATASET"/*.hdf5
+ls -lh "$LIBERO10_DATASET"/*.hdf5
 ```
 
-PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必要です。`/absolute/path/to/...`は実際の任意の保存場所へ置き換えてください。対象benchmarkのデータが見つからなければ先へ進まないでください。`uv run python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。
+LIBERO-10はタスクごとのHDF5が10個必要です。`LIBERO10_DATASET`には10個の`.hdf5`を直接含むディレクトリを指定します。PushTのように単一ファイルを指定する形式ではありません。例えば別の保存先なら`export LIBERO10_DATASET="/mnt/data/robot datasets/libero_10"`と引用符で囲みます。対象benchmarkのデータが見つからなければ先へ進まないでください。`uv run --no-sync python`やimportが見つからない場合も環境準備が必要です。任意の最新版をまとめてインストールして既存環境を上書きしないでください。
 
 学習では実画像・実行行動から一段先の潜在状態を予測します。LIBEROは2つの実カメラを使い、10タスクで1つのモデルを共有します。HDF5からの学習にはMuJoCo/OSMesaの起動は不要です。シミュレータが必要なのは後述の制御評価です。
 
@@ -148,42 +337,24 @@ PushTは約46.3GBのHDF5が1つ、LIBERO-10はタスクごとのHDF5が10個必�
 
 `manifest.json`はデータの場所、学習/検証/テストの分割、行動の正規化統計を記録するファイルです。データ本体を複製・生成する処理ではありません。新しいmanifestを**現在の実フォルダで**作り、旧フォルダ名の一時リンクに依存しないようにします。
 
-PushT用：
-
-```bash
-uv run python mylewm/training.py prepare \
-  --dataset "$PUSHT_HDF5" \
-  --manifest output/manifests/pusht/manifest.json
-```
-
 LIBERO-10用：
 
 ```bash
-uv run python mylewm/train_libero.py prepare \
+uv run --no-sync python mylewm/train_libero.py prepare \
   --dataset "$LIBERO10_DATASET" \
   --manifest output/manifests/libero10/manifest.json
 ```
 
-完了すると分割件数が表示されます。manifestにはデータの**絶対パス**、サイズ、更新時刻（PushTはhashも）を記録し、学習・評価はその記録を使います。LIBEROは隣に`files.json`も作ります。既に作成済みならこの工程を飛ばしてください。`FileExistsError`は上書き防止です。学習開始後はmanifest・データ・フォルダ名を変更しないでください。移転後の**新規実験**は新しいmanifestを作れますが、途中再開のために元のmanifestを書き換えると互換性チェックで拒否されます。
+完了すると分割件数が表示されます。LIBEROのmanifestの`dataset`は、隣に作る`files.json`の絶対パスです。`files.json`には10個のHDF5それぞれの絶対パス・サイズ・更新時刻を保存し、学習はこの一覧から読み込みます。prepare時のデータhashも記録します。既に作成済みならこの工程を飛ばしてください。`FileExistsError`は上書き防止です。学習開始後はmanifest・データ・フォルダ名を変更しないでください。移転後の**新規実験**は新しいmanifestを作れますが、途中再開のために元のmanifestを書き換えると互換性チェックで拒否されます。
 
 ### 4. まず100ステップだけ動作確認する
 
 `--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
 
-PushT（BT例。Rawは`--mode raw --output output/pusht/spt_raw_smoke`だけを変更）：
-
-```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
-  --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt_smoke \
-  --steps 100 --batch-size 16 --workers 0 --seed 3072 \
-  --warmup-steps 10 --save-every 50 --execute
-```
-
 LIBERO-10：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_smoke \
   --steps 100 --batch-size 16 --workers 0 --seed 3072 \
@@ -199,25 +370,16 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
 
 ```bash
 tmux new -s bt-training
-cd "$(git rev-parse --show-toplevel)"
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
 ```
 
 短期学習のcheckpointは使わず、新規初期値から始めます。
 
-PushT・10万ステップ（BT例。Rawは`--mode raw --output output/pusht/spt_raw`だけを変更）：
-
-```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train.py \
-  --mode bt --manifest output/manifests/pusht/manifest.json \
-  --output output/pusht/spt_bt \
-  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
-  --warmup-steps 500 --save-every 5000 --execute
-```
-
 LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証していません）：
 
 ```bash
-CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python mylewm/train_libero.py train \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python mylewm/train_libero.py train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_train \
   --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
@@ -256,7 +418,19 @@ bash mylewm/tools/monitor_training.sh --run output/libero10/bt_train
 
 ### 7. 中断した学習を再開する
 
-学習プロセスが終了していることと、対象runに`resume.pt`があることを確認します。**開始時と同じコマンドの末尾に`--resume`だけを追加**して実行してください。これは改名後に開始したLIBERO run向けで、`train_libero.py`を使います。PushT新経路は冒頭のLightning再開手順です。改名前のrunは開始時のGit版で再開し、ソース照合を解除しないでください。
+学習プロセスが終了していることと、対象runに`resume.pt`があることを確認します。以下は上のLIBERO本学習例で開始し、中断したrunを同じ条件で再開する例です。LIBEROでは`--resume`はファイルパスを取らず、元の`--output`内の`resume.pt`を使います。PushT新経路は前半のLightning再開例を使ってください。開始時のソース・環境を維持し、改名前のrunは開始時のGit版を使います。
+
+```bash
+cd "/home/sadasue/bt-sigreg"
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv-training"
+CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python mylewm/train_libero.py train \
+  --mode bt --manifest "output/manifests/libero10/manifest.json" \
+  --output "output/libero10/bt_train" \
+  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
+  --warmup-steps 500 --lr 5e-5 --min-lr 0 \
+  --bt-depth 2 --bt-kappa .2 --bt-hidden 192 \
+  --save-every 5000 --diagnostics-every 1000 --deterministic --resume
+```
 
 - `--output`は元のrunのまま。`--steps`も元の総数のままです（残りステップ数ではありません）。
 - ほかの引数・manifest・データ・学習ソース・環境を変えないでください。`resume mismatch`を無理に解除してはいけません。

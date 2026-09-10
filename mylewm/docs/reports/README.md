@@ -4,6 +4,7 @@
 
 | レポート | 内容 |
 |---|---|
+| [学習高速化（2026-09-10）](TRAINING_SPEED_20260910.ja.md) | GB10での短期速度比較、同期・転送・任意コンパイル、依存版による差と再開検証 |
 | [PushT Issue #20](PUSHT_ISSUE20.ja.md) | 画像/Goal欠落・動画・CEM監査メモリ修正、複数ケースの実機確認と未確認範囲 |
 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md) | 途中・最終checkpoint、固定200ケースと上流50ケース、比較条件・失敗・hash |
 | [PushT失敗監査](PUSHT_FAILURE_AUDIT.ja.md) | 固定ケースの一段・5遷移誤差と、遷移／cost／探索の切り分け範囲 |

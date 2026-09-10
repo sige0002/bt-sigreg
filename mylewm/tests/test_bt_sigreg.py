@@ -134,6 +134,33 @@ def test_new_parameterization_metadata_and_parameter_count():
     assert t.config()['normalization'] == 'cayley_spectral_v2'
 
 
+@pytest.mark.parametrize('dim,hidden', [(192, 192), (5, 7)])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+def test_batched_cuda_transport_matches_sequential_values_and_gradients(dim, hidden, dtype):
+    if not torch.cuda.is_available():
+        pytest.skip('CUDA not available')
+    torch.manual_seed(17)
+    transport = BoundedTransport(dim=dim, hidden=hidden).to(device='cuda', dtype=dtype)
+    # Non-identity weights exercise all factors, not only zero-spectrum init.
+    with torch.no_grad():
+        for block in transport.blocks:
+            block.output_weight.raw_spectrum.uniform_(-.7, .7)
+    reference = copy.deepcopy(transport)
+    z = torch.randn(3, 8, dim, device='cuda', dtype=dtype, requires_grad=True)
+    zr = z.detach().clone().requires_grad_()
+    actual = transport(z)
+    expected = zr
+    for block in reference.blocks:
+        expected = block(expected)
+    tolerance = dict(rtol=2e-5, atol=2e-6) if dtype == torch.float32 else dict(rtol=1e-11, atol=1e-12)
+    torch.testing.assert_close(actual, expected, **tolerance)
+    actual.square().mean().backward()
+    expected.square().mean().backward()
+    torch.testing.assert_close(z.grad, zr.grad, **tolerance)
+    for a, b in zip(transport.parameters(), reference.parameters()):
+        torch.testing.assert_close(a.grad, b.grad, **tolerance)
+
+
 class TinyBTModel(torch.nn.Module):
     def __init__(self, views=1):
         super().__init__()

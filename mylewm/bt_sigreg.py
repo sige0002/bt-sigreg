@@ -33,12 +33,34 @@ class CayleyOrthogonal(nn.Module):
         self.angles = nn.Parameter(torch.randn(indices.shape[1]) * (.01 / math.sqrt(dim)))
         self.dim = dim
 
-    def forward(self):
+    def skew_matrix(self):
         upper = self.angles.new_zeros(self.dim, self.dim)
         upper = upper.index_put(tuple(self.indices), self.angles)
-        skew = upper - upper.T
+        return upper - upper.T
+
+    def forward(self):
+        skew = self.skew_matrix()
         identity = torch.eye(self.dim, device=skew.device, dtype=skew.dtype)
         return torch.linalg.solve(identity-skew, identity+skew)
+
+    @staticmethod
+    def batched(factors):
+        """One checked solve per dimension, retaining the original parameters.
+
+        solve checks CUDA errors with a CPU synchronization. Grouping the
+        independent factors reduces eight checks to one for the default T,
+        without dropping singular-system errors or caching across updates.
+        """
+        groups = {}
+        for factor in factors:
+            groups.setdefault(factor.dim, []).append(factor)
+        result = {}
+        for dim, group in groups.items():
+            skew = torch.stack([factor.skew_matrix() for factor in group])
+            identity = torch.eye(dim, device=skew.device, dtype=skew.dtype)
+            matrices = torch.linalg.solve(identity-skew, identity+skew)
+            result.update(zip(group, matrices.unbind()))
+        return result
 
 
 class SpectralLinear(nn.Module):
@@ -51,9 +73,9 @@ class SpectralLinear(nn.Module):
         self.raw_spectrum = nn.Parameter(torch.full(
             (self.rank,), math.atanh(initial_singular_value)))
 
-    def forward(self):
-        left = self.left()[:, :self.rank]
-        right = self.right()[:, :self.rank]
+    def forward(self, factors=None):
+        left = (self.left() if factors is None else factors[self.left])[:, :self.rank]
+        right = (self.right() if factors is None else factors[self.right])[:, :self.rank]
         return (left * self.raw_spectrum.tanh()) @ right.T
 
 
@@ -71,8 +93,8 @@ class BoundedResidual(nn.Module):
     def activation(x):
         return .5*x + .5*torch.tanh(x)
 
-    def forward(self, x):
-        a, b = self.input_weight(), self.output_weight()
+    def forward(self, x, factors=None):
+        a, b = self.input_weight(factors), self.output_weight(factors)
         # Evaluate the linear difference analytically to avoid cancellation of bias.
         ax = F.linear(x, a)
         centered = .5*ax + .5*(torch.tanh(ax+self.bias)-torch.tanh(self.bias))
@@ -98,8 +120,11 @@ class BoundedTransport(nn.Module):
         # FP64 is retained for mathematical tests; mixed-precision training uses FP32.
         with torch.autocast(device_type=z.device.type, enabled=False):
             u = z if z.dtype == torch.float64 else z.float()
+            factors = (CayleyOrthogonal.batched(
+                m for m in self.modules() if isinstance(m, CayleyOrthogonal))
+                if z.is_cuda and self.blocks else None)
             for block in self.blocks:
-                u = block(u)
+                u = block(u, factors)
         return u
 
     def config(self):

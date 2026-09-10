@@ -48,19 +48,30 @@ class GaussianBranch(torch.nn.Module):
                               if mode == 'bt' else torch.nn.Identity())
         self.gaussian = SIGReg(num_proj=projections)
         self.seed = seed
-        self.register_buffer('draw_index', torch.zeros((), dtype=torch.long))
+        # A CUDA scalar converted to int synchronizes every forward. Keep this
+        # counter on the host and persist it through Module's checkpoint API.
+        self.draw_index = 0
+
+    def get_extra_state(self):
+        return {'draw_index': self.draw_index}
+
+    def set_extra_state(self, state):
+        index = state['draw_index']
+        if type(index) is not int or index < 0:
+            raise ValueError('Invalid projection draw index')
+        self.draw_index = index
 
     def forward(self, z):
         devices = [z.device.index] if z.is_cuda else []
         with torch.random.fork_rng(devices=devices):
-            seed = self.seed + int(self.draw_index)
+            seed = self.seed + self.draw_index
             torch.random.default_generator.manual_seed(seed)
             if z.is_cuda:
                 torch.cuda.default_generators[z.device.index].manual_seed(seed)
             with torch.autocast(device_type=z.device.type, enabled=False):
                 loss = self.gaussian(self.transport(z.float()))
         if self.training:
-            self.draw_index.add_(1)
+            self.draw_index += 1
         return loss
 
 
@@ -234,16 +245,43 @@ def build_model():
     return hydra.utils.instantiate(cfg.model)
 
 
+def compile_encoder(model):
+    # In-place Module.compile keeps checkpoint keys unchanged. Module's pickle
+    # state omits the compiled callable, so deepcopy/export remains eager.
+    # Keep the predictor (including its dropout) and projection RNG in eager mode.
+    model.encoder.compile(backend='inductor', mode='default')
+
+
+def compiler_identity():
+    from triton import knobs
+    assembler = knobs.nvidia.ptxas
+    path = Path(assembler.path).resolve()
+    return dict(backend='inductor', mode='default', triton=importlib.metadata.version('triton'),
+                ptxas_path=str(path), ptxas_version=assembler.version,
+                ptxas_sha256=file_sha256(path))
+
+
 def run(args):
     if args.steps < 2 or not 0 < args.warmup_steps < args.steps or args.batch_size < 2 or args.workers < 0 or args.save_every < 1 or not np.isfinite(args.lr) or args.lr <= 0:
         raise ValueError('Invalid steps/warmup/batch/workers/save frequency/lr')
+    val_every = getattr(args, 'val_every', None)
+    if val_every is None:
+        val_every = args.save_every
+    if val_every < 1:
+        raise ValueError('--val-every must be a positive number of updates')
     if args.output.exists():
         raise FileExistsError('Use a fresh output directory, including for resume')
     if args.resume and (not args.resume.is_file() or args.resume.suffix != '.ckpt'):
         raise ValueError('--resume requires a trusted Lightning .ckpt, not legacy resume.pt')
+    compiled = getattr(args, 'compile_encoder', False)
+    if compiled and args.accelerator != 'gpu':
+        raise ValueError('--compile-encoder is supported only with --accelerator gpu')
     manifest = json.loads(args.manifest.read_text())
     recipe = {k: v for k, v in vars(args).items() if k not in ('output', 'execute', 'resume', 'manifest')}
     recipe.update(schema='pusht_spt_v1', manifest_sha256=file_sha256(args.manifest),
+                  pin_memory=getattr(args, 'pin_memory', True),
+                  compile_encoder=compiled,
+                  val_every=val_every,
                   loss_weight=.09, sampling='pytorch_epoch_shuffle_drop_last',
                   normalization='frozen_manifest_train_only', statistics_precision='float32',
                   source_sha256={str(p.relative_to(ROOT)): file_sha256(p) for p in
@@ -258,6 +296,8 @@ def run(args):
     recipe['dependency_sources'] = {name: file_sha256(Path(inspect.getfile(obj))) for name, obj in
         [('spt_module', spt.Module), ('swm_dataset', swm.data.HDF5Dataset),
          ('spt_scheduler', LinearWarmupCosineAnnealingLR), ('lightning_trainer', pl.Trainer)]}
+    if compiled:
+        recipe['compiler'] = compiler_identity()
     if not args.execute:
         print(json.dumps(recipe, indent=2))
         print('Dry-run only; no model load, GPU initialization, or training.')
@@ -274,13 +314,18 @@ def run(args):
     recipe.update(train_clips=len(train_set), validation_clips=len(val_set))
     batches = EpochBatches(train_set, args.batch_size, args.steps, args.seed)
     train_loader = DataLoader(train_set, batch_sampler=batches, num_workers=args.workers,
+                              pin_memory=recipe['pin_memory'] and args.accelerator == 'gpu',
                               generator=torch.Generator().manual_seed(args.seed + 100))
     val_loader = DataLoader(val_set, batch_size=args.batch_size, num_workers=0,
+                            pin_memory=recipe['pin_memory'] and args.accelerator == 'gpu',
                             generator=torch.Generator().manual_seed(args.seed + 101))
     model = build_model()
     recipe['initial_model_sha256'] = tensor_state_hash(model.state_dict())
     for name in ('mean', 'std'):
         model.register_buffer('training_action_' + name, torch.tensor(manifest['action_' + name], dtype=torch.float64))
+    if compiled:
+        print('Compiling image encoder; the first training/validation batch can take longer.', flush=True)
+        compile_encoder(model)
     reg = GaussianBranch(args.mode, args.seed + 10000, depth=args.bt_depth,
                          hidden=args.bt_hidden, kappa=args.bt_kappa)
     module = TrainingModule(model, reg, recipe, batches)
@@ -291,7 +336,7 @@ def run(args):
                                   save_last=True, auto_insert_metric_name=False)
     trainer = make_trainer(default_root_dir=args.output, accelerator=args.accelerator, devices=1,
         max_steps=args.steps, max_epochs=-1, precision=args.precision, deterministic=True,
-        num_sanity_val_steps=0, check_val_every_n_epoch=None, val_check_interval=args.save_every,
+        num_sanity_val_steps=0, check_val_every_n_epoch=None, val_check_interval=val_every,
         logger=CSVLogger(str(args.output), name='metrics'), log_every_n_steps=1,
         callbacks=[Export(args.output, args.save_every), checkpoint], enable_model_summary=False)
     trainer.fit(module, train_dataloaders=train_loader, val_dataloaders=val_loader,
@@ -310,7 +355,14 @@ def main():
     p.add_argument('--warmup-steps', type=int, default=500)
     p.add_argument('--batch-size', type=int, default=128)
     p.add_argument('--workers', type=int, default=4)
-    p.add_argument('--save-every', type=int, default=5000)
+    p.add_argument('--pin-memory', action=argparse.BooleanOptionalAction, default=True,
+                   help='Use pinned DataLoader memory for GPU transfer (default: enabled on GPU)')
+    p.add_argument('--compile-encoder', action='store_true',
+                   help='Opt in to torch.compile for the image encoder; requires a compatible Triton/CUDA compiler')
+    p.add_argument('--save-every', type=int, default=5000,
+                   help='Checkpoint interval in updates (default: 5000)')
+    p.add_argument('--val-every', type=int,
+                   help='Validation interval in updates (default: same as --save-every)')
     p.add_argument('--seed', type=int, default=3072)
     p.add_argument('--lr', type=float, default=5e-5)
     p.add_argument('--accelerator', choices=['cpu', 'gpu'], default='gpu')
