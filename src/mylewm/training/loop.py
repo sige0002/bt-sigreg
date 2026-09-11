@@ -166,6 +166,7 @@ def train(args, adapter=None):
     if transport_parameters:
         opt.add_param_group({'params': transport_parameters})
     config={**vars(args),'schema':'controlled_training_v2',
+            'pin_memory':getattr(args,'pin_memory',True),
             'schedule':schedule.config,'device':device,
             'precision':'bf16_autocast' if device=='cuda' else 'float32',
             'torch_version':str(torch.__version__),
@@ -214,14 +215,15 @@ def train(args, adapter=None):
     else:
         budget_path.write_text(json.dumps(budget,indent=2))
     loader=torch.utils.data.DataLoader(ds,batch_sampler=StepBatches(len(ds),args.batch_size,args.steps,args.seed,start_step),
-        num_workers=args.workers,pin_memory=device=='cuda',persistent_workers=args.workers>0,
+        num_workers=args.workers,pin_memory=config['pin_memory'] and device=='cuda',persistent_workers=args.workers>0,
         generator=torch.Generator().manual_seed(args.seed+100))
     val=torch.utils.data.DataLoader(adapter.dataset(m,True),batch_size=args.batch_size,num_workers=0,
         generator=torch.Generator().manual_seed(args.seed+101))
     begin=time.monotonic()
     if device=='cuda':torch.cuda.reset_peak_memory_stats()
     print(json.dumps({'event':'start','parameters':config['parameters'],'mode':args.mode,
-                      'train_clips':len(ds),'steps':args.steps,'device':device}),flush=True)
+                      'train_clips':len(ds),'steps':args.steps,'device':device,
+                      'pin_memory':loader.pin_memory,'validation_pin_memory':val.pin_memory}),flush=True)
     with (args.output/'metrics.jsonl').open('a') as log:
         for step,batch in enumerate(loader,start_step+1):
             learning_rates=schedule.apply(opt,step)
@@ -294,6 +296,8 @@ def main():
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
     p.add_argument('--batch-size',type=int,default=128)
     p.add_argument('--workers',type=int,default=4)
+    p.add_argument('--pin-memory',action=argparse.BooleanOptionalAction,default=True,
+                   help='Pin training DataLoader memory on CUDA; use --no-pin-memory to disable')
     p.add_argument('--save-every',type=int,default=1000)
     p.add_argument('--seed',type=int,default=3072)
     add_schedule_arguments(p)

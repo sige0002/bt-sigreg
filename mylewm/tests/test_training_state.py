@@ -55,7 +55,7 @@ def test_schedule_boundaries_and_group_lrs():
 
 @pytest.mark.parametrize('key', ['steps', 'warmup_steps', 'lr', 'min_lr', 'gaussian_weight',
                                 'adapter_sources', 'source_sha256',
-                                'manifest_sha256', 'seed', 'precision'])
+                                'manifest_sha256', 'seed', 'precision', 'pin_memory'])
 def test_resume_rejects_contract_changes(key):
     with pytest.raises(ValueError, match=key):
         check_resume_config({key: 'old'}, {key: 'new'})
@@ -90,7 +90,8 @@ def assert_tree_equal(a, b, atol=0.):
 
 @pytest.mark.parametrize('device', ['cpu', 'cuda'])
 @pytest.mark.parametrize('workers', [0, 2])
-def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, workers):
+@pytest.mark.parametrize('pin_memory', [False, True])
+def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, workers, pin_memory):
     if device == 'cuda' and not torch.cuda.is_available():
         pytest.skip('CUDA not available')
     if device == 'cpu':
@@ -99,6 +100,13 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
     deterministic = torch.are_deterministic_algorithms_enabled()
     torch.use_deterministic_algorithms(True)
     monkeypatch.setattr(training, 'GaussianSIGReg', TinyRegularizer)
+    observed_batches = []
+    class ObservedDataLoader(torch.utils.data.DataLoader):
+        def __iter__(self):
+            for batch in super().__iter__():
+                observed_batches.append((self.dataset.n == 29, batch[0].is_pinned()))
+                yield batch
+    monkeypatch.setattr(torch.utils.data, 'DataLoader', ObservedDataLoader)
     adapter = training.TrainingAdapter(TinyClips,
         lambda batch, m, d: tuple(x.to(d) for x in batch), TinyModel)
     dataset = tmp_path / 'data.identity'
@@ -124,11 +132,15 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
 
     monkeypatch.setattr(training, 'one_step_objective', objective)
     args = argparse.Namespace(steps=6, warmup_steps=2, lr=.003, min_lr=0., seed=3072,
-        manifest=manifest, mode='raw', batch_size=4, workers=workers,
+        manifest=manifest, mode='raw', batch_size=4, workers=workers, pin_memory=pin_memory,
         gaussian_weight=.09, save_every=2, resume=False,
         output=tmp_path/'full',deterministic=True)
     try:
         training.train(args, adapter=adapter)
+        assert json.loads((args.output/'config.json').read_text())['pin_memory'] is pin_memory
+        assert observed_batches
+        assert all(pinned == (is_train and pin_memory and device == 'cuda')
+                   for is_train, pinned in observed_batches)
         full_batches = seen.copy()
         full = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
         full_rows = [json.loads(line) for line in (args.output/'metrics.jsonl').read_text().splitlines()]
@@ -140,6 +152,10 @@ def test_real_loop_uninterrupted_equals_resumed(tmp_path, monkeypatch, device, w
             training.train(args, adapter=adapter)
         interrupt = False
         args.resume = True
+        args.pin_memory = not pin_memory
+        with pytest.raises(ValueError, match='pin_memory'):
+            training.train(args, adapter=adapter)
+        args.pin_memory = pin_memory
         training.train(args, adapter=adapter)
         resumed = torch.load(args.output/'resume.pt', map_location='cpu', weights_only=False)
         resumed_rows = [json.loads(line) for line in (args.output/'metrics.jsonl').read_text().splitlines()]

@@ -503,6 +503,8 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 以下はLIBERO-10のHDF5取得・学習手順です。PushTの学習は前半の例を使い、ここでは重ねて起動しません。LIBEROには新PushT用の`--val-every`と`--compile-encoder`はありません。PushTとLIBEROの学習は一方ずつ実行してください。
 
+2026-09-11追記：LIBEROの`train_libero.py`にも`--pin-memory`／`--no-pin-memory`を追加しました。新規学習で固定CPUメモリを使わない場合は`--no-pin-memory`を明示します。訓練DataLoaderへ適用し、従来から固定メモリを使わないvalidationはそのままです。`config.json`の`pin_memory`と起動ログの訓練・validationそれぞれの有効値を記録します。以下の新規例は固定メモリなしです。[速度面の注意](#pin-memory-tradeoffs)も参照してください。変更前runは開始時コード・設定でのみ厳密再開でき、新しい引数を足して照合を回避することはできません。
+
 旧経路PushT BT v2の100,000更新は完了済みです。新経路Rawの100k完了という意味ではありません。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
 
 ### 0. 固定依存の環境を用意する
@@ -578,7 +580,7 @@ LIBERO-10：
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train_libero train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_smoke \
-  --steps 100 --batch-size 16 --workers 0 --seed 3072 \
+  --steps 100 --batch-size 16 --workers 0 --no-pin-memory --seed 3072 \
   --warmup-steps 10 --lr 5e-5 --min-lr 0 \
   --save-every 50 --diagnostics-every 25 --deterministic
 ```
@@ -603,7 +605,7 @@ LIBERO-10・10万ステップ（本学習のこの設定はまだ完走検証し
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train_libero train \
   --mode bt --manifest output/manifests/libero10/manifest.json \
   --output output/libero10/bt_train \
-  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
+  --steps 100000 --batch-size 128 --workers 4 --no-pin-memory --seed 3072 \
   --warmup-steps 500 --lr 5e-5 --min-lr 0 \
   --bt-depth 2 --bt-kappa .2 --bt-hidden 192 \
   --save-every 5000 --diagnostics-every 1000 --deterministic
@@ -647,7 +649,7 @@ export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train_libero train \
   --mode bt --manifest "output/manifests/libero10/manifest.json" \
   --output "output/libero10/bt_train" \
-  --steps 100000 --batch-size 128 --workers 4 --seed 3072 \
+  --steps 100000 --batch-size 128 --workers 4 --no-pin-memory --seed 3072 \
   --warmup-steps 500 --lr 5e-5 --min-lr 0 \
   --bt-depth 2 --bt-kappa .2 --bt-hidden 192 \
   --save-every 5000 --diagnostics-every 1000 --deterministic --resume

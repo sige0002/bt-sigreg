@@ -112,6 +112,8 @@ def main():
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
     p.add_argument('--batch-size',type=int,default=128)
     p.add_argument('--workers',type=int,default=4)
+    p.add_argument('--pin-memory',action=argparse.BooleanOptionalAction,default=True,
+                   help='Pin training DataLoader memory on CUDA; use --no-pin-memory to disable')
     p.add_argument('--save-every',type=int,default=1000)
     p.add_argument('--seed',type=int,default=3072)
     common.add_schedule_arguments(p)
