@@ -73,7 +73,26 @@ NVIDIAも[容量内で起きるUMA／cache関連のメモリ問題](https://nvid
 
 主な追加証拠は同じ診断ディレクトリの`driver_probe.py`、`trace_ioctl.c`、`driver_probe_compaction.log`、`ioctl_trace_compaction.log`、`ioctl_query_only.log`です。shared libraryはその場で`cc -shared -fPIC ... -ldl`により作成した診断専用物で、学習環境へ導入していません。診断後もPushTとLIBEROの元PID・更新進行を確認しました。解消のためのOS設定変更、手動compaction、学習停止・再起動、ドライバ更新は未実施です。
 
-実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
+### 新規学習コマンドでの確認（同日12:39〜12:41 JST）
+
+「本当に新規の学習ができないか」という依頼に対し、既存のPushT・LIBERO学習を動かしたまま、新規プロセスで実際の学習コマンドを実行しました。**この時点では新しいGPU学習は開始できず、CPUの小規模学習と既存GPU学習は動作しました。** 確認対象はこの環境状態における新規CUDAプロセスの起動です。
+
+| 新規プロセス | 指定予算 | 完了更新数 | 終了コード・所要時間 | 結果 |
+|---|---|---:|---|---|
+| 小規模MLP、CPU | batch 8、4更新 | 4 | 0・3.71秒 | 逆伝播・SGD更新が完了 |
+| 同じMLP、CUDA 0 | batch 8、4更新 | 0 | 1・2.58秒 | `.to('cuda:0')`でOOM |
+| BC CLI、実データmanifest・凍結BT ViT | batch 2、2更新、workers 0 | 0 | 1・9.22秒 | データ・encoder由来の照合後、方策のCUDA転送でOOM |
+| BT LIBERO世界モデルCLI、新規初期値 | batch 2、2更新、workers 0 | 0 | 1・14.68秒 | データmetadata確認・ViT生成後、モデルのCUDA転送でOOM |
+
+MLPは2,372パラメータ（float32の重み合計9,488 bytes）です。GPU側の3試行ともoptimizer更新より前に失敗し、同時刻のkernel logに`kgrctxAllocMainCtxBuffer`の`NV_ERR_NO_MEMORY`が残りました。BCの`status.json`も`failed`です。BT CLIは出力ディレクトリ作成前に終了したため、外側で実コマンド・終了コード・ログを保存しました。2更新の指定を、2更新完了として扱いません。
+
+試行後のMemAvailableは40.90 GiBでしたが、Normal zoneのorder 9以上の空きブロックは0でした。先のDriver API診断と整合し、モデルやbatchを小さくするだけでは今回の初期化失敗を回避できませんでした。OS・ドライバ状態を回復させた後も新規学習できない、という意味ではありません。回復操作は今回未実施です。
+
+12:40:59時点で元PIDは両方生存し、PushTは32,675更新（CSVの`step=32674`、`update=32675`）、LIBEROは2,048更新まで進行し、両ログは約2秒前に更新されていました。新規の長時間学習や再試行キューは追加していません。
+
+証拠は`output/libero10/bc_implementation_check/memory_diagnosis_20260911/fresh_training_123954/`に保存しました。`results.json`、`bt_cuda_result.json`にコマンド・終了コード・時間、各`*.log`に実行結果、`kernel.log`に該当時間帯のドライバ記録、`state_after.json`にRAM・buddyinfo・既存学習の進捗を記録しています。
+
+先に行ったCPUの実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
 
 実環境の最終記録は`output/libero10/bc_implementation_check/eval_native_task0/`。9行動では未成功（0/1）で、環境ループ約3.20秒、CPU方策生成2回の合計約1.59秒です。短期checkpoint・短い予算の接続確認であり、成功率や実機制御Hzの評価ではありません。方策への入力は現在画像・タスクIDのみで、成功デモ画像は表示だけに使います。
 
