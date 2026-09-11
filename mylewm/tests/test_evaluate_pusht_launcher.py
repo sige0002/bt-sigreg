@@ -115,6 +115,7 @@ def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,re
                     'physical_actions':[{'actions':[[0,0]],'mask':[True]}],
                     'initial_runtime_hashes':[{'state':str(i)} for i in range(50)]}
             (output/'results.txt.json').write_text(json.dumps(result))
+            (output/'results.txt').write_text('mock evaluator matrix\n')
         return subprocess.CompletedProcess(cmd,returncode)
     monkeypatch.setattr(subprocess,'run',fake_run)
     namespace={'__name__':'__main__'}

@@ -160,6 +160,8 @@ if metrics['checkpoint_sha256'] != plan['checkpoint_sha256'] or metrics['provena
 successes = sum(metrics['successes'])
 if abs(metrics['success_rate'] - 100*successes/len(cases)) > 1e-6:
     raise ValueError('Reported success rate differs from case flags')
+from mylewm.evaluation.pusht_result_table import append_trial_table
+append_trial_table(output)
 print(f'Completed: {successes}/{len(cases)} successes ({metrics["success_rate"]:.1f}%).')
 record_status('succeeded', successes=successes, cases=len(cases), success_rate=metrics['success_rate'])
 terminal = True
