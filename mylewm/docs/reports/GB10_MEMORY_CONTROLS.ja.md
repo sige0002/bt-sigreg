@@ -59,6 +59,8 @@ GPU allocatorの最大予約量はPushTが約22.9〜23.4GiB、LIBEROが約25.4Gi
 
 PushTの`--no-pin-memory`は固定host領域の保持を減らすが、workerが先読みする画像のRAM自体は引き続き必要になる。メモリ総量の低下と、ページを移動可能にする効果を今回の試験だけで数量分解してはいない。最小worker数・最小pin削減量、長時間の性能・安定性も未測定である。
 
+無効化にはデータ転送待ちが増えて学習速度が下がる可能性がある。一般的なデメリットと、このGB10で速度差をまだ確定していない点は[学習手順のpin-memory説明](../TRAINING.ja.md#pin-memory-tradeoffs)に記載した。本試験のwall timeや異なる同時稼働区間を、そのまま速度比較として使わない。
+
 このPyTorch環境では、反復中のhost統計`allocated_bytes.current`が`reserved_bytes.current`や物理RAM量を超えて増える記録があった。一方で予約量と`num_host_alloc`は安定していた。このactiveカウンタを実使用量やリークの証拠にせず、reservedとプロセス・システム観測を使用した。raw値は証拠に保持している。`VmPin`／`VmLck`が0でも固定メモリなしとは判断できないことは[単一バッファ実測](LIBERO_BC.ja.md#memory-attribution)で確認済み。
 
 ## 比較の限界と本学習の状態

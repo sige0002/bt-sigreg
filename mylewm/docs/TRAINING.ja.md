@@ -481,6 +481,12 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 2026-09-10の高速化：新PushTのGPU用DataLoaderは既定で`pin_memory`を使います。無効化する場合は`--no-pin-memory`を指定し、Raw／BTで設定を揃えてください。射影乱数のカウンタはCPUの整数としてcheckpointに保存し、毎更新のGPU同期を減らします。BTはCUDA上で同じ次元のCayley行列を一括計算します。バッチサイズ・射影数・損失・決定論設定・ログ頻度は変更しません。
 
+<a id="pin-memory-tradeoffs"></a>
+
+`--no-pin-memory`は、この学習CLIでDataLoaderの`pin_memory=False`を指定するオプションです。無効化の主なデメリットは、GPUへのデータ転送待ちが増え、学習の更新速度が下がる可能性があることです。一般的なCUDA転送では通常のCPUメモリからの転送に一時的な固定バッファへのコピーが必要になり、固定メモリと別streamを使った転送・計算の重ね合わせによる利点も得られません。実際の影響はハードウェアと転送実装に依存します。[PyTorch 2.9 DataLoader](https://docs.pytorch.org/docs/2.9/data.html#memory-pinning)・[公式転送チュートリアル](https://docs.pytorch.org/tutorials/intermediate/pinmem_nonblock.html)の一般的な説明を2026-09-11に確認しました。このGB10の共有メモリ構成で必ず遅くなる、という実測結果ではありません。
+
+無効にしてもGPUで学習し、画像解像度・dtype・バッチサイズ・モデル・損失を下げる設定ではありません。ただし、学習結果の完全一致や長時間の性能を今回検証したわけではありません。先読み画像用の通常RAMは引き続き使い、CUDA内部の一時確保まで全てなくす設定でもありません。下記の対照試験はOOM切り分けが目的で、開始時の物理メモリ配置や同時稼働区間も異なるため、所要時間からpin無効化だけの速度差を断定しません。**このPCで何％速い／遅いかの厳密な比較は未実施です。**
+
 固定CPUメモリと先読み画像にもRAMを使います。このPCではPushTのbatch256の画像588MiBをpinすると1GiBの確保になり、workers8・既定prefetch2の16枠が全てpin済みなら画像だけで約16GiBになります（1バッチ実測からの計算値で、総使用量や常時使用量ではありません）。上の本学習例のbatch128／workers4とは別条件です。GB10での併走時はGPUの使用量だけでなく、固定CPUメモリの保持量も確認してください。停止済みrunの再開条件は変更せず、調整は別の診断条件として扱います。[実測・原因切り分け](reports/LIBERO_BC.ja.md#memory-attribution)。
 
 2026-09-11の対照試験では、このbatch256／workers8のPushTで固定host予約量約16GiBを実測しました。LIBERO（batch128／workers4、GPU予約約25.4GiB）との併走で新規CUDA初期化OOMが再現し、PushTだけ`--no-pin-memory`にした条件では観測中の失敗がなく、有効に戻すと再発しました。利用可能RAMが約40GiBあっても連続領域を確保できない場合があります。短期試験の結果であり、長時間の再発防止保証ではありません。[対照条件・結果](reports/GB10_MEMORY_CONTROLS.ja.md)。
