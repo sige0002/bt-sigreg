@@ -481,6 +481,8 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 2026-09-10の高速化：新PushTのGPU用DataLoaderは既定で`pin_memory`を使います。無効化する場合は`--no-pin-memory`を指定し、Raw／BTで設定を揃えてください。射影乱数のカウンタはCPUの整数としてcheckpointに保存し、毎更新のGPU同期を減らします。BTはCUDA上で同じ次元のCayley行列を一括計算します。バッチサイズ・射影数・損失・決定論設定・ログ頻度は変更しません。
 
+固定CPUメモリと先読み画像にもRAMを使います。このPCではPushTのbatch256の画像588MiBをpinすると1GiBの確保になり、workers8・既定prefetch2の16枠が全てpin済みなら画像だけで約16GiBになります（1バッチ実測からの計算値で、総使用量や常時使用量ではありません）。上の本学習例のbatch128／workers4とは別条件です。GB10での併走時はGPUの使用量だけでなく、固定CPUメモリの保持量も確認してください。停止済みrunの再開条件は変更せず、調整は別の診断条件として扱います。[実測・原因切り分け](reports/LIBERO_BC.ja.md#memory-attribution)。
+
 ソースと乱数カウンタの保存形式が変わるため、**変更前runの厳密再開は変更前のコードで行います**。保存済みconfigや照合条件を変更して再開しないでください。[高速化の計測・検証記録](reports/TRAINING_SPEED_20260910.ja.md)を参照してください。
 
 <a id="hdf5-libero-training"></a>

@@ -118,6 +118,48 @@ MLPとBTの確認はユーザーの「まだ再実行しなくていい」が届
 
 証拠は同じ診断ディレクトリの`recovery_125512/`です。`before_stop.json`、`stop_actions.json`、`checkpoint_verification.json`、`results.json`、`after_recovery.json`と各実行ログを保持しています。LIBERO停止時にsystemdはcontrol groupのkillについて`Invalid argument`を1件記録しましたが、その後の実PID・worker・GPU compute process一覧で残留なしを確認しました。
 
+<a id="memory-attribution"></a>
+
+### LIBERO追加との因果関係と固定メモリの確認（同日追記）
+
+「後から起動したLIBEROが原因では」という依頼について、**LIBERO追加によるメモリ負荷増は確認できましたが、LIBERO単独の問題とは特定できませんでした。PushT側に大きな固定メモリ負荷があることを追加で実測しました。** 両本学習は停止したまま、保存済み記録・ソースの照合、CPUで各データの1clip読込、モデルなしの固定CPUバッファ確保だけを行いました。
+
+時系列は次の通りです。
+
+| JST | 記録 |
+|---|---|
+| 11:02:29 | PushTに加えてLIBEROの本学習を起動 |
+| 11:03:29 | LIBEROの最初の更新。Torch GPU peak 26,934,989,312 bytes（25.09 GiB） |
+| 11:19:02 | 別プロセスのBC GPUテストが1件合格、16.88秒 |
+| 11:31:50 | Playwrightによるviewer確認の最初のHTTPアクセス |
+| 11:31:51 | 調査したkernel log内の最初のmain context OOM |
+
+LIBEROのGPU peakは1〜2,351更新の全記録で同じでした。起動直後から新規CUDAプロセスが全て失敗したわけではなく、GPU peakが継続増大した証拠もありません。ただしpeak allocatedだけでは、予約メモリ・固定CPUメモリ・物理配置の変化を追跡できず、全種のメモリリーク不在を証明しません。最初のOOMはブラウザ起動と重なりますが、ブラウザが断片化を作ったか、既存状態を顕在化させたかもこの時系列だけでは分かりません。
+
+両runのconfigに記録された`training/train.py`・`training/train_libero.py`・`training/loop.py`のhashは、今回調査したソースと一致しました。実データのCPU読込で形状・dtypeを確認し、各runと同じ1バッチ分の画像を`torch.empty(..., device='cpu', pin_memory=True)`で確保しました。CUDAの初期化は使いますが、モデル・DataLoader worker・GPUへの画像転送・逆伝播・optimizer更新は含みません。
+
+| 画像の負荷要因 | PushT本学習の設定 | LIBERO本学習の設定 |
+|---|---:|---:|
+| batch / workers | 256 / 8 | 128 / 4 |
+| CPU上の画像 | 4フレーム、224×224、float32 | 4フレーム×2カメラ、128×128、uint8 |
+| 1バッチの画像payload | 588 MiB | 48 MiB |
+| 1バッチの固定メモリ確保実測 | **1 GiB** | **64 MiB** |
+| 既定prefetch=2による先読み枠 | 16バッチ | 8バッチ |
+| 全先読み枠がpin済みの場合の画像確保量（計算値） | 約16 GiB | 約0.5 GiB |
+| 停止直前の親PIDのRssShmem（実測） | 10.18 GiB | 0.43 GiB |
+
+最後から2行目は1バッチ実測からの計算であり、停止前に全枠がpin済みだったという測定ではありません。現在処理中のバッチ・validation・allocatorの未使用cache等を含む総上限でもありません。RssShmemも全てをpin-memoryへ分類した値ではなく、GPU観測値やシステムcacheと単純加算しません。
+
+PyTorchの固定メモリallocatorは要求を2の累乗へ切り上げます。インストール済みヘッダと[PyTorch v2.9.1の処理](https://github.com/pytorch/pytorch/blob/v2.9.1/aten/src/ATen/core/CachingHostAllocator.h)を照合し、[host_memory_stats](https://docs.pytorch.org/docs/2.9/generated/torch.cuda.memory.host_memory_stats.html)で上記1GiB／64MiBを実測しました。各バッファを削除してGCした後も、activeは0になる一方、reservedは同量のままで`num_host_free=0`でした。プロセス内の再利用cacheとして保持されます。両診断プロセスは終了コード0（1.66秒／1.20秒）で終了し、確保領域もプロセス終了で解放しました。
+
+さらに**固定メモリを確保した診断プロセスでもVmPin・VmLckは0**でした。この環境では、それらの0だけを根拠にpin-memoryなしとは判断できません。以前の停止前snapshotでも両PIDのVmPin・VmLckは0ですが、固定CPUメモリの寄与を除外できません。
+
+現時点の作業仮説は、**PushTの大きな画像先読み・固定メモリ保持に、LIBEROの約25GiBのGPU確保が加わり、両者の併走中に連続空き領域が不足した**というものです。起動順だけからLIBERO実装のバグと結論付けず、これを因果の完全特定とも呼びません。2本を同時に止めたため、停止による回復だけでは片方の寄与を分離できません。
+
+完全な切り分けに残る条件は、各学習の単独動作と併走、同じ計画予算でPushTの先読み／pin-memoryを変えた対照です。その場合はdeviceのallocated/reservedとhostのallocated/reserved、buddyinfo、独立したCUDA初期化の可否を同時に記録します。**これらの学習試験は今回未実行・未予約です。** 元runの再開条件を変更したり、source/config照合を解除したりはしません。
+
+追加証拠は`memory_diagnosis_20260911/attribution_20260911/`の`summary.json`、`batch_payloads.json`、`config_comparison.json`、`kernel_context_errors.json`、`libero_timed_steps.json`、`pin_allocation_probe.py`と各`pin_*.log`です。解析途中の補助スクリプトに出力フォルダ作成順・JSON型の扱いの失敗があり、修正後の出力を保存しました。メモリ確保の診断自体は両方正常終了しています。終了後も元PIDなし・GPU compute processなし・LIBERO service inactiveを確認しました。
+
 先に行ったCPUの実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
 
 実環境の最終記録は`output/libero10/bc_implementation_check/eval_native_task0/`。9行動では未成功（0/1）で、環境ループ約3.20秒、CPU方策生成2回の合計約1.59秒です。短期checkpoint・短い予算の接続確認であり、成功率や実機制御Hzの評価ではありません。方策への入力は現在画像・タスクIDのみで、成功デモ画像は表示だけに使います。
