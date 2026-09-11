@@ -46,6 +46,33 @@ NVIDIAも[容量内で起きるUMA／cache関連のメモリ問題](https://nvid
 
 証拠は`output/libero10/bc_implementation_check/memory_diagnosis_20260911/`のprobe、JSON行付きログ、kernel log、buddyinfo、参照した同版ドライバソースに保存しました。RAMの余裕は同一GPU併走の必要条件ですが、GB10では新規CUDAコンテキストが作れるかも別途確認します。
 
+### 追加の原因調査：CUDA Driver APIと要求サイズ
+
+ユーザーの追加調査依頼に従い、PyTorchを一切importせず`libcuda.so.1`へ直接問い合わせました。**新規CUDAコンテキストの初期化に必要な連続メモリを確保できないこと**が失敗原因と判断できます。RAM総容量やBC計算量による不足ではありません。
+
+| 実測した呼び出し・状態 | 結果 |
+|---|---|
+| `cuInit(0)` | CUDA_SUCCESS |
+| `cuDeviceGetCount` | CUDA_SUCCESS、1 GPU |
+| `cuDevicePrimaryCtxRetain` | CUDA_ERROR_OUT_OF_MEMORY（2） |
+| RMのgraphics engine contextサイズ照会（`0x801707`、engine 0） | NV_OK、基本サイズ1,145,600 bytes、alignment 4,096 |
+| 最大subcontext数照会（`0x20801201`、info index `0x2c`） | NV_OK、64 |
+| CUDA計算オブジェクトclass `0xcec0` のRM allocation | NV_ERR_NO_MEMORY（`0x51`） |
+| 失敗区間の`/proc/vmstat`差分 | compact_stall +3、compact_fail +3、compact_success +0、allocstall_normal +2 |
+| 同時点のNormal zone空きブロック | order 9以上が0（2MiB以上なし） |
+
+診断プロセスだけに`LD_PRELOAD`で`ioctl`記録を加え、元の要求を変更せず、同プロセスが所有するdevice/subdevice handleへの読み取り専用照会を追加しました。既存学習プロセスへのattachや照会はしていません。サイズ照会だけなら終了コード0、コンテキスト作成まで進むと終了コード2で再現します。`cuInit`成功だけをコンテキスト作成成功と扱いません。
+
+要求サイズと失敗の対応は次の通りです。
+
+1. ドライバ580.95.05の`kgraphicsGetMainCtxBufferSize`は基本サイズからmain contextを構成します。subcontext headerを含める経路では`align_up(1,145,600,4096) + 4096×64 = 1,409,024 bytes`です。ヘッダ有無にかかわらず1MiBを超え2MiB以下です。[同版ソース](https://github.com/NVIDIA/open-gpu-kernel-modules/blob/580.95.05/src/nvidia/src/kernel/gpu/gr/kernel_graphics.c#L1705)
+2. `kgraphicsShouldForceMainCtxContiguity`はtrueを返します。Linux側の`nv_alloc_contig_pages`は`get_order(page_count×PAGE_SIZE)`で切り上げて`__get_free_pages`を呼ぶため、このサイズは**order 9＝2MiBの連続領域**を必要とします。[Linux側ソース](https://github.com/NVIDIA/open-gpu-kernel-modules/blob/580.95.05/kernel-open/nvidia/nv-vm.c#L358)
+3. その空きブロックがなく、失敗区間では連続空き領域を作るcompactionも成功していません。先の約6GiBの部分cache解放でもNormal zoneのorder 9以上は増えず、同じ失敗が続きました。
+
+`vmstat`はシステム全体のカウンタなので、3件全てを診断プロセスに帰属させたカーネルトレースとは区別します。どの常駐・移動不能ページが断片化を固定しているか、既存GPU allocationとpin-memoryの寄与の内訳は未特定です。CMAやBC実装を単独原因と断定しません。BPF/perfによる割当引数・戻り値の直接追跡は管理者権限が必要で、このセッションの`sudo -n`では実行できませんでした。
+
+主な追加証拠は同じ診断ディレクトリの`driver_probe.py`、`trace_ioctl.c`、`driver_probe_compaction.log`、`ioctl_trace_compaction.log`、`ioctl_query_only.log`です。shared libraryはその場で`cc -shared -fPIC ... -ldl`により作成した診断専用物で、学習環境へ導入していません。診断後もPushTとLIBEROの元PID・更新進行を確認しました。解消のためのOS設定変更、手動compaction、学習停止・再起動、ドライバ更新は未実施です。
+
 実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
 
 実環境の最終記録は`output/libero10/bc_implementation_check/eval_native_task0/`。9行動では未成功（0/1）で、環境ループ約3.20秒、CPU方策生成2回の合計約1.59秒です。短期checkpoint・短い予算の接続確認であり、成功率や実機制御Hzの評価ではありません。方策への入力は現在画像・タスクIDのみで、成功デモ画像は表示だけに使います。
