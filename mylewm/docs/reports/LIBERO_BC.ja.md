@@ -156,7 +156,7 @@ PyTorchの固定メモリallocatorは要求を2の累乗へ切り上げます。
 
 現時点の作業仮説は、**PushTの大きな画像先読み・固定メモリ保持に、LIBEROの約25GiBのGPU確保が加わり、両者の併走中に連続空き領域が不足した**というものです。起動順だけからLIBERO実装のバグと結論付けず、これを因果の完全特定とも呼びません。2本を同時に止めたため、停止による回復だけでは片方の寄与を分離できません。
 
-完全な切り分けに残る条件は、各学習の単独動作と併走、同じ計画予算でPushTの先読み／pin-memoryを変えた対照です。その場合はdeviceのallocated/reservedとhostのallocated/reserved、buddyinfo、独立したCUDA初期化の可否を同時に記録します。**これらの学習試験は今回未実行・未予約です。** 元runの再開条件を変更したり、source/config照合を解除したりはしません。
+この調査時点で残った条件は、各学習の単独動作と併走、同じ計画予算でPushTの先読み／pin-memoryを変えた対照でした。**この時点では未実行・未予約で、同日後続のユーザー依頼により別runの対照試験を実施しました。** 併走時の同じOOM、LIBEROだけの停止による回復、PushTのpin-memory無効時の不発と再有効化時の再発を確認しています。[対照試験の条件・実測・限界](GB10_MEMORY_CONTROLS.ja.md)を参照してください。元runの再開条件やsource/config照合は変更していません。
 
 追加証拠は`memory_diagnosis_20260911/attribution_20260911/`の`summary.json`、`batch_payloads.json`、`config_comparison.json`、`kernel_context_errors.json`、`libero_timed_steps.json`、`pin_allocation_probe.py`と各`pin_*.log`です。解析途中の補助スクリプトに出力フォルダ作成順・JSON型の扱いの失敗があり、修正後の出力を保存しました。メモリ確保の診断自体は両方正常終了しています。終了後も元PIDなし・GPU compute processなし・LIBERO service inactiveを確認しました。
 

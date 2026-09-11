@@ -483,6 +483,8 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 固定CPUメモリと先読み画像にもRAMを使います。このPCではPushTのbatch256の画像588MiBをpinすると1GiBの確保になり、workers8・既定prefetch2の16枠が全てpin済みなら画像だけで約16GiBになります（1バッチ実測からの計算値で、総使用量や常時使用量ではありません）。上の本学習例のbatch128／workers4とは別条件です。GB10での併走時はGPUの使用量だけでなく、固定CPUメモリの保持量も確認してください。停止済みrunの再開条件は変更せず、調整は別の診断条件として扱います。[実測・原因切り分け](reports/LIBERO_BC.ja.md#memory-attribution)。
 
+2026-09-11の対照試験では、このbatch256／workers8のPushTで固定host予約量約16GiBを実測しました。LIBERO（batch128／workers4、GPU予約約25.4GiB）との併走で新規CUDA初期化OOMが再現し、PushTだけ`--no-pin-memory`にした条件では観測中の失敗がなく、有効に戻すと再発しました。利用可能RAMが約40GiBあっても連続領域を確保できない場合があります。短期試験の結果であり、長時間の再発防止保証ではありません。[対照条件・結果](reports/GB10_MEMORY_CONTROLS.ja.md)。
+
 ソースと乱数カウンタの保存形式が変わるため、**変更前runの厳密再開は変更前のコードで行います**。保存済みconfigや照合条件を変更して再開しないでください。[高速化の計測・検証記録](reports/TRAINING_SPEED_20260910.ja.md)を参照してください。
 
 <a id="hdf5-libero-training"></a>
