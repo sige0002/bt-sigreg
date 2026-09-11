@@ -108,6 +108,7 @@ if not args.execute:
     sys.exit(0)
 output.mkdir(parents=True, exist_ok=False)
 terminal = False
+exit_details = {}
 def record_status(state, **details):
     record = dict(state=state, updated_at=datetime.now(timezone.utc).isoformat(),
                   pid=os.getpid(), checkpoint=str(checkpoint), **details)
@@ -116,7 +117,7 @@ def record_status(state, **details):
     temporary.replace(output/'status.json')
 def unfinished_exit():
     if not terminal:
-        record_status('failed', reason='Launcher exited before validated completion; inspect console.log and service status')
+        record_status('failed', **exit_details, reason='Launcher exited before validated completion; inspect console.log and service status')
 atexit.register(unfinished_exit)
 record_status('running')
 (output/'checkpoint_object.ckpt').symlink_to(checkpoint)
@@ -162,8 +163,27 @@ if abs(metrics['success_rate'] - 100*successes/len(cases)) > 1e-6:
     raise ValueError('Reported success rate differs from case flags')
 from mylewm.evaluation.pusht_result_table import append_trial_table
 append_trial_table(output)
-print(f'Completed: {successes}/{len(cases)} successes ({metrics["success_rate"]:.1f}%).')
-record_status('succeeded', successes=successes, cases=len(cases), success_rate=metrics['success_rate'])
+summary = dict(successes=successes, cases=len(cases), success_rate=metrics['success_rate'])
+exit_details = dict(phase='visual_report', evaluation_verified=True, **summary)
+record_status('running', **exit_details)
+def report_progress(message):
+    print(message, flush=True)
+    with (output/'console.log').open('a') as stream:
+        stream.write(message + '\n')
+report_progress('Building visual report: verified goal images, videos, and numbered trial outcomes')
+try:
+    from mylewm.evaluation.build_pusht_ui import build
+    report = build(output, output/'viewer')
+except Exception as error:
+    record_status('failed', **exit_details, reason=f'Visual report failed: {error}')
+    terminal = True
+    report_progress(f'Visual report failed; evaluation records retained: {error}')
+    raise
+with (output/'results.txt').open('a') as stream:
+    stream.write('\nVisual report: viewer/index.html\n')
+report_progress(f'Visual report: {report["index"]}')
+record_status('succeeded', **summary, visual_report='viewer/index.html')
 terminal = True
+print(f'Completed: {successes}/{len(cases)} successes ({metrics["success_rate"]:.1f}%).')
 print('This is a fixed-case checkpoint evaluation, not a guarantee or a matched-training-budget comparison.')
 PY

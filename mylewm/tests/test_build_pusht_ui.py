@@ -103,3 +103,22 @@ def test_rejects_outcome_that_only_occurs_after_masking(evaluation, tmp_path):
     with pytest.raises(ValueError, match='reconstructed success'):
         build(evaluation, tmp_path / 'invalid')
     assert not (tmp_path / 'invalid').exists()
+
+
+@pytest.mark.parametrize('state', ['running', 'failed'])
+def test_verified_report_phase_can_build_without_rerunning_evaluation(evaluation, tmp_path, state):
+    path = evaluation / 'status.json'
+    status = json.loads(path.read_text())
+    status.update(state=state, phase='visual_report', evaluation_verified=True)
+    path.write_text(json.dumps(status))
+    assert build(evaluation, tmp_path/'ui')['successes'] == 1
+
+
+def test_unfinished_evaluation_cannot_publish_report(evaluation, tmp_path):
+    path = evaluation / 'status.json'
+    status = json.loads(path.read_text())
+    status.update(state='running', phase='visual_report')
+    path.write_text(json.dumps(status))
+    with pytest.raises(ValueError, match='verified complete results'):
+        build(evaluation, tmp_path/'ui')
+    assert not (tmp_path/'ui').exists()

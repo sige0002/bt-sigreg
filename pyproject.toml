@@ -10,6 +10,8 @@ dependencies = [
     "torchvision==0.24.1",
     # Existing trusted object checkpoints serialize Transformers 4.x ViT classes.
     "transformers==4.57.6",
+    # Decode evaluation videos for the automatically generated goal viewer.
+    "av==15.1.0",
 ]
 
 [dependency-groups]

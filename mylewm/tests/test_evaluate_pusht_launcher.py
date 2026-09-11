@@ -88,10 +88,26 @@ def test_external_dataset_and_relocation(launch_fixture):
     assert not output.exists()
 
 
-@pytest.mark.parametrize('returncode',[0,1])
-def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,returncode,capsys):
+@pytest.mark.parametrize('failure',[None, 'evaluator', 'viewer'])
+def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,failure,capsys):
     # Exercise launch/log/result handling without starting a real GPU process.
     root,manifest,output,command=launch_fixture
+    returncode = int(failure == 'evaluator')
+    from mylewm.evaluation import build_pusht_ui
+    report_calls = []
+    def fake_build(evaluation, viewer):
+        report_calls.append(evaluation)
+        state = json.loads((output/'status.json').read_text())
+        assert state['state'] == 'running' and state['phase'] == 'visual_report'
+        assert state['evaluation_verified'] is True
+        assert state['successes'] == 50
+        assert evaluation == output and viewer == output/'viewer'
+        if failure == 'viewer':
+            raise ValueError('injected goal hash mismatch')
+        viewer.mkdir()
+        (viewer/'index.html').write_text('verified visual report fixture')
+        return {'index': str(viewer/'index.html')}
+    monkeypatch.setattr(build_pusht_ui, 'build', fake_build)
     source=Path(command[1]).read_text().split("<<'PY'\n",1)[1].rsplit('\nPY',1)[0]
     monkeypatch.setattr(sys,'argv',['-',str(root),*command[2:],'--execute'])
     def fake_run(cmd,**kwargs):
@@ -127,12 +143,29 @@ def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,re
         captured = capsys.readouterr()
         assert 'Evaluation failed' in captured.err
         assert 'mock evaluator only' in captured.out
+    elif failure == 'viewer':
+        with pytest.raises(ValueError, match='injected goal hash mismatch'):
+            exec(compile(source,'<launcher>','exec'),namespace)
+        assert (output/'results.txt.json').exists()
+        assert not (output/'viewer/index.html').exists()
+        captured = capsys.readouterr()
+        assert 'Completed:' not in captured.out
+        assert 'Visual report failed' in captured.out
     else:
         exec(compile(source,'<launcher>','exec'),namespace)
         captured = capsys.readouterr()
         assert 'Completed: 50/50 successes' in captured.out
         assert 'mock evaluator only' in captured.out
+        assert 'Visual report:' in captured.out
+        assert (output/'viewer/index.html').is_file()
+        assert 'Visual report: viewer/index.html' in (output/'results.txt').read_text()
     assert 'mock evaluator only' in (output/'console.log').read_text()
     namespace['unfinished_exit']()
     atexit.unregister(namespace['unfinished_exit'])
-    assert json.loads((output/'status.json').read_text())['state'] == ('failed' if returncode else 'succeeded')
+    state = json.loads((output/'status.json').read_text())
+    assert state['state'] == ('failed' if failure else 'succeeded')
+    assert len(report_calls) == (0 if failure == 'evaluator' else 1)
+    if failure == 'viewer':
+        assert state['phase'] == 'visual_report' and state['evaluation_verified'] is True
+    elif failure is None:
+        assert state['visual_report'] == 'viewer/index.html'

@@ -40,8 +40,13 @@ def build(evaluation, output):
     result_path = evaluation / 'results.txt.json'
     result = json.loads(result_path.read_text())
     status = json.loads((evaluation / 'status.json').read_text())
-    if status['state'] != 'succeeded':
-        raise ValueError('Evaluation must have succeeded')
+    # The launcher publishes final success only after the visual report exists.
+    # A failed report phase can also be retried from verified evaluation records.
+    verified_report_phase = (status['state'] in ('running', 'failed')
+                             and status.get('phase') == 'visual_report'
+                             and status.get('evaluation_verified') is True)
+    if status['state'] != 'succeeded' and not verified_report_phase:
+        raise ValueError('Evaluation must have verified complete results')
     if result['config']['world']['env_name'] != 'swm/PushT-v1':
         raise ValueError('This viewer only supports the audited SWM PushT protocol')
     n = len(result['episodes'])

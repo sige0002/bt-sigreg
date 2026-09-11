@@ -143,7 +143,7 @@ tail -f output/pusht/eval_bt_100000_50/console.log
 
 ### 6. 終了と結果を確認する
 
-正常終了すると`Completed: 成功数/ケース数 successes (...)`を表示します。`echo $?`を実行**直後**に確認すると終了コードで、0が正常です。ログのエラーも確認してください。
+通常の`--execute`は、CEM評価と結果検証に続けて正解画像付きの比較画面を自動生成します。端末と`console.log`へ`Visual report: .../viewer/index.html`を表示し、画面の保存後に`Completed: 成功数/ケース数 successes (...)`を表示します。`echo $?`を実行**直後**に確認すると終了コードで、0が正常です。ログのエラーも確認してください。
 
 ```bash
 tail -n 12 output/pusht/eval_bt_100000_50/console.log
@@ -153,11 +153,13 @@ uv run python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/
 | ファイル | 内容 |
 |---|---|
 | `launch.json` | 引数、launcher・重み・manifestのSHA256 |
-| `status.json` | launcherのrunning/succeeded/failed。succeededは結果の整合性検査後だけ。SIGKILL等では更新できないため、実プロセスの終了と結果も手動確認 |
+| `status.json` | launcherのrunning/succeeded/failed。succeededは結果検証と比較画面保存の完了後。画面生成中はrunningかつphase=visual_report。SIGKILL等では更新できないため、実プロセスの終了と結果も手動確認 |
 | `console.log` | 起動、CEM時間、例外、正常評価完了時のPyTorchメモリpeak |
 | `results.txt.json` | 成功/失敗、成功率、ケース・実行監査・設定 |
 | `results.txt` | 人間向け設定と結果 |
 | `env_N.mp4` | 実行動画 |
+| `viewer/index.html` | 自動生成する正解画像・動画・判定時点・試行番号付き比較画面。ブラウザで開く |
+| `viewer/assets/`・`viewer/report.json` | 画像・動画のコピーと各stepの判定数値 |
 | `cem_audit.jsonl` | `--cem-audit`指定時の候補正規化前後・選択plan・予測costの診断 |
 | `checkpoint_object.ckpt` | 元checkpointへのリンク。複製ではない |
 
@@ -173,7 +175,11 @@ uv run python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/
 
 各有効stepで、操作点と物体の位置4成分のずれの距離が20未満、かつ物体の角度差が20度未満なら成功です。位置は512×512の環境座標で、表示画像上の20ピクセルという意味ではありません。両条件を同時に一度満たせば成功として記録します。操作点の位置も必要で、速度はこの成功条件に含みません。固定T字への95%被覆率とは別の評価です。
 
-保存済み評価から、正解画像・元動画・判定時点・数値を並べたHTMLを作れます。CEMや物理環境を再実行せず、開始／Goalの画像・状態を評価時のhashと照合し、全成功フラグを保存状態から再計算します。データ全量のhash走査はしません。
+通常の評価コマンドは、正解画像・元動画・判定時点・数値を並べたHTMLを**評価出力先の`viewer/index.html`へ自動保存**します。別コマンドは不要です。CEMや物理環境を再実行せず、開始／Goalの画像・状態を評価時のhashと照合し、全成功フラグを保存状態から再計算します。データ全量のhash走査はしません。
+
+画面生成だけが失敗した場合は、`status.json`の`phase=visual_report`・`evaluation_verified=true`とエラーを確認します。評価結果は保持されるので、下の単独生成コマンドを未使用の出力先へ実行できます。CEM評価を再実行する必要はありません。
+
+既存の評価へ画面を追加したい場合だけ、次の単独生成コマンドを使います。
 
 ```bash
 uv run --no-sync python -m mylewm.evaluation.build_pusht_ui \
