@@ -28,6 +28,24 @@ TC-LeWM v3の[付録A.1](https://arxiv.org/html/2607.26924v3#A1.SS1)を確認。
 
 最終確認で`--deterministic`用のcuBLAS設定も共有学習ループと揃えました。ただし決定論モードの追加GPU試験は、モデルをCUDAへ転送する段階でメモリ不足となり未検証です（`/tmp/bt-libero-bc-gpu-deterministic-test.log`）。先の通常GPU試験1合格と区別します。2本の本学習は稼働継続を確認し、停止や全体cache解放はしていません。
 
+### GPU試験のOOMを追加診断（同日）
+
+「RAM容量が足りない」という説明は不正確でした。**モデルを作らず、決定論モードも使わない新規プロセスの`torch.cuda.mem_get_info()`だけで再現**しました。CUDAコンテキストの初期化バッファ確保が失敗しており、BCの重み・活性・逆伝播が消費する容量によるOOMとは区別します。
+
+| 実測 | 対象cache解放前 | 解放直後 |
+|---|---:|---:|
+| MemAvailable | 40.38 GiB | 40.64 GiB |
+| MemFree | 1.62 GiB | 7.79 GiB |
+| Cached（Shmemを含む） | 57.71 GiB | 51.68 GiB |
+
+既存PushT HDF5の先頭8GiB範囲だけへ`POSIX_FADV_DONTNEED`を明示的に実行し、約6GiBのclean file cacheを解放しました。ファイルのsize・mtimeは不変です。解放後もモデルなしのCUDA初期化は同じエラーとなり、単なるcache量だけでは解消しませんでした。共有`.venv`の更新、全体`drop_caches`、OS設定変更、本学習の停止はしていません。
+
+ドライバ580.95.05のkernel logは`kgrctxAllocMainCtxBuffer`→`kernel_graphics_context.c:1178`で`NV_ERR_NO_MEMORY`を記録。該当版の[コンテキスト確保処理](https://github.com/NVIDIA/open-gpu-kernel-modules/blob/580.95.05/src/nvidia/src/kernel/gpu/gr/kernel_graphics_context.c#L1115)と[HAL定義](https://github.com/NVIDIA/open-gpu-kernel-modules/blob/580.95.05/src/nvidia/generated/g_kernel_graphics_nvoc.h#L862)はmain contextに連続領域を要求しています。解放直後の`/proc/buddyinfo`ではNormal zoneのorder 9以上が0（4KiB pageなので2MiB以上の空きブロックなし）。**物理メモリの断片化による確保失敗が有力ですが、失敗要求の実サイズ・割当経路の直接トレースは未実施で、根本原因を完全確定したとはしません。** CMA空き約1.78MiBも観測しましたが、それが当該要求の原因とは断定しません。プロセスのcgroupにmemory.max/high上限はありませんでした。
+
+NVIDIAも[容量内で起きるUMA／cache関連のメモリ問題](https://nvidia.custhelp.com/app/answers/detail/a_id/5776)を案内しています。ただし今回の部分cache解放は不成功で、この一般的案内だけから原因確定・解消済みとはしません。検証結果は引き続き「通常BC GPU試験1合格、追加の決定論GPU試験は初期化で未検証」です。
+
+証拠は`output/libero10/bc_implementation_check/memory_diagnosis_20260911/`のprobe、JSON行付きログ、kernel log、buddyinfo、参照した同版ドライバソースに保存しました。RAMの余裕は同一GPU併走の必要条件ですが、GB10では新規CUDAコンテキストが作れるかも別途確認します。
+
 実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
 
 実環境の最終記録は`output/libero10/bc_implementation_check/eval_native_task0/`。9行動では未成功（0/1）で、環境ループ約3.20秒、CPU方策生成2回の合計約1.59秒です。短期checkpoint・短い予算の接続確認であり、成功率や実機制御Hzの評価ではありません。方策への入力は現在画像・タスクIDのみで、成功デモ画像は表示だけに使います。

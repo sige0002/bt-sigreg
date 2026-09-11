@@ -111,6 +111,8 @@ bash scripts/evaluate_pusht.sh \
 
 `--gb10-cache-workaround`はこのGB10の起動OOM対処です。**実行時だけ**対象PushT HDF5の読み取りcacheへ解放ヒントを出し、データ読込より先にCUDAを初期化します。データ削除、全体の`drop_caches`、モデルや学習条件の変更はしません。学習側の再読込で一時的に遅くなる可能性はあります。通常の別GPUではこのフラグを外せます。
 
+MemAvailableに余裕があってもCUDA初期化用バッファの確保に失敗する場合があります。2026-09-11には約40GiB available、対象cacheを約6GiB解放した後もモデルなしの初期化が失敗しました。連続領域の断片化が有力で、cache解放は万能ではありません。GPU計算前の失敗をモデルの必要RAMと混同せず、[診断記録](reports/LIBERO_BC.ja.md#gpu試験のoomを追加診断同日)のように初期化段階・kernel logも照合します。
+
 <a id="pusht-5-評価を実行しログを見る"></a>
 
 ### 5. 評価を実行し、ログを見る
