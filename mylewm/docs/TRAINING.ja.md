@@ -505,6 +505,8 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 2026-09-11追記：LIBEROの`train_libero.py`にも`--pin-memory`／`--no-pin-memory`を追加しました。新規学習で固定CPUメモリを使わない場合は`--no-pin-memory`を明示します。訓練DataLoaderへ適用し、従来から固定メモリを使わないvalidationはそのままです。`config.json`の`pin_memory`と起動ログの訓練・validationそれぞれの有効値を記録します。以下の新規例は固定メモリなしです。[速度面の注意](#pin-memory-tradeoffs)も参照してください。変更前runは開始時コード・設定でのみ厳密再開でき、新しい引数を足して照合を回避することはできません。
 
+同日15:38 JST、ユーザー依頼で`output/libero10/bt_no_pin_100k_s3072/`を新規100,000更新・batch128・workers4・固定メモリなしで起動しました。user serviceは`bt-libero10-no-pin-100k-s3072`です。21〜120更新の100件で平均1.220秒／更新を実測し、学習は継続中です。初回・保存・validationの追加時間はこの平均に含みません。既存の固定メモリ有効runとPushTは停止を維持しています。[開始条件・時間・監視方法](reports/LIBERO_NO_PIN_TRAINING.ja.md)。
+
 旧経路PushT BT v2の100,000更新は完了済みです。新経路Rawの100k完了という意味ではありません。以下は新規実験の手順で、文書整理を理由に学習を自動起動しません。既存の重み・出力を上書きしないでください。
 
 ### 0. 固定依存の環境を用意する

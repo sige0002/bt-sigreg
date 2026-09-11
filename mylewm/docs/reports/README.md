@@ -20,6 +20,8 @@
 | [LeRobot v3対応](LEROBOT_V3.ja.md) | HDF5との共存、形式間推論、実データBT100更新・保存再開・回帰確認 |
 | [ckpt／LeRobot Policy変換](POLICY_EXPORT.ja.md) | 共通CEM・config・コンバーター、実データ2episode／22時刻の行動一致 |
 | [LIBERO BC実装](LIBERO_BC.ja.md) | 凍結ViT方策の保存再開・native接続確認、依頼されたBT世界モデル100kの起動記録 |
+| [GB10メモリ対照試験](GB10_MEMORY_CONTROLS.ja.md) | PushT／LIBERO単独・併走・pin切替と新規CUDA context OOMの再現 |
+| [LIBERO固定メモリなしの本学習](LIBERO_NO_PIN_TRAINING.ja.md) | 新規BT100kの開始条件、pin切替の検証、1更新時間の実測 |
 | [学習高速化（2026-09-10）](TRAINING_SPEED_20260910.ja.md) | GB10での短期速度比較、同期・転送・任意コンパイル、依存版による差と再開検証 |
 | [実装・運用監査履歴](IMPLEMENTATION_AUDIT.ja.md) | 数学・接続・再開テスト、LIBERO短期診断、Issue対応、旧試作・失敗記録 |
 

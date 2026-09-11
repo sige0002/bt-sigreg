@@ -1,5 +1,7 @@
 # 検証状況と未完了事項
 
+2026-09-11 15:38 JST追記：LIBERO共有ループへpin-memory切替を追加。関連66テスト合格・スキップ0で、GPU／CPU・workers0／2・pin ON／OFFの実batchと保存再開一致、設定変更時の拒否を確認しました。ユーザー依頼で固定メモリなしのBT100kを別runで開始し、21〜120更新の平均1.220秒／更新を実測しました。旧LIBEROとPushTは停止維持、新runは継続中です。10万更新完了・制御性能の検証ではありません。[起動と計測](reports/LIBERO_NO_PIN_TRAINING.ja.md)。
+
 2026-09-11追記：LIBEROの凍結ViT＋タスクID付きflow BCを実装。実データ4更新・保存再開・native task 0の9行動／2chunk生成とviewerまで確認しました。CPU全回帰185合格・CUDA専用18スキップ、追加BC GPUテスト1合格。BC本学習・成功率比較は未実施です。別途ユーザー依頼でBT LIBERO世界モデルの100,000更新を同一GPU上に起動し、開始時ソースを固定してバックグラウンド実行中です。[手順](BEHAVIOR_CLONING.ja.md)・[検証と起動記録](reports/LIBERO_BC.ja.md)。
 
 2026-09-11：srcへの構成整理後、隔離環境の全回帰182合格・スキップ0。GPU・保存再開・LeRobot Policy・CLI・旧LIBERO object checkpointの読込を確認しました。長時間学習・制御成功率評価ではありません。[移行内容・検証記録](reports/CLEANUP.ja.md#src移行共通処理整理2026-09-11)。
