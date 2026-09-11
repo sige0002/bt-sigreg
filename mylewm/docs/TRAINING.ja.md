@@ -16,6 +16,41 @@ PushT／LIBEROでは、保存済みの途中checkpointも評価できます。[�
 
 一つのrunにHDF5とLeRobotを混ぜません。以下のコマンド例は必要なものだけを選び、学習を重複起動しないでください。`train.py`は既定dry-runで、`--execute`で学習を開始します。LIBEROの`train_libero.py train`はそのまま学習を開始します。
 
+### このPCのデータ場所を確認する（2026-09-11確認）
+
+現在のリポジトリは`/home/sadasue/bt-sigreg`、準備済みのPython環境はその直下の`.venv`です。取得済みデータとmanifestは以下にあります。パスはリポジトリ直下を基準にしています。
+
+| データ | 実データの場所 | 学習へ渡すmanifest |
+|---|---|---|
+| PushT HDF5（約46.3 GB） | `.cache/stable-wm/datasets/pusht_expert_train.h5` | `output/manifests/pusht/manifest.json` |
+| LIBERO-10（HDF5 10個） | `.cache/libero-datasets/libero_10/` | `output/manifests/libero10/manifest.json` |
+
+**場所の確認だけなら、次のブロックをそのまま実行してください。** 前の端末の環境変数に依存せず、manifestが指すファイルの存在・サイズ・更新時刻を確認します。データの全量hash計算、再取得、prepare、依存同期、学習は行いません。
+
+```bash
+cd /home/sadasue/bt-sigreg
+.venv/bin/python - <<'PYCODE'
+import json
+from pathlib import Path
+from mylewm.data.verification import verify_training_data
+
+for name in ("pusht", "libero10"):
+    path = Path("output/manifests") / name / "manifest.json"
+    manifest = json.loads(path.read_text())
+    verify_training_data(manifest, full=False)
+    print(f"{name}: OK — manifest={path.resolve()}")
+    if "files" in manifest:
+        print("  ファイル一覧:", manifest["dataset"])
+        print("  HDF5数:", len(manifest["files"]))
+        for entry in manifest["files"]:
+            print(" ", entry["path"])
+    else:
+        print("  HDF5:", manifest["dataset"])
+PYCODE
+```
+
+以前のLIBERO確認例にあった`/mnt/data/bt-sigreg-data/libero_10`は、このPCにはありません。`/mnt/data/robot datasets/...`も外部ストレージの書き方の例で、取得済みデータの場所ではありません。新しい端末で`PUSHT_MANIFEST`等が未設定だと、旧確認コマンドは空のパスを読み、`IsADirectoryError: '.'`等になります。まず上の確認を使い、学習コマンドを使う場合は該当章の変数設定から実行してください。
+
 <a id="lerobot-training"></a>
 <a id="lerobot-v3で学習する"></a>
 
@@ -27,14 +62,15 @@ HDF5とLeRobot v3は同じ`src/mylewm/training/train.py`を使い、manifestの`
 
 ### 1.1 環境を用意する
 
-まず専用環境を構築します。稼働中の環境には同期しません。
+このPCでは準備済みの標準環境`.venv`を選び、依存版を確認します。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-uv sync --locked --group lerobot --group libero
 uv run --no-sync python -c 'import importlib.metadata as m; print({n: m.version(n) for n in ["lerobot", "torch", "transformers", "av"]})'
 ```
+
+環境を初めて構築する場合だけ、リポジトリ直下で`uv sync --locked --group lerobot --group libero`を実行します。学習・評価で使用中の`.venv`では実行しません。
 
 ### 1.2 データを取得・指定し、manifestを作る
 
@@ -161,7 +197,6 @@ ckpt直接読込とLeRobot Policy形式のCEM行動一致は、[Policy変換・�
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-uv sync --locked --group libero --group lerobot
 uv run --no-sync python -c 'import torch, transformers; print("torch:", torch.__version__); print("transformers:", transformers.__version__)'
 ls -l "/usr/local/cuda-13.0/bin/ptxas"
 nvidia-smi
@@ -169,13 +204,15 @@ nvidia-smi
 
 以後の例も同じ端末で実行します。新しい端末やtmuxへ移った場合は、同じ`cd`と`export UV_PROJECT_ENVIRONMENT`、次節のデータ／manifestの`export`を設定し直してください。同期済み環境を使う各コマンドは`uv run --no-sync`としており、起動のたびに依存を変更しません。ここにあるコード例をまとめて実行する必要はありません。短期確認・本学習・再開は、それぞれ目的のrunだけを実行します。
 
+上は準備済み環境の確認です。初回構築が必要な場合だけ、学習・評価が動いていない状態で`uv sync --locked --group libero --group lerobot`を実行します。
+
 #### PushT HDF5が未取得の場合
 
 圧縮済みで約13.1GB、展開後は約46.3GBです。保存先と空き容量を確認してください。取得済みなら次節へ進みます。
 
 ```bash
-export BT_SIGREG_DATA_ROOT="/mnt/data/bt-sigreg-data"
-export PUSHT_HDF5="$BT_SIGREG_DATA_ROOT/pusht/pusht_expert_train.h5"
+export BT_SIGREG_DATA_ROOT="$PWD/.cache/stable-wm"
+export PUSHT_HDF5="$BT_SIGREG_DATA_ROOT/datasets/pusht_expert_train.h5"
 mkdir -p "$(dirname "$PUSHT_HDF5")"
 uv run --no-sync hf download quentinll/lewm-pusht --repo-type dataset \
   --local-dir "$BT_SIGREG_DATA_ROOT/pusht-source"
@@ -192,20 +229,14 @@ zstd -d --keep "$BT_SIGREG_DATA_ROOT/pusht-source/pusht_expert_train.h5.zst" \
 このPCにある既存PushTデータと既存manifestを使う例：
 
 ```bash
+cd /home/sadasue/bt-sigreg
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 export PUSHT_HDF5="$PWD/.cache/stable-wm/datasets/pusht_expert_train.h5"
 export PUSHT_MANIFEST="$PWD/output/manifests/pusht/manifest.json"
-ls -lh -- "$PUSHT_HDF5"
+ls -lh -- "$PUSHT_HDF5" "$PUSHT_MANIFEST"
 ```
 
-別ストレージに置いたデータで新規実験を始める例。空白を含むパスも必ず引用符で囲みます。こちらを使う場合は、上の2変数の代わりに以下を設定します。
-
-```bash
-export PUSHT_HDF5="/mnt/data/robot datasets/pusht_expert_train.h5"
-export PUSHT_MANIFEST="$PWD/output/manifests/pusht/external/manifest.json"
-ls -lh -- "$PUSHT_HDF5"
-```
-
-`/mnt/data/robot datasets/pusht_expert_train.h5`は外部ストレージの書き方の例なので、実際のファイルの場所に合わせます。ファイル名まで指定し、フォルダだけは渡しません。相対パスなら`export PUSHT_HDF5="./.cache/stable-wm/datasets/pusht_expert_train.h5"`とも書けます。`./`はリポジトリ直下が基準で、prepareが絶対パスに変換して記録します。データ未取得の場合は、前節の「PushT HDF5が未取得の場合」を先に実施します。
+別ストレージで新規実験を始める場合だけ、`PUSHT_HDF5`を実在するHDF5のパスへ、`PUSHT_MANIFEST`を新しいmanifestの保存先へ変更します。空白を含むパスは引用符で囲み、ファイル名まで指定してください。例えば`/mnt/data/robot datasets/pusht_expert_train.h5`は書き方の例であり、このPCにはありません。相対パスの`./`はリポジトリ直下が基準で、prepareが絶対パスに変換して記録します。データ未取得の場合は、前節の「PushT HDF5が未取得の場合」を先に実施します。
 
 ### 2. manifestを作成し、記録されたデータの場所を確認する
 
@@ -220,7 +251,7 @@ uv run --no-sync python -m mylewm.training.loop prepare \
 既存・新規のどちらも、学習前に記録された場所を確認します。下のコマンドはJSONとパスを確認するだけで、全量データhashは走査しません。
 
 ```bash
-uv run --no-sync python - "$PUSHT_MANIFEST" "$PUSHT_HDF5" <<'PYCODE'
+uv run --no-sync python - "${PUSHT_MANIFEST:?先に節1のPUSHT_MANIFESTを設定してください}" "${PUSHT_HDF5:?先に節1のPUSHT_HDF5を設定してください}" <<'PYCODE'
 import json
 import sys
 from pathlib import Path
@@ -466,26 +497,27 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 以下は環境準備の工程です。学習・評価が稼働中の共有`.venv`では`uv sync`や自動同期を行わず、準備済み環境を`UV_NO_SYNC=1`で使うか、分離環境を用意します。[途中評価時の環境注意](EVALUATION.ja.md#intermediate-実行前の確認)を参照してください。
 
-前半で固定依存の環境を準備済みなら、同期を繰り返す必要はありません。別端末では`cd`と環境変数を同じ値で設定します。以下はLIBEROのPython依存も含めて環境を新規準備する例です。`pyproject.toml`と`uv.lock`はGB10/CUDA 13向けです。
+前半で固定依存の環境を準備済みなら、同期を繰り返す必要はありません。別端末では`cd`と環境変数を同じ値で設定します。以下は準備済みの環境を確認する例です。`pyproject.toml`と`uv.lock`はGB10/CUDA 13向けです。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-uv sync --locked --group libero --group lerobot
 uv run --no-sync python -c 'import hydra, h5py, lightning, stable_pretraining, stable_worldmodel, torch; print("hydra", hydra.__version__, "torch", torch.__version__)'
 uv run --no-sync python -m mylewm.training.train --help
 ```
 
+初回構築が必要な場合だけ、学習・評価が動いていない状態で`uv sync --locked --group libero --group lerobot`を実行します。
+
 `ModuleNotFoundError: No module named 'hydra'` の配布名は`hydra-core`であり、`pyproject.toml`の依存`stable-worldmodel[env,train]`経由で導入されます。最後の2コマンドが通れば、少なくともPushT trainerのimportとCLIまで確認できています。CUDAを使わないPCはこのlockfileをそのまま使わず、対応するPyTorch backendで別途lockを作成してください。
 
-上の環境準備例はLIBEROのPython依存も導入します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
+初回構築用の`--group libero`はLIBEROのPython依存も導入します。実環境評価にはさらにLIBERO本体（この作業木では`external/libero`）、OSMesa、`LIBERO_CONFIG_PATH`、10個のHDF5データが必要です。公式LIBEROのPython 3.8 / CUDA 11.3手順をこのPython 3.12 / CUDA 13環境へ一般化した完全な構築手順は未検証です。したがって、新しいPCでLIBERO評価まで行う場合は、ここにない依存を推測で導入せず、対応環境を先に検証してください。
 
 ### 1. LIBERO-10のHDF5を取得する
 
 既に10個のHDF5がある場合は次節へ進みます。未取得の場合は、実際の保存先に合わせて以下を実行します。容量は約13.7GBです。
 
 ```bash
-export BT_SIGREG_DATA_ROOT="/mnt/data/bt-sigreg-data"
+export BT_SIGREG_DATA_ROOT="$PWD/.cache/libero-datasets"
 uv run --no-sync hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
   --include 'libero_10/*' --local-dir "$BT_SIGREG_DATA_ROOT"
 ```
@@ -497,7 +529,7 @@ uv run --no-sync hf download yifengzhu-hf/LIBERO-datasets --repo-type dataset \
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-export LIBERO10_DATASET="/mnt/data/bt-sigreg-data/libero_10"
+export LIBERO10_DATASET="$PWD/.cache/libero-datasets/libero_10"
 uv run --no-sync python --version
 uv run --no-sync python -m mylewm.training.train_libero --help
 nvidia-smi
