@@ -113,6 +113,8 @@ bash scripts/evaluate_pusht.sh \
 
 MemAvailableに余裕があってもCUDA初期化用バッファの確保に失敗する場合があります。2026-09-11には約40GiB available、対象cacheを約6GiB解放した後もモデルなしの初期化が失敗しました。追加のDriver API照会では基本contextサイズ1,145,600 bytesを実測し、現ドライバで必要な2MiB連続領域の空きがないことを確認しました。cache解放は万能ではありません。GPU計算前の失敗をモデルの必要RAMと混同せず、[診断記録](reports/LIBERO_BC.ja.md#追加の原因調査cuda-driver-apiと要求サイズ)のように初期化段階・kernel logも照合します。
 
+同日、ユーザー指示で2本の学習を停止すると連続空き領域が戻り、停止前に失敗した新規BT GPU学習が2更新・validation・保存まで正常終了しました。停止はその場の明示指示による対応です。この短期確認では長時間併走時の再発防止まで検証していません。[停止・回復記録](reports/LIBERO_BC.ja.md#gpu-recovery-after-stop)。
+
 <a id="pusht-5-評価を実行しログを見る"></a>
 
 ### 5. 評価を実行し、ログを見る

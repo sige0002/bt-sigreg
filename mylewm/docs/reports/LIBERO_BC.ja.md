@@ -92,6 +92,32 @@ MLPは2,372パラメータ（float32の重み合計9,488 bytes）です。GPU側
 
 証拠は`output/libero10/bc_implementation_check/memory_diagnosis_20260911/fresh_training_123954/`に保存しました。`results.json`、`bt_cuda_result.json`にコマンド・終了コード・時間、各`*.log`に実行結果、`kernel.log`に該当時間帯のドライバ記録、`state_after.json`にRAM・buddyinfo・既存学習の進捗を記録しています。
 
+<a id="gpu-recovery-after-stop"></a>
+
+### 学習停止後の回復確認（同日12:55〜12:56 JST）
+
+ユーザーの「状態の解消しよう。とりあえず学習止めてから」に従い、PushTへSIGINTを送り、LIBEROのuser serviceを停止しました。**停止後に新規CUDA初期化が回復し、直前と同じ条件のBT世界モデルGPU学習が2更新・validation・checkpoint保存まで正常終了しました。** OS再起動・ドライバ変更・手動compaction・全体cache解放は行っていません。
+
+| 停止後の確認 | 結果 |
+|---|---|
+| 元の2 PID・DataLoader worker | 終了、LIBERO serviceはinactive/dead |
+| MemAvailable | 約115 GiB |
+| Normal zoneのorder 9空きブロック | 停止前0から、停止直後5,298個（各2MiB）に回復 |
+| 小規模MLPの新規GPU学習 | 4更新、終了コード0、2.06秒 |
+| 新規BT LIBERO学習、batch 2・workers 0 | 2更新、終了コード0、8.02秒、`completed.json`もstep 2 |
+| BT確認runのGPU利用 | configのdeviceはcuda、metricsのpeak allocatedは726,093,312 bytes |
+
+MLPとBTの確認はユーザーの「まだ再実行しなくていい」が届く前に終了しました。以後は追加の学習起動・再開を行わず、両本学習を停止したままにしています。GPU初期化の回復を確認した短期試験であり、長時間併走時の再発防止は未検証です。GPU専用回帰の追加実行も行っていません。
+
+| 停止した本学習 | 最後に記録された更新 | 保存済み再開点 |
+|---|---:|---:|
+| PushT `bt_compiled_100k_s3072` | 33,016（CSV stepは33,015） | 30,000（`step_30000.ckpt`・`last.ckpt`） |
+| LIBERO `bt_spectral_v2_100k_s3072` | 2,351 | 2,000（`resume.pt`） |
+
+上記3つの再開ファイルはCPUで読み取り、更新数・optimizer状態の存在と停止前後のSHA-256不変を確認しました。停止直前の未保存分は再開点からやり直しになります。元runのconfig・manifest・checkpoint・metricsは改変していません。再開時は各runの開始時コード・環境を使用し、照合を無効化しません。
+
+証拠は同じ診断ディレクトリの`recovery_125512/`です。`before_stop.json`、`stop_actions.json`、`checkpoint_verification.json`、`results.json`、`after_recovery.json`と各実行ログを保持しています。LIBERO停止時にsystemdはcontrol groupのkillについて`Invalid argument`を1件記録しましたが、その後の実PID・worker・GPU compute process一覧で残留なしを確認しました。
+
 先に行ったCPUの実データ確認は`output/libero10/bc_implementation_check/train/`に保存。凍結ViTは5,501,376パラメータ、方策は5,985,287パラメータです。固定validation flow lossは2更新時2.60468、4更新時2.43697でした。短期動作確認であり、学習性能の結論ではありません。
 
 実環境の最終記録は`output/libero10/bc_implementation_check/eval_native_task0/`。9行動では未成功（0/1）で、環境ループ約3.20秒、CPU方策生成2回の合計約1.59秒です。短期checkpoint・短い予算の接続確認であり、成功率や実機制御Hzの評価ではありません。方策への入力は現在画像・タスクIDのみで、成功デモ画像は表示だけに使います。
@@ -118,6 +144,8 @@ MLPは2,372パラメータ（float32の重み合計9,488 bytes）です。GPU側
 - 実コマンドと場所は`output/libero10/bt_spectral_v2_100k_s3072_launch.json`。再開も固定ソース・当初の環境を使用し、hash照合を無効化しない。
 
 記録時点では起動・更新進行を確認した段階です。10万更新の完了や制御性能は未報告です。自動評価・BCの自動起動は予約していません。
+
+同日12:55 JSTにユーザー指示で停止しました。最後の記録は2,351更新、保存済み再開点は2,000更新です。現在は停止したままで、再開の明示依頼を待ちます。
 
 ```bash
 systemctl --user status bt-libero10-100k-s3072 --no-pager
