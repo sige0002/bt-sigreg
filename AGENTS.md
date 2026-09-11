@@ -2,6 +2,8 @@
 
 ## 現在の運用（2026-09-09）
 
+2026-09-11追記：凍結ViT＋タスクID付きflow BCは`src/mylewm/training/train_libero_bc.py`で追加学習し、`src/mylewm/evaluation/evaluate_libero_bc.py`でnative評価する（どちらも既定dry-run）。Raw/TC/BT共通、世界モデル訓練・CEMとは別経路。実データ4更新・再開・native 1ケース9行動の接続確認までで、BC本学習・性能比較は未実施。[手順](mylewm/docs/BEHAVIOR_CLONING.ja.md)。別途明示依頼のBT LIBERO世界モデル100kは`output/libero10/bt_spectral_v2_100k_s3072/`、user service `bt-libero10-100k-s3072`で同一GPUに起動。開始時Git 3cd7e554のソースコピーと当初の環境で再開し、照合を無効化しない。自動評価・BC学習は予約しない。[記録](mylewm/docs/reports/LIBERO_BC.ja.md)。
+
 2026-09-10追記：`src/mylewm/policy/runtime.py`はckpt直接読込の世界モデル＋CEM、`src/mylewm/policy/lerobot/`は同じruntimeを使うLeRobot Policy。別CLI`src/mylewm/policy/export_lerobot_policy.py`でconfig・safetensors・前後処理を保存する。実データ確認は`src/mylewm/policy/check_policy_export.py`（既定dry-run）。実画像3枚・実行済み2行動chunkでprimeし、以後も前回実行行動・時刻を渡す。複製画像で初期履歴を捏造しない。保持2episode・22時刻で両形式の行動一致を確認済みだが、実機I/Oとstockのlerobot-record起動は未対応。[手順](mylewm/docs/MODEL_USAGE.ja.md#policy)・[検証記録](mylewm/docs/reports/POLICY_EXPORT.ja.md)。
 
 2026-09-10追記：HDF5／LeRobot Dataset v3は`src/mylewm/data/prepare_dataset.py`で形式を選択し、`src/mylewm/training/train.py`の共通Raw／BT経路で学習する。新契約付きは`trajectory_spt_v1`、旧manifestは従来経路。一つのrunで形式は混ぜない。LeRobotは公式0.4.4・単一選択カメラ・明示prepare時のHub取得を使用する。形式間のオフライン推論は`src/mylewm/policy/infer_trajectories.py`。入力契約（行動の意味・成分順・単位・FPS・カメラ等）を照合し、checkpointの訓練統計を使う。旧checkpointに契約が無ければ確認済みの訓練条件を別ファイルで明示し、既存成果物を書き換えない。実データBT100更新・保存再開・推論まで確認済みで、実機・多カメラ融合・制御成功率評価は未実施。[手順](mylewm/docs/MODEL_USAGE.ja.md#data)・[検証記録](mylewm/docs/reports/LEROBOT_V3.ja.md)。

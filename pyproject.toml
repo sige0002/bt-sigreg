@@ -18,6 +18,11 @@ dependencies = [
 dev = ["pytest==9.1.1"]
 lerobot = ["lerobot==0.4.4"]
 libero = [
+    # Native LIBERO environment imports these (official LIBERO requirements).
+    "bddl==1.0.1",
+    "easydict==1.9",
+    "future==1.0.0",
+    "gym==0.25.2",
     "dm-control==1.0.45",
     "gymnasium-robotics==1.4.2",
     "mujoco==3.12.0",

@@ -45,3 +45,29 @@ def test_reject_noncomparable_evaluation(tmp_path,fault):
         (b/'config.json').write_text(json.dumps(c))
     (b/'episodes.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
     with pytest.raises(ValueError):compare(a,b)
+
+
+def test_bc_comparison_holds_head_training_fixed_and_rejects_cem(tmp_path):
+    a, b = tmp_path/'a', tmp_path/'b'
+    fixture_run(a, [True]*4); fixture_run(b, [True]*4)
+    base = json.loads((a/'config.json').read_text())
+    bc = dict(base, controller='flow_matching_bc_v1', execute_actions=8, euler_steps=10,
+              policy_config={'width': 256}, bc_step=40000, init_states_sha256='same',
+              control_fps=20, source_sha256='same')
+    keys = ('manifest_sha256', 'model', 'task_names', 'steps', 'batch_size', 'workers',
+            'lr', 'weight_decay', 'seed', 'precision', 'optimizer', 'deterministic', 'source_sha256')
+    bc['training_provenance'] = {'training_config': {k: 'same' for k in keys}}
+    (a/'config.json').write_text(json.dumps(bc))
+    with pytest.raises(ValueError, match='controller'):
+        compare(a, b)
+    (b/'config.json').write_text(json.dumps(bc))
+    assert compare(a, b)['pooled']['difference'] == 0
+    bc['bc_step'] = 20000
+    (b/'config.json').write_text(json.dumps(bc))
+    with pytest.raises(ValueError, match='bc_step'):
+        compare(a, b)
+    bc['bc_step'] = 40000
+    bc['training_provenance']['training_config']['steps'] = 20000
+    (b/'config.json').write_text(json.dumps(bc))
+    with pytest.raises(ValueError, match='BC training'):
+        compare(a, b)

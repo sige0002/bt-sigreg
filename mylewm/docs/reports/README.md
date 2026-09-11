@@ -11,6 +11,7 @@
 | [PushT失敗監査](PUSHT_FAILURE_AUDIT.ja.md) | 固定ケースの一段・5遷移誤差と、遷移／cost／探索の切り分け範囲 |
 | [PushT Issue #20](PUSHT_ISSUE20.ja.md) | 画像/Goal欠落・動画・CEM監査メモリ修正、複数ケースの実機確認と未確認範囲 |
 | [CEM評価高速化・途中checkpoint](CACHED_CEM.ja.md) | 探索設定を維持した画像キャッシュ、10k／20k固定50ケース評価、同一GPUの時間・メモリ実測 |
+| [Goal付き動画・viewer](PUSHT_VIEWER.ja.md) | 保存の重複整理、シーク・選択保持の修正、Playwright検証 |
 
 ## データ形式・Policy・学習基盤
 
@@ -18,6 +19,7 @@
 |---|---|
 | [LeRobot v3対応](LEROBOT_V3.ja.md) | HDF5との共存、形式間推論、実データBT100更新・保存再開・回帰確認 |
 | [ckpt／LeRobot Policy変換](POLICY_EXPORT.ja.md) | 共通CEM・config・コンバーター、実データ2episode／22時刻の行動一致 |
+| [LIBERO BC実装](LIBERO_BC.ja.md) | 凍結ViT方策の保存再開・native接続確認、依頼されたBT世界モデル100kの起動記録 |
 | [学習高速化（2026-09-10）](TRAINING_SPEED_20260910.ja.md) | GB10での短期速度比較、同期・転送・任意コンパイル、依存版による差と再開検証 |
 | [実装・運用監査履歴](IMPLEMENTATION_AUDIT.ja.md) | 数学・接続・再開テスト、LIBERO短期診断、Issue対応、旧試作・失敗記録 |
 

@@ -8,9 +8,22 @@ from scipy.stats import beta
 def compare(baseline, candidate):
     baseline, candidate = Path(baseline), Path(candidate)
     configs = [json.loads((p/'config.json').read_text()) for p in (baseline,candidate)]
+    if configs[0]['controller'] != configs[1]['controller']:
+        raise ValueError('Incompatible evaluation protocol: controller (BC and CEM are separate tracks)')
     keys = ('manifest_sha256','mujoco','render_backend','render_audit_sha256',
             'controller','initial_history','goal','metric','seed','budget','horizon',
-            'samples','iterations','task_ids','episodes','offset')
+            'task_ids','episodes','offset')
+    if configs[0]['controller'] == 'flow_matching_bc_v1':
+        keys += ('execute_actions', 'euler_steps', 'policy_config', 'bc_step', 'init_states_sha256', 'control_fps', 'source_sha256')
+        # Allow the world-model source/method to differ, but hold BC training fixed.
+        training_keys = ('manifest_sha256', 'model', 'task_names', 'steps', 'batch_size', 'workers',
+                         'lr', 'weight_decay', 'seed', 'precision', 'optimizer', 'deterministic', 'source_sha256')
+        training = [c['training_provenance']['training_config'] for c in configs]
+        for key in training_keys:
+            if training[0][key] != training[1][key]:
+                raise ValueError(f'Incompatible BC training protocol: {key}')
+    else:
+        keys += ('samples','iterations')
     for key in keys:
         if configs[0][key] != configs[1][key]:
             raise ValueError(f'Incompatible evaluation protocol: {key}')

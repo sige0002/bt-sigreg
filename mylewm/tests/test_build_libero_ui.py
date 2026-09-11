@@ -24,3 +24,23 @@ def test_builds_static_report_from_complete_evaluation(tmp_path):
     assert (output/'assets/task0_init0_initial.png').is_file()
     with pytest.raises(FileExistsError):
         build(evaluation, output)
+
+
+def test_bc_viewer_accepts_no_goal_without_duplicating_video(tmp_path):
+    evaluation = tmp_path/'evaluation'
+    evaluation.mkdir()
+    (evaluation/'config.json').write_text(json.dumps({'controller': 'flow_matching_bc_v1'}))
+    (evaluation/'summary.json').write_text(json.dumps({'episodes': 1, 'macro_success': 0.}))
+    row = {'task_id': 0, 'init_id': 0, 'task': 'task', 'success': False, 'steps': 1,
+           'elapsed': .5, 'trial': 1, 'video': 'viewer/videos/trial_001.mp4'}
+    (evaluation/'episodes.jsonl').write_text(json.dumps(row)+'\n')
+    images = np.zeros((2, 4, 6, 3), dtype=np.uint8)
+    np.savez(evaluation/'task0_init0.npz', initial=images, final=images)
+    (evaluation/'viewer/videos').mkdir(parents=True)
+    (evaluation/row['video']).write_bytes(b'fixture video')
+    output = evaluation/'viewer'
+    build(evaluation, output)
+    page = (output/'index.html').read_text()
+    assert 'Trial 1' in page and 'task identity' in page and '<video controls' in page
+    assert 'src="videos/trial_001.mp4"' in page
+    assert len(list(evaluation.rglob('*.mp4'))) == 1

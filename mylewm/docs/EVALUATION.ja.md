@@ -6,6 +6,7 @@
 |---|---|
 | HDF5のPushTモデルで成功率を測る | [第1章 PushT](#pusht) |
 | HDF5のLIBERO-10モデルで成功率を測る | [第2章 LIBERO-10](#libero) |
+| LIBEROの凍結ViT＋行動模倣方策を評価する | [BC方策の学習・評価](BEHAVIOR_CLONING.ja.md) |
 | 学習終了前の保存済み重みを評価する | [第3章 途中checkpoint](#intermediate) |
 | LeRobotの保持軌道で予測・Policyを確認する | [学習手順のLeRobot評価](TRAINING.ja.md#lerobot-evaluation)・[モデル利用](MODEL_USAGE.ja.md) |
 
@@ -176,6 +177,10 @@ uv run python -c 'import json; d=json.load(open("output/pusht/eval_bt_100000_50/
 各有効stepで、操作点と物体の位置4成分のずれの距離が20未満、かつ物体の角度差が20度未満なら成功です。位置は512×512の環境座標で、表示画像上の20ピクセルという意味ではありません。両条件を同時に一度満たせば成功として記録します。操作点の位置も必要で、速度はこの成功条件に含みません。固定T字への95%被覆率とは別の評価です。
 
 通常の評価コマンドは、正解画像・元動画・判定時点・数値を並べたHTMLを**評価出力先の`viewer/index.html`へ自動保存**します。別コマンドは不要です。CEMや物理環境を再実行せず、開始／Goalの画像・状態を評価時のhashと照合し、全成功フラグを保存状態から再計算します。データ全量のhash走査はしません。
+
+MP4単体でもGoalを確認できるように、**`viewer/videos/trial_001.mp4`から試行順に、左＝実行動画、右＝固定Goalの動画**を生成します。試行番号・現在step・判定数値も動画内に表示します。viewerの再生と「Goal付きMP4を保存」は同じファイルを使い、assetsに動画を複製しません。元の評価記録`env_N.mp4`は評価ディレクトリに1部だけ保持し、元のfps・フレーム数を維持します。固定Goalの対象は灰色のTと青い操作点です。50ケースの動画生成は約12秒で、CEM再実行は不要でした。
+
+HTTPでのシーク、絞り込み時の選択保持、連続切替の読み込み競合も修正し、PlaywrightでHTTP／file URLを検証しました。[保存整理・ブラウザ検証記録](reports/PUSHT_VIEWER.ja.md)。
 
 画面生成だけが失敗した場合は、`status.json`の`phase=visual_report`・`evaluation_verified=true`とエラーを確認します。評価結果は保持されるので、下の単独生成コマンドを未使用の出力先へ実行できます。CEM評価を再実行する必要はありません。
 

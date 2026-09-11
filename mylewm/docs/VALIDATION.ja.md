@@ -1,5 +1,7 @@
 # 検証状況と未完了事項
 
+2026-09-11追記：LIBEROの凍結ViT＋タスクID付きflow BCを実装。実データ4更新・保存再開・native task 0の9行動／2chunk生成とviewerまで確認しました。CPU全回帰185合格・CUDA専用18スキップ、追加BC GPUテスト1合格。BC本学習・成功率比較は未実施です。別途ユーザー依頼でBT LIBERO世界モデルの100,000更新を同一GPU上に起動し、開始時ソースを固定してバックグラウンド実行中です。[手順](BEHAVIOR_CLONING.ja.md)・[検証と起動記録](reports/LIBERO_BC.ja.md)。
+
 2026-09-11：srcへの構成整理後、隔離環境の全回帰182合格・スキップ0。GPU・保存再開・LeRobot Policy・CLI・旧LIBERO object checkpointの読込を確認しました。長時間学習・制御成功率評価ではありません。[移行内容・検証記録](reports/CLEANUP.ja.md#src移行共通処理整理2026-09-11)。
 
 2026-09-10追記（Policy変換）：ckpt直接読込／LeRobot Policyの共通CEMと別CLIのコンバーターを追加。既存の実データBT100更新重みをconfig・safetensors・前後処理込みで変換。公式LeRobot PushTの保持2episode・計22時刻で、推論用／訓練用ckptとLeRobot形式の行動が完全一致し、実履歴更新と再計画まで確認した。標準processorで時刻が落ちる等の実行時問題も修正。全回帰171合格・スキップ0。オフライン記録データでの接続確認であり、実機I/O・環境での提案行動実行・制御成功率は未実施。[実データの結果と失敗記録](reports/POLICY_EXPORT.ja.md)・[利用手順](MODEL_USAGE.ja.md#policy)。

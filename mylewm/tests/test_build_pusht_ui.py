@@ -67,10 +67,22 @@ def test_goal_identity_masked_success_and_trial_numbers(evaluation, tmp_path):
     report = build(evaluation, output)
     assert report['successes'] == 1
     rows = json.loads((output / 'report.json').read_text())['cases']
+    assert rows[0]['goal_video'] == 'videos/trial_001.mp4'
+    assert len(list(output.rglob('*.mp4'))) == len(rows)
+    assert not list((output / 'assets').glob('*.mp4'))
     assert rows[0]['first_success_step'] == 2
     assert rows[1]['first_success_step'] is None
     assert rows[1]['scores'][2]['position'] == 0
     assert rows[1]['scores'][2]['passed'] is False  # inactive frame cannot create success
+    with av.open(str(output / rows[0]['goal_video'])) as video:
+        assert video.streams.video[0].average_rate == 15
+        frames = [f.to_ndarray(format='rgb24') for f in video.decode(video=0)]
+    assert len(frames) == 3 and frames[0].shape == (96, 32, 3)
+    # The goal is fixed on the right while the left panel changes over time.
+    right = [f[34:46, 18:30].astype(float) for f in frames]
+    assert max(np.abs(r - right[0]).mean() for r in right) < 3
+    assert np.abs(right[0] - np.array([0, 40, 0])).mean() < 5
+    assert not np.array_equal(frames[0][32:48, :16], frames[-1][32:48, :16])
     with h5py.File(tmp_path / 'data.h5') as f:
         np.testing.assert_array_equal(np.asarray(Image.open(output / 'assets/case_1_goal.png')), f['pixels'][4])
     assert '1回目\tenv_0.mp4\t成功' in (output / 'results.txt').read_text()
