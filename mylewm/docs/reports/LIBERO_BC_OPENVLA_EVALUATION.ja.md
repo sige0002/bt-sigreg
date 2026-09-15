@@ -38,3 +38,7 @@ OpenVLA再生成データにはmodel XMLがなく、先頭stateは元デモの�
 続くユーザーの明示依頼で、確認時点の最新保存済み34,000更新を固定して評価を開始した。学習は34,810更新時点で継続中だった。5k／25kは停止維持し、34kのみ新規評価する。条件は同じ256px・全10タスク×50試行・520行動上限・seed42・8行動実行・ゼロ行動5回settling。
 
 serviceは`bt-libero10-eval-bc-openvla-34k-s3072`、出力は`output/libero10/eval_bc_openvla_34k_s3072/`、起動記録・ログは`output/libero10/eval_bc_openvla_34k_s3072_launch/`。直前に検証した固定`source_v2`・256px画像監査を使用し、checkpoint hashと引数を新規launch.jsonへ記録した。自動再起動なし。学習が先へ進んでも評価対象を自動で差し替えない。これは起動記録であり、500試行完了や最終成功率を示さない。
+
+## 34k環境評価の停止と意図の訂正（2026-09-15）
+
+ユーザーの「BC評価」は、最新モデルが良い行動を生成できるかを教師デモとの比較で測る意図だった。環境評価として開始したのは取り違えだったため34k serviceを停止した。MainPID=0、終了143を確認し、`eval_bc_openvla_34k_s3072_launch/stopped_after_clarification.json`へ記録。旧statusは保存したままとする。最新35kの[生成行動診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md)を別途完了した。環境評価の再開は別途依頼がある場合のみ。

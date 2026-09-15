@@ -1,5 +1,8 @@
 # 学習・運用記録
 
+2026-09-15追記：ユーザーの意図訂正により34k環境評価も停止維持。求められたのは生成行動の教師デモとの比較であり、最新35kのオフライン診断を完了した。[結果](reports/LIBERO_BC_ACTION_DIAGNOSTIC.ja.md)。今後「BC評価」を環境成功率評価と決め付けない。
+
+
 2026-09-15追記：新たなユーザー依頼で最新保存済みBC34kの環境評価を新規起動。`bt-libero10-eval-bc-openvla-34k-s3072`、各10タスク×50試行。5k／25kの停止指示は継続。[34k起動記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md)。
 
 
