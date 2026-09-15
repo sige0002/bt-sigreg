@@ -4,6 +4,8 @@
 
 2026-09-16の主方針は[BT-SIGRegの比較評価](COMPARISON_PROTOCOL.ja.md)です。このページは学習操作のガイドで、記載したBT10k→BC40kは既存のLIBEROレシピです。**BC工程は補助評価を選んだ場合だけ実施します。** 世界モデル＋CEMの比較では世界モデル学習後に評価へ進みます。
 
+OGBench Cube single expertは[LeWMに揃えたOGBench手順](OGBENCH.ja.md)を参照してください。
+
 ## 何を学習するか選ぶ
 
 | 目的 | 経路 |

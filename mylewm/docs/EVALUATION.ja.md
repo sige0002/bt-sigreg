@@ -4,6 +4,8 @@
 
 BT-SIGRegの効果を調べる場合は、先に[比較手順](COMPARISON_PROTOCOL.ja.md)でRaw／TC／BTの共通条件を決め、[既存実験一覧](EXPERIMENTS.ja.md)で再利用できる証拠を確認します。このページはその条件を実行するための操作ガイドです。CEM改善とBCは主比較の代わりにしません。
 
+OGBench Cube single expertは[LeWMに揃えたOGBench手順](OGBENCH.ja.md)を参照してください。
+
 ## 最初に評価経路を選ぶ
 
 | 経路 | 入力checkpoint | 測るもの |

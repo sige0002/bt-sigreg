@@ -45,7 +45,7 @@ BCの途中checkpointと各診断は保持するが、BT正則化の主比較の
 |---|---|---|
 | Reacher | `lewm/config/train/data/dmc.yaml`、`lewm/config/eval/reacher.yaml` | 設定は存在。今回、同条件Raw／TC／BTの完了実験は確認していない |
 | TwoRoom | `lewm/config/train/data/tworoom.yaml`、`lewm/config/eval/tworoom.yaml` | 同上 |
-| Cube | `lewm/config/train/data/ogb.yaml`、`lewm/config/eval/cube.yaml` | 同上 |
+| Cube | `lewm/config/train/data/ogb.yaml`、`lewm/config/eval/cube.yaml` | [LeWMに揃える手順](OGBENCH.ja.md)を追加。公開配布メタデータと設定展開を確認。実行・方式比較は未実施 |
 
 設定が置かれていることを「この環境でもBTを実行済み」と説明しない。追加前の確認順は[比較手順](COMPARISON_PROTOCOL.ja.md)を参照する。
 

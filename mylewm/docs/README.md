@@ -23,6 +23,7 @@ CEM制御を主な能力評価、BCを視覚表現の補助評価として扱い
 
 | 目的 | 文書 |
 |---|---|
+| OGBench CubeをLeWM条件で比較する | [OGBench手順](OGBENCH.ja.md) |
 | BCの入力・保存再開を詳しく知る | [BCガイド](BEHAVIOR_CLONING.ja.md) |
 | HDF5／LeRobot、推論、Policy exportを使う | [モデル利用](MODEL_USAGE.ja.md) |
 | 数学的な導出・Cayley v2の詳細を読む | [BT仕様](research/BT_SIGREG.ja.md) |
