@@ -1,5 +1,8 @@
 # 学習・運用記録
 
+2026-09-15 21:46 JST追記：ユーザー指示により再生成データBCの5k／25k環境評価を停止維持。両serviceのMainPID=0・終了143・実プロセスなしを確認。BC40k学習は継続。[停止記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md)。
+
+
 2026-09-15追記：ユーザーの明示依頼で再生成データ由来BCの5k／25kを各500試行で評価開始。固定ソース・service・出力・画像監査の初回失敗と修正は[評価記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md)。両評価は独立service、自動再起動なし。BC40k学習は継続。ここに記載した起動状態から現在の稼働・完了を推測しない。
 
 

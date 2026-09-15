@@ -28,3 +28,7 @@ OpenVLA再生成データにはmodel XMLがなく、先頭stateは元デモの�
 | 25k | `bt-libero10-eval-bc-openvla-25k-s3072` | `output/libero10/eval_bc_openvla_25k_s3072/` |
 
 両serviceは起動直後activeを確認した。自動再起動なし。ログは起動ディレクトリ内のservice名`.log`、監査の最終結果は`render_audit_v2/`。完了判定には各serviceの終了コード0、`status.json`のsucceeded、`summary.json`と`episodes.jsonl`の500試行を照合する。比較では対応するtask/initの初期state・画像hashも確認する。完了前のタスク順途中集計を10タスクの最終平均としない。
+
+## ユーザー指示による停止（2026-09-15 21:46 JST）
+
+5k／25kの環境評価はユーザー指示で両方停止した。各25試行完了時点で5kは0成功、25kは1成功。最初のタスクの途中結果であり、全10タスク平均や最終比較結果ではない。両serviceはMainPID=0、終了コード143、実評価プロセスなしを確認。SIGTERMによる停止のため既存status.jsonのrunning表示は上書きせず、起動ディレクトリの`stopped_by_user.json`に停止理由と実測状態を記録した。再開・再評価は別途ユーザー指示がある場合のみ。BC本学習は停止せず、確認時33,011／40,000更新で稼働していた。
