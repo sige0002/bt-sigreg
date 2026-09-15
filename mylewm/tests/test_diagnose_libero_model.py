@@ -84,3 +84,17 @@ def test_native_branch_reset_clears_robot_then_pins_xml_before_gathering_history
         assert env.calls[-4:]==[('seed',42),('reset',),('xml','fixed_xml'),('state','fixed_state')]
         np.testing.assert_array_equal(frames[:,0,0,0,0],[5,9,13])
         np.testing.assert_array_equal(state,[13])
+
+
+def test_extra_cem_branch_is_not_counted_as_random_and_order_does_not_matter():
+    from mylewm.evaluation.diagnose_libero_model import native_ranking
+    def row(name, predicted, actual):
+        return {'candidate': name, 'predicted_costs': [predicted], 'actual_costs': [actual],
+                'task_id': 2, 'initial_cost': 10}
+    rows = [row('cem', 2, 3), row('zero', 0, 0), row('random_0', 1, 4), row('random_1', 3, 2)]
+    original = native_ranking(rows, 1)
+    extended = native_ranking([row('cem_large', -100, -100), *reversed(rows)], 1)
+    assert original['cem_predicted_beats_random_fraction'] == .5
+    assert original['cem_actual_beats_random_fraction'] == .5
+    for key in original.keys() - {'spearman_all'}:
+        assert original[key] == extended[key]

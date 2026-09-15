@@ -1,5 +1,8 @@
 # 検証状況と未完了事項
 
+2026-09-15追記：新BT10k世界モデルの予測・Goal距離・CEM探索の診断を完了。全10タスク・110候補、256pxの初期状態と画像を揃え、通常CEMと探索16倍を比較。32行動先の予測コスト改善は9/10、実測改善は4/10。実測履歴からのCEM行動の一段予測誤差は無変化対照の2.83倍。通しの成功率やBT正則化の因果評価とは区別する。終了コード0・status succeeded・保存NPZ再検算、関連回帰25合格。[詳細](reports/LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md)。
+
+
 2026-09-15 push前検証：`CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python -m pytest mylewm -q`で240件合格、skipなし（GPUテスト含む）、61.03秒。最初の環境変数未指定の全回帰はCuBLASの決定論設定不足で15件失敗・225件合格。失敗ログを保持し、起動時に設定した新規テストプロセスで全回帰を再確認した。稼働中ジョブの環境や固定ソースは変更していない。ログは`output/libero10/prepush_20260915/`。再生成・再学習の進捗とは別の検証である。
 
 2026-09-14 23:28 JST追記（BC本学習）：ユーザーの明示依頼でBT100k由来の凍結encoder＋flow BCを40,000更新・batch256・workers4・seed3072で開始。固定ソースのdry-runとhash照合を経てuser serviceで起動し、active/running・154更新・有限loss/勾配・GPU利用を確認。21〜154更新は平均0.330秒／更新。これは本学習開始の記録で、完了や制御成功率は未確認。[起動・再開条件](reports/LIBERO_BC_BT100K.ja.md)。

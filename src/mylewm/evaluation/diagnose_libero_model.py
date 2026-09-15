@@ -160,6 +160,24 @@ def offline(args, model, manifest):
     return {'cases':len(rows), 'demos':len(manifest['test']), 'groups':groups}
 
 
+def native_ranking(task_rows, chunk):
+    """Keep the random reference pool independent of additional CEM branches."""
+    base = next(r for r in task_rows if r['candidate'] == 'cem')
+    random_rows = [r for r in task_rows if r['candidate'].startswith('random_')]
+    i = chunk - 1
+    estimated = [r['predicted_costs'][i] for r in task_rows]
+    observed = [r['actual_costs'][i] for r in task_rows]
+    random_estimated = np.array([r['predicted_costs'][i] for r in random_rows])
+    random_observed = np.array([r['actual_costs'][i] for r in random_rows])
+    return {'task_id': base['task_id'], 'horizon_actions': 4 * chunk,
+            'spearman_all': rank_correlation(estimated, observed),
+            'spearman_random_only': rank_correlation(random_estimated, random_observed),
+            'cem_predicted_beats_random_fraction': float(np.mean(random_estimated > base['predicted_costs'][i])),
+            'cem_actual_beats_random_fraction': float(np.mean(random_observed > base['actual_costs'][i])),
+            'cem_predicted_progress': base['initial_cost'] - base['predicted_costs'][i],
+            'cem_actual_progress': base['initial_cost'] - base['actual_costs'][i]}
+
+
 def native(args, model, manifest):
     for p in libero_paths():
         sys.path.insert(0, str(p))
@@ -168,6 +186,8 @@ def native(args, model, manifest):
     import mujoco
     if os.environ.get('MUJOCO_GL') != 'osmesa':
         raise RuntimeError('Use the audited OSMesa wrapper')
+    from mylewm.evaluation.evaluate_libero_bc import native_image_size, validate_render_audit
+    image_size = native_image_size(manifest)
     suite = benchmark.get_benchmark_dict()['libero_10']()
     rows, rankings = [], []
     with (args.output / 'cases.jsonl').open('x') as log, torch.inference_mode():
@@ -175,8 +195,7 @@ def native(args, model, manifest):
             task = suite.get_task(task_id)
             index = manifest['task_names'].index(task.name)
             audit = json.loads((args.render_audit_dir / f'task_{task_id}/report.json').read_text())
-            if not (audit['passed'] and audit['task']==task.name and audit['mujoco']==mujoco.__version__ and audit['render_backend']=='osmesa'):
-                raise ValueError('Missing or incompatible render audit')
+            validate_render_audit(audit, task.name, mujoco.__version__, image_size, manifest['files'][index]['path'])
             with h5py.File(manifest['files'][index]['path'], 'r') as f:
                 cases = [c for c in manifest['test'] if c['task']==index]
                 c = next(c for c in cases if f[f'data/{c["demo"]}/rewards'][-1]>0)
@@ -186,7 +205,7 @@ def native(args, model, manifest):
             init_state = torch.load(init_file, weights_only=False)[args.init_id]
             seed = args.seed + task_id*10000 + args.init_id
             env = OffScreenRenderEnv(bddl_file_name=str(Path(get_libero_path('bddl_files')) / task.problem_folder / task.bddl_file),
-                                     camera_heights=128, camera_widths=128)
+                                     camera_heights=image_size, camera_widths=image_size)
             try:
                 random.seed(seed); np.random.seed(seed); env.seed(seed)
                 env.reset()
@@ -209,6 +228,12 @@ def native(args, model, manifest):
                 random_sequences = (.6*torch.randn((args.random_candidates, 8, 4, 7), generator=generator, device=args.device)).clamp(-1, 1)
                 candidates = torch.cat((planner.final_sequence[None], torch.zeros(1, 8, 4, 7, device=args.device), random_sequences))
                 names = ['cem', 'zero'] + [f'random_{i}' for i in range(args.random_candidates)]
+                if args.large_cem_samples:
+                    larger = RecordedCEM(model, horizon=8, samples=args.large_cem_samples,
+                                         elites=16, iterations=5, seed=seed)
+                    larger.plan(history, past, goal)
+                    candidates = torch.cat((candidates, larger.final_sequence[None]))
+                    names.append('cem_large')
                 predicted = rollout(planner, history, past, candidates)
                 costs = (predicted-goal.reshape(1, 1, -1)).square().mean(-1)
                 torch.testing.assert_close(costs[:, -1], CEM.costs(planner, history, past, candidates, goal), atol=1e-6, rtol=1e-5)
@@ -262,22 +287,18 @@ def native(args, model, manifest):
                                       'predicted_cost':row['predicted_costs'][-1], 'actual_cost':row['actual_costs'][-1]}), flush=True)
                 task_rows = rows[-len(names):]
                 for chunk in (1, 4, 8):
-                    observed = [r['actual_costs'][chunk-1] for r in task_rows]
-                    estimated = [r['predicted_costs'][chunk-1] for r in task_rows]
-                    rankings.append({'task_id':task_id, 'horizon_actions':4*chunk,
-                        'spearman_all':rank_correlation(estimated, observed),
-                        'spearman_random_only':rank_correlation(estimated[2:], observed[2:]),
-                        'cem_predicted_beats_random_fraction':float(np.mean(np.array(estimated[2:])>estimated[0])),
-                        'cem_actual_beats_random_fraction':float(np.mean(np.array(observed[2:])>observed[0])),
-                        'cem_predicted_progress':initial_cost-estimated[0], 'cem_actual_progress':initial_cost-observed[0]})
+                    rankings.append(native_ranking(task_rows, chunk))
                 dump(args.output/'rankings.json', rankings)
             finally:
                 env.close()
-    if len(rows) != len(args.task_ids)*(2+args.random_candidates):
+    if len(rows) != len(args.task_ids)*(2+args.random_candidates+bool(args.large_cem_samples)):
         raise ValueError('Missing native cases')
     return {'cases':len(rows), 'tasks':len(args.task_ids), 'native_steps':32*len(rows), 'rankings':rankings,
-            'success_counts':{kind:sum(r['success_any'] for r in rows if r['candidate'].startswith(kind)) for kind in ('cem','zero','random')},
-            'note':'32-action branching diagnostic, not full-episode benchmark success rate; fixed CEM 128x5.'}
+            'success_counts':{kind:sum(r['success_any'] for r in rows
+                if (r['candidate'].startswith('random_') if kind=='random' else r['candidate']==kind))
+                for kind in (('cem','cem_large','zero','random') if args.large_cem_samples else ('cem','zero','random'))},
+            'native_image_size':image_size, 'large_cem_samples':args.large_cem_samples,
+            'note':'32-action branching diagnostic, not full-episode success rate; base CEM 128x5, optional larger CEM.'}
 
 
 def main():
@@ -291,8 +312,12 @@ def main():
     parser.add_argument('--task-ids', type=int, nargs='+', default=list(range(10)))
     parser.add_argument('--init-id', type=int, default=0)
     parser.add_argument('--random-candidates', type=int, default=8)
+    parser.add_argument('--large-cem-samples', type=int, default=0,
+                        help='Additional native branch using this many CEM samples; 0 disables')
     parser.add_argument('--render-audit-dir', type=Path, default=ROOT/'output/libero10/eval_bt100k_20260914/render_audit')
     args = parser.parse_args()
+    if args.large_cem_samples and args.large_cem_samples < 16:
+        parser.error('Large CEM needs at least 16 samples')
     args.output = args.output.resolve()
     if not args.output.is_relative_to((ROOT/'output').resolve()) or args.output == ROOT/'output':
         parser.error('Output must be a fresh subdirectory of output/')
@@ -320,7 +345,7 @@ def main():
                   'source_sha256':{str(p.relative_to(ROOT)):digest(p) for p in source_paths},
                   'data_verification':'size and mtime; no full hash scan',
                   'native_protocol':'official init state, fixed context XML reset per candidate, 5 zero settling steps, then 8 zero steps for real model history',
-                  'cem':{'samples':128,'iterations':5,'elites':16,'horizon_chunks':8},
+                  'cem':{'samples':128,'iterations':5,'elites':16,'horizon_chunks':8,'large_samples':args.large_cem_samples},
                   'torch':torch.__version__, 'test_seen_before':True}
         dump(args.output/'config.json', config)
         torch.set_num_threads(4); torch.manual_seed(args.seed)

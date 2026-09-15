@@ -24,6 +24,7 @@
 | [LIBERO固定メモリなしの本学習](LIBERO_NO_PIN_TRAINING.ja.md) | 新規BT100kの開始条件、pin切替の検証、1更新時間の実測 |
 | [LIBERO BT100kの初回CEM評価](LIBERO_BT100K_EVALUATION.ja.md) | 10タスク各1試行・520行動で0/10、全描画監査・終了確認・画像一覧 |
 | [LIBERO CEM切り分け](LIBERO_CEM_DIAGNOSTIC.ja.md) | 成功デモ対ランダム50窓と探索予算60件のオフライン診断、成功率は未再評価 |
+| [世界モデル制御の切り分け](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md) | BT10k・110候補の実測、探索16倍、短期予測、行動分布とGoal距離 |
 | [BC実生成行動の診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md) | 全388デモ・3時刻・3生成、5k／25kの教師行動誤差と汎化 |
 | [再生成データBCの5k／25k評価](LIBERO_BC_OPENVLA_EVALUATION.ja.md) | 256px対応・全タスク画像監査・同条件500試行ずつの起動記録 |
 | [旧・新モデルの予測比較](LIBERO_PREDICTION_COMPARISON.ja.md) | 再生成データBT10kの351条件、旧BT100kとの参考比較、旧BC21%の解釈 |
