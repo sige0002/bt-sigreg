@@ -4,9 +4,17 @@
 
 2026-09-11：学習、保存・再開、推論、native LIBERO評価、動画・参考画像付きレポートを実装。[検証範囲とBT本学習の起動記録](reports/LIBERO_BC.ja.md)。BCの本学習・成功率比較は未実施です。
 
+2026-09-14：既存実装をTC-LeWM v3と再照合し、現在のBT100k encoderでGPU短期学習・厳密再開・全10タスクの行動生成を確認。評価のsettling既定を公式LIBEROの5回に統一しました。[今回の確認](reports/LIBERO_BC_BT100K.ja.md)。BTで学習したencoderを使う下流BC評価であり、世界モデルの正則化をTCへ変更する処理ではありません。
+
+2026-09-14 23:28 JST追記：ユーザー依頼で上記BT100k由来のBC本学習（40,000更新）を開始しました。runは`output/libero10/bc_bt100k_40k_s3072/`。以降、同じ出力先の新規起動は行わず、稼働状況と固定ソースを[運用記録](reports/LIBERO_BC_BT100K.ja.md)で確認してください。完了・成功率はまだ未確認です。
+
+2026-09-15追記：上記BCの40,000更新完了・終了コード0とencoder凍結を確認し、ユーザー依頼で全10タスク×50初期状態のnative評価を開始しました。[完了確認と評価記録](reports/LIBERO_BC_BT100K.ja.md)。評価結果はまだ未確定です。
+
+2026-09-15条件整備：[TC-LeWM条件の照合とOpenVLA再生成入口](reports/TCLEWM_ALIGNMENT.ja.md)を追加。その後、ユーザー承認のローカル設定で再生成→BT1万更新→BC4万更新のジョブを開始しました。実行段階は運用記録を参照。未公開のBC詳細や分割は公式一致と扱いません。
+
 ## 論文との関係
 
-[TC-LeWM v3、付録A.1](https://arxiv.org/html/2607.26924v3#A1.SS1)を参照したローカル実装です。2026-09-11の[著者ページ](https://ryuuchou17.github.io/tclewm/)は「Code Coming soon」であり、公式コード移植や成功率再現とは呼びません。
+[TC-LeWM v3、付録A.1](https://arxiv.org/html/2607.26924v3#A1.SS1)を参照したローカル実装です。2026-09-14に再確認した[著者ページ](https://ryuuchou17.github.io/tclewm/)は「Code Coming soon」であり、公式コード移植や成功率再現とは呼びません。
 
 | 項目 | 実装 |
 |---|---|
@@ -32,15 +40,15 @@
 
 ## 学習と再開
 
-リポジトリ直下で、保存完了済みのcheckpointを指定します。下の1,000更新checkpointがまだ存在しなければ起動できません。世界モデルの学習後にBCを自動開始する仕組みはありません。
+リポジトリ直下で、保存完了済みのcheckpointを指定します。下は今回確認済みのBT100,000更新checkpointです。このCLI単体はBCだけを扱います。今回承認された逐次ジョブは世界モデル完了後にBCを起動します（[実行記録](reports/TCLEWM_ALIGNMENT.ja.md)）。
 
 ```bash
-export LIBERO_WM=output/libero10/bt_spectral_v2_100k_s3072/step_1000_object.ckpt
+export LIBERO_WM=output/libero10/bt_no_pin_100k_s3072/step_100000_object.ckpt
 test -f "$LIBERO_WM"
 .venv/bin/python -m mylewm.training.train_libero_bc \
   --checkpoint "$LIBERO_WM" \
   --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/bc_bt_from_step1000 \
+  --output output/libero10/bc_bt100k_40k_s3072 \
   --steps 40000 --batch-size 256 --workers 4 --seed 3072
 ```
 
@@ -68,14 +76,17 @@ ViTのstate hashを保存ごとに照合します。再開はソース・依存�
 ```bash
 export PYTHONPATH="$PWD/output/libero10/bc_implementation_check/runtime${PYTHONPATH:+:$PYTHONPATH}"
 bash scripts/run_libero.sh -m mylewm.evaluation.evaluate_libero_bc \
-  --checkpoint output/libero10/bc_bt_from_step1000/step_40000_bc.pt \
+  --checkpoint output/libero10/bc_bt100k_40k_s3072/step_40000_bc.pt \
   --manifest output/manifests/libero10/manifest.json \
-  --output output/libero10/eval_bc_bt_from_step1000 \
+  --output output/libero10/eval_bc_bt100k_40k_s3072 \
   --task-ids 0 1 2 3 4 5 6 7 8 9 --episodes 50 \
-  --budget 520 --execute-actions 8 --device cuda:0
+  --budget 520 --execute-actions 8 --settling-steps 5 --device cuda:0 \
+  --render-audit-dir output/libero10/eval_bt100k_20260914/render_audit
 ```
 
 ここも既定dry-runです。`--execute`だけがモデル・環境を起動します。別outputで`--task-ids 0 --episodes 1 --budget 9`とすれば、8行動実行後の再生成を含む短い接続確認ができます。短期checkpointでの成否を性能値とは扱いません。
+
+公式LIBEROと同じく、通常reset→固定init state復元→ゼロ行動5回で初期化します。旧ローカル条件の10回は`--settling-steps 10`で明示できます。回数を評価configとinitial_historyへ記録し、異なる条件の評価を同条件比較しません。BCは現在画像1組だけを使うため、世界モデル診断の追加8行動や複製履歴は不要です。
 
 環境の`env.check_success()`で判定します。`episodes.jsonl`にnative task ID・タスク名・初期状態番号・1からの試行番号・成否・実行step・方策生成時間、`results.txt`に一覧、`summary.json`に各タスクと平均の成功率を保存します。各試行のMP4、初期／最終画像、参考の成功デモ画像を`viewer/index.html`に表示します。参考画像は**方策には渡しません**。物体配置も異なり得るため、参考画像との完全一致は成功条件ではありません。
 

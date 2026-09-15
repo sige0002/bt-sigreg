@@ -27,6 +27,18 @@ def array_hash(value):
     return hashlib.sha256(np.asarray(value).tobytes()).hexdigest()
 
 
+def reset_episode(env, init_state, seed, settling_steps=5):
+    """Official LIBERO initialization; recreate robot/gripper via normal reset."""
+    if type(settling_steps) is not int or settling_steps < 0:
+        raise ValueError('Settling steps must be a nonnegative integer')
+    random.seed(seed); np.random.seed(seed); env.seed(seed)
+    env.reset()
+    obs = env.set_init_state(init_state)
+    for _ in range(settling_steps):
+        obs, _, _, _ = env.step(np.zeros(7))
+    return obs
+
+
 def rollout(env, controller, obs, budget):
     """Only measured camera images enter the policy; success comes from LIBERO."""
     if budget < 1:
@@ -87,6 +99,8 @@ def main():
     p.add_argument('--offset', type=int, default=0)
     p.add_argument('--budget', type=int, default=520)
     p.add_argument('--execute-actions', type=int, default=8)
+    p.add_argument('--settling-steps', type=int, default=5,
+                   help='Zero actions after native state restore (official LIBERO: 5; old local BC: 10)')
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--device', default='cuda:0')
     p.add_argument('--render-audit-dir', type=Path, default=ROOT / 'output/libero10/render_audit')
@@ -98,7 +112,7 @@ def main():
         raise ValueError('Supply a saved *_bc.pt policy')
     if args.output.exists() or args.output == ROOT / 'output' or not args.output.is_relative_to(ROOT / 'output'):
         raise ValueError('Use a fresh evaluation directory under output/')
-    if min(args.episodes, args.budget, args.execute_actions) < 1 or min(args.offset, args.seed) < 0:
+    if min(args.episodes, args.budget, args.execute_actions) < 1 or min(args.offset, args.seed, args.settling_steps) < 0:
         raise ValueError('Invalid BC evaluation budget')
     if len(set(args.task_ids)) != len(args.task_ids) or not set(args.task_ids) <= set(range(10)):
         raise ValueError('Require unique native LIBERO-10 task IDs 0..9')
@@ -109,7 +123,7 @@ def main():
     metadata.update(controller='flow_matching_bc_v1', checkpoint_sha256=file_sha256(args.checkpoint),
                     manifest_sha256=file_sha256(args.manifest), data_identity=identity,
                     metric='native env.check_success()', goal='none; task ID supplied to policy',
-                    initial_history='one current measured camera pair; ten settling actions',
+                    initial_history=f'one current measured camera pair; {args.settling_steps} settling actions',
                     control_fps=20, video_fps=20,
                     source_sha256={name: file_sha256(path) for name, path in {
                         'evaluation': Path(__file__),
@@ -171,10 +185,7 @@ def main():
                 try:
                     for init_id in range(args.offset, args.offset + args.episodes):
                         seed = args.seed + task_id * 10000 + init_id
-                        random.seed(seed); np.random.seed(seed); env.seed(seed)
-                        env.reset(); obs = env.set_init_state(states[init_id])
-                        for _ in range(10):
-                            obs, _, _, _ = env.step(np.zeros(7))
+                        obs = reset_episode(env, states[init_id], seed, args.settling_steps)
                         initial_state = np.asarray(env.get_sim_state()).copy()
                         controller = BCController(policy, task.name, seed, args.execute_actions)
                         print(f'BC task {task_id}, init {init_id}: starting (budget {args.budget})', flush=True)

@@ -576,6 +576,10 @@ uv run --no-sync python -m mylewm.training.train_libero prepare \
 
 `--steps`はoptimizerの呼出し数、`--batch-size`は1回に使うクリップ数です。出力先は未使用の名前にします。**runフォルダ自体を先にmkdirしないでください**。trainerが作成します。
 
+LIBEROのRaw／TC／BT共有ループでは、SIGRegのため`--batch-size`とvalidation件数を2以上にします。validationの最後が1件になる場合は、直前のバッチから1件を移します（50件・batch49なら48件＋2件）。batch2でvalidation件数が奇数の場合だけ、最後を3件にまとめます。全ケースを元の順序で一度ずつ使い、既定batch128・validation50件の分け方は変わりません。
+
+validation指標は従来どおりバッチごとの値の平均で、タスクmacro平均ではありません。分け方を`config.json`の`validation_batching`へ記録します。変更前runの厳密再開には開始時のソース・環境・設定を使ってください。
+
 LIBERO-10：
 
 ```bash

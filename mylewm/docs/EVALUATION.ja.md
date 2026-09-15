@@ -387,6 +387,14 @@ bash scripts/run_libero.sh -m mylewm.evaluation.evaluate_libero \
 
 評価中に学習を併走しない。成功は`env.check_success()`だけで決め、デモ状態距離やBCスコアと混ぜない。終了時は`status.json=succeeded`、`summary.json`、10×50行の`episodes.jsonl`、全`taskN_initM.npz`を確認する。途中終了は未測定であり0%ではない。
 
+### 世界モデルの予測・候補順位を切り分ける補助診断
+
+`python -m mylewm.evaluation.diagnose_libero_model --stage offline|native --checkpoint <trusted_object.ckpt> --output <fresh_output>`で実行する。nativeは上記OSMesa wrapperと全対象タスクの画像監査が必要。明示依頼時のみ実行し、checkpoint・manifest・HDF5を書き換えない。
+
+offlineは保持デモで実行動・ゼロ・別デモ・時間シャッフルの4／16／32行動先予測を比較する。nativeは公式init stateと固定環境XMLを候補ごとに復元し、CEM128×5・ランダム8本・ゼロ1本の各32行動を実行する。公式の5回settlingに加えて実測履歴を得る8回のゼロ行動が必要。候補ごとの通常resetでgripperも初期化してからXMLを復元し、開始画像とsim stateの一致を検証する。
+
+これは通しの公式成功率評価ではなく、予測と実行の対応を調べる補助診断である。通常MPCは4行動で再計画するため、32行動open-loopの誤差と区別する。結果の意味・実行例・復元時に検出した問題は[モデル診断](reports/LIBERO_MODEL_DIAGNOSTICS.ja.md)を参照。
+
 <a id="libero-5-ブラウザの可視ui"></a>
 
 ### 5. ブラウザの可視UI

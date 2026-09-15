@@ -1,0 +1,61 @@
+{
+  "schema": "tclewm_alignment_spec_v1",
+  "status": "incomplete_not_a_training_launcher",
+  "paper": "https://arxiv.org/html/2607.26924v3",
+  "scope": "Align data and downstream BC/evaluation; retain BT method and independently specified world-model budget",
+  "data": {
+    "implementation": "mylewm.data.regenerate_libero_openvla",
+    "openvla_revision": "c8f03f48af692657d3060c19588038c7220e9af9",
+    "resolution": 256,
+    "remove_noops": true,
+    "keep_replay_successes_only": true,
+    "tclewm_dataset_revision": null,
+    "split_demo_ids": null,
+    "image_orientation_and_resize": null
+  },
+  "bc_paper_settings": {
+    "frozen_encoder": true,
+    "visual_tokens": 34,
+    "horizon": 8,
+    "euler_steps": 10,
+    "optimizer": "AdamW",
+    "lr": 0.0002,
+    "batch_size": 256,
+    "updates": 40000
+  },
+  "bc_unpublished_settings": {
+    "width": null,
+    "depth": null,
+    "heads": null,
+    "weight_decay": null,
+    "lr_schedule": null,
+    "augmentation": null,
+    "tail_chunk_handling": null,
+    "execute_actions": null,
+    "checkpoint_selection": null
+  },
+  "evaluation": {
+    "full_pipeline_training_seed_count": 3,
+    "evaluation_seed_count_per_training_seed": 3,
+    "rollouts_per_task_per_evaluation_seed": 50,
+    "task_count": 10,
+    "total_rollouts": 4500,
+    "training_seed_values": null,
+    "evaluation_seed_values": null,
+    "exact_reset_protocol": null
+  },
+  "automatic_training": false,
+  "automatic_evaluation": false,
+  "local_assumptions_accepted_20260915": {
+    "split": "per-task 80/10/10 after regeneration; 40/5/5 when 50 survive",
+    "bc_width": 256,
+    "bc_depth": 4,
+    "bc_heads": 8,
+    "augmentation": false,
+    "execute_actions": 8,
+    "training_seed": 3072,
+    "world_model_updates": 10000,
+    "bc_updates": 40000,
+    "note": "User revised world-model budget to 10000; BC40000; earlier100k plan superseded before training"
+  }
+}

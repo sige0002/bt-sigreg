@@ -13,7 +13,16 @@ import torch.nn.functional as F
 from mylewm.training import loop as common
 
 
-def prepare(folder,path):
+def split_counts(count, mode):
+    if mode == 'legacy_40_5_rest':
+        return 40, 5
+    if mode != 'ratio_80_10_10' or count < 10:
+        raise ValueError('Ratio split requires at least ten successful demos per task')
+    held = max(1, int(round(count * .1)))
+    return count - 2 * held, held
+
+
+def prepare(folder,path,split_mode='legacy_40_5_rest'):
     if path.exists(): raise FileExistsError(path)
     files=sorted(folder.glob('*.hdf5'))
     if len(files)!=10: raise ValueError('Require exactly ten official task files')
@@ -23,19 +32,20 @@ def prepare(folder,path):
         metadata.append({'path':str(p.resolve()),'size':p.stat().st_size,'mtime_ns':p.stat().st_mtime_ns})
         with h5py.File(p) as f:
             names=sorted(f['data'],key=lambda s:int(s.split('_')[-1]))
+            train_count, val_count = split_counts(len(names), split_mode)
             names=np.array(names)[rng.permutation(len(names))]
             for j,name in enumerate(names):
                 n=len(f[f'data/{name}/actions'])
                 if n<=12: raise ValueError('Demonstration too short')
                 entry={'task':task,'demo':str(name),'length':n}
-                if j<40:
+                if j<train_count:
                     train.append(entry)
                     a=f[f'data/{name}/actions'][:]
                     if not np.isfinite(a).all(): raise ValueError('Nonfinite action')
                     actions.append(a)
                 else:
                     entry['start']=int(rng.integers(0,n-12))
-                    (validation if j<45 else test).append(entry)
+                    (validation if j<train_count+val_count else test).append(entry)
     a=np.concatenate(actions).astype(np.float64)
     if min(a.std(0,ddof=1))<=0: raise ValueError('Degenerate action')
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -50,6 +60,9 @@ def prepare(folder,path):
        'image_convention':'native opengl; do not flip training images independently of simulator',
        'task_names':[p.stem.removesuffix('_demo') for p in files],
        'initialization':'random','split_seed':20260906}
+    if split_mode != 'legacy_40_5_rest':
+        m['split_policy'] = split_mode
+        m['split_note'] = 'Local assumption; per-task 80/10/10 after regeneration, rounded held-out counts'
     print('Preparing dataset SHA-256 (one-time full scan)', flush=True)
     m['data_fingerprints'] = common.data_fingerprints(m)
     path.write_text(json.dumps(m,indent=2))
@@ -107,6 +120,8 @@ def main():
     p.add_argument('--dataset',type=Path,default=ROOT/'.cache/libero-datasets/libero_10')
     p.add_argument('--manifest',type=Path,default=ROOT/'output/manifests/libero10/manifest.json')
     p.add_argument('--output',type=Path)
+    p.add_argument('--split-mode',choices=['legacy_40_5_rest','ratio_80_10_10'],
+                   default='legacy_40_5_rest',help='prepare only: explicit split for filtered datasets')
     p.add_argument('--mode',choices=['raw','tc','bt'],default='bt')
     common.add_bt_arguments(p)
     p.add_argument('--steps','--total-steps',dest='steps',type=int,default=50000)
@@ -121,7 +136,7 @@ def main():
     p.add_argument('--verify-data',action='store_true',help='Full dataset SHA-256 verification')
     p.add_argument('--resume',action='store_true')
     args=p.parse_args()
-    if args.command=='prepare': prepare(args.dataset,args.manifest)
+    if args.command=='prepare': prepare(args.dataset,args.manifest,args.split_mode)
     else:
         if args.output is None: p.error('--output required')
         args.adapter_sources={str(f.relative_to(ROOT)):common.file_sha256(f) for f in

@@ -244,3 +244,31 @@ def test_bc_cuda_update_and_inference(policy, tmp_path):
     assert all(p.grad is None for p in policy.encoder.parameters())
     out = policy.sample(images, tasks, torch.Generator(device='cuda').manual_seed(1))
     assert torch.isfinite(out).all() and out.abs().max() <= 1
+
+
+@pytest.mark.parametrize('settling_steps', [0, 5, 10])
+def test_bc_official_reset_and_configurable_settling(settling_steps):
+    from mylewm.evaluation.evaluate_libero_bc import reset_episode
+    class Env:
+        def __init__(self): self.calls=[]; self.steps=0; self.gripper_action=99
+        def seed(self, value): self.calls.append(('seed', value))
+        def reset(self): self.calls.append(('reset',)); self.steps=0; self.gripper_action=0
+        def set_init_state(self, value): self.calls.append(('state', value)); return self.steps
+        def step(self, action):
+            assert self.gripper_action==0
+            np.testing.assert_array_equal(action, np.zeros(7))
+            self.steps+=1
+            return self.steps, 0, False, {}
+    env=Env()
+    for _ in range(2):
+        assert reset_episode(env, 'fixed', 42, settling_steps)==settling_steps
+        assert env.calls[-3:]==[('seed',42),('reset',),('state','fixed')]
+        env.gripper_action=99
+    with pytest.raises(ValueError, match='Settling'):
+        reset_episode(env, 'fixed', 42, -1)
+
+
+def test_bc_default_matches_paper_policy_recipe():
+    args=trainer.parser().parse_args(['--checkpoint','world_object.ckpt','--output','unused'])
+    assert (args.horizon,args.euler_steps,args.steps,args.batch_size,args.lr)==(8,10,40000,256,2e-4)
+    assert not args.execute

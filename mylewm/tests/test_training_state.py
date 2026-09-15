@@ -55,7 +55,8 @@ def test_schedule_boundaries_and_group_lrs():
 
 @pytest.mark.parametrize('key', ['steps', 'warmup_steps', 'lr', 'min_lr', 'gaussian_weight',
                                 'adapter_sources', 'source_sha256',
-                                'manifest_sha256', 'seed', 'precision', 'pin_memory'])
+                                'manifest_sha256', 'seed', 'precision', 'pin_memory',
+                                'validation_batching'])
 def test_resume_rejects_contract_changes(key):
     with pytest.raises(ValueError, match=key):
         check_resume_config({key: 'old'}, {key: 'new'})

@@ -4,6 +4,19 @@
 
 ## 記録
 
+2026-09-15最新：ユーザー指示で再学習予算をBT10k→BC40kに訂正。新service `bt-libero10-retrain-openvla-10k-s3072.service`、実行記録`output/libero10/retrain_openvla_bt10k_bc40k_s3072_20260915/`。既存のデータ再生成は継続、旧100k親プロセスのみ停止して遷移を抑止し、新ジョブが終了イベントで引き継ぐ。旧親をSIGCONTしない。新ジョブのactive/runningと10k/40k引数を確認。[引継ぎ・失敗保持の詳細](reports/TCLEWM_ALIGNMENT.ja.md)。
+
+2026-09-15：ユーザー依頼でOpenVLA再生成データによるBT100k→BC40kの逐次再学習ジョブを開始。service `bt-libero10-retrain-openvla-s3072.service`（Restart=no）、実行記録・固定ソースは`output/libero10/retrain_openvla_bt100k_bc40k_s3072_20260915/`。起動時はデータ再生成段階。旧評価は継続、旧停止runは停止維持。設定・新規出力・検証は[再学習記録](reports/TCLEWM_ALIGNMENT.ja.md)。再開時は失敗段階を確認し、固定ソース・依存・設定を変更せずhash照合を維持する。ジョブ全体の再実行は既存出力を拒否する。追加評価は予約していない。
+
+2026-09-15 10:15 JST：ユーザーの「2000はもうやらなくていい」によりBC 2,000更新評価serviceを停止。MainPID=0、SIGTERM相当の終了143を確認。14試行・1成功の途中記録を保持し、全50試行完了とは扱わない。停止証拠は`output/libero10/eval_bc_bt100k_2k_s3072_50_launch/stopped_by_user.json`。元statusはrunningのまま残っているため停止記録と実serviceを参照する。40,000更新側の500試行評価はactive/runningを確認し継続。2,000更新評価は再開しない。
+
+2026-09-15追記：ユーザー依頼で検証loss最良のBC 2,000更新checkpointを全10タスク×5初期状態で追加評価開始。出力`output/libero10/eval_bc_bt100k_2k_s3072_50/`、service `bt-libero10-eval-bc-bt100k-2k-s3072-50.service`（Restart=no）。40kの既存500試行評価は継続し、その対応試行と比較する。起動時は未完了。[記録](reports/LIBERO_BC_BT100K.ja.md)。
+
+2026-09-15：BC `bc_bt100k_40k_s3072`は40,000更新・status/completed succeeded・学習service終了コード0を確認。ユーザー依頼で最終BC checkpointの全10タスク×50初期状態評価を開始。出力は`output/libero10/eval_bc_bt100k_40k_s3072/`、serviceは`bt-libero10-eval-bc-bt100k-40k-s3072.service`（Restart=no）。学習時snapshotをhash照合して使用。起動後1試行の完走まで確認、全評価の完了は未確認。[記録](reports/LIBERO_BC_BT100K.ja.md)。
+
+2026-09-14 23:28 JST：ユーザーの明示依頼で、BT100k encoderを凍結したTC-LeWM形式BCの本学習を開始。runは`output/libero10/bc_bt100k_40k_s3072/`、serviceは`bt-libero10-bc-bt100k-40k-s3072.service`、Restart=no。40,000更新・batch256・workers4・seed3072、保存／validationは1,000更新ごと。23:28:07時点でPID 855119・active/running・154更新、平均0.330秒／更新を確認。固定ソースと再開条件は[BC本学習記録](reports/LIBERO_BC_BT100K.ja.md)と`output/libero10/bc_bt100k_40k_s3072_launch/launch.json`。学習済み世界モデルと旧停止runは再開していない。自動評価・定期監視は予約していない。この記録を現在の稼働状態の証拠にせず、必要時に実サービスとmetricsを確認する。
+
+
 2026-09-11 15:38 JST追記：ユーザーの新しい明示依頼でLIBERO BTを固定メモリなしの新規100kとして開始。runは`output/libero10/bt_no_pin_100k_s3072/`、user serviceは`bt-libero10-no-pin-100k-s3072`、batch128・workers4・seed3072。開始時Git 8ec0abc9のソースを`output/libero10/source_bt_no_pin_100k_8ec0abc9/`へ固定。21〜120更新の平均1.220秒／更新を実測し継続中。旧LIBERO runとPushTは停止維持。新runの再開も開始時ソース・環境・設定を使う。自動評価・定期監視は予約しない。[記録](../../mylewm/docs/reports/LIBERO_NO_PIN_TRAINING.ja.md)。
 
 2026-09-11追記：ユーザー依頼のGB10メモリ対照試験でPushT＋LIBERO併走中の新規CUDA context OOMを再現。PushTの固定host予約約16GiBが寄与し、PushTのpin-memory無効条件では観測中に失敗せず、再有効化で再発した。最初の併走試験ではLIBEROだけの停止で回復。単独試験は観測中成功。短期条件の結果であり長時間保証ではない。元の本学習・再開条件を変更しない。[対照試験](../../mylewm/docs/reports/GB10_MEMORY_CONTROLS.ja.md)。

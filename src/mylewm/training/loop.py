@@ -103,6 +103,33 @@ class StepBatches:
                 0,self.n,size=self.batch).tolist()
 
 
+class ValidationBatches:
+    """Ordered, complete validation with at least two samples for SIGReg.
+
+    Move one sample from the penultimate batch to a singleton tail. With
+    batch_size=2, an odd-sized dataset instead needs a final batch of three.
+    """
+    def __init__(self, size, batch_size):
+        if batch_size < 2:
+            raise ValueError('SIGReg requires --batch-size >= 2')
+        if size < 2:
+            raise ValueError('SIGReg requires at least two validation clips')
+        self.size, self.batch_size = size, batch_size
+
+    def __len__(self):
+        count = (self.size + self.batch_size - 1) // self.batch_size
+        return count - int(self.batch_size == 2 and self.size % 2 == 1)
+
+    def __iter__(self):
+        start = 0
+        while start < self.size:
+            stop = min(start + self.batch_size, self.size)
+            if self.size - stop == 1:
+                stop = self.size if self.batch_size == 2 else stop - 1
+            yield list(range(start, stop))
+            start = stop
+
+
 def preprocess(batch,m,device):
     pixels, actions = [x.to(device,non_blocking=True) for x in batch]
     x = pixels.float()/255
@@ -137,6 +164,8 @@ def train(args, adapter=None):
     adapter = adapter or TrainingAdapter(Clips, preprocess, build_model)
     if args.mode not in ('raw', 'tc', 'bt'):
         raise ValueError(f'Unsupported mode: {args.mode}')
+    if args.batch_size < 2:
+        raise ValueError('SIGReg requires --batch-size >= 2')
     schedule=UpdateSchedule(args.steps,args.warmup_steps,args.lr,args.min_lr)
     if getattr(args,'deterministic',False):
         os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG',':4096:8')
@@ -153,6 +182,9 @@ def train(args, adapter=None):
     full = getattr(args, 'verify_data', False)
     print(json.dumps({'event':'verifying_training_data', 'verification':'sha256' if full else 'size_mtime'}),flush=True)
     data_identity=verify_training_data(m, full=full)
+    ds=adapter.dataset(m)
+    validation_ds=adapter.dataset(m,True)
+    validation_batches=ValidationBatches(len(validation_ds),args.batch_size)
     model=adapter.build_model().to(device)
     initial_model_sha256=tensor_state_hash(model.state_dict())
     model.register_buffer('training_action_mean',torch.tensor(m['action_mean'],device=device,dtype=torch.float64))
@@ -167,6 +199,7 @@ def train(args, adapter=None):
         opt.add_param_group({'params': transport_parameters})
     config={**vars(args),'schema':'controlled_training_v2',
             'pin_memory':getattr(args,'pin_memory',True),
+            'validation_batching':'sequential_min_two_v1',
             'schedule':schedule.config,'device':device,
             'precision':'bf16_autocast' if device=='cuda' else 'float32',
             'torch_version':str(torch.__version__),
@@ -206,7 +239,6 @@ def train(args, adapter=None):
         atomic_save({'model':model.state_dict(),'regularizer':reg.state_dict(),
                      'random_state':capture_rng()},args.output/'initialization.pt')
     initialization_sha256=file_sha256(args.output/'initialization.pt')
-    ds=adapter.dataset(m)
     budget=training_budget(len(ds),args.steps,args.batch_size)
     budget_path=args.output/'budget.json'
     if args.resume:
@@ -217,7 +249,7 @@ def train(args, adapter=None):
     loader=torch.utils.data.DataLoader(ds,batch_sampler=StepBatches(len(ds),args.batch_size,args.steps,args.seed,start_step),
         num_workers=args.workers,pin_memory=config['pin_memory'] and device=='cuda',persistent_workers=args.workers>0,
         generator=torch.Generator().manual_seed(args.seed+100))
-    val=torch.utils.data.DataLoader(adapter.dataset(m,True),batch_size=args.batch_size,num_workers=0,
+    val=torch.utils.data.DataLoader(validation_ds,batch_sampler=validation_batches,num_workers=0,
         generator=torch.Generator().manual_seed(args.seed+101))
     begin=time.monotonic()
     if device=='cuda':torch.cuda.reset_peak_memory_stats()
