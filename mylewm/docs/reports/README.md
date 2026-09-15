@@ -1,6 +1,8 @@
 # 実験レポート
 
-一覧整理：2026-09-15。研究仕様と現行手順は[文書一覧](../README.md)を参照。各レポートの実験日・検証範囲は本文に記載しています。
+一覧整理：2026-09-16。研究仕様と現行手順は[文書一覧](../README.md)を参照。各レポートの実験日・検証範囲は本文に記載しています。
+
+現在の研究方針は[比較手順](../COMPARISON_PROTOCOL.ja.md)、再利用できる結果と不足は[実験一覧](../EXPERIMENTS.ja.md)を参照してください。このページは個別レポートの索引です。
 
 ## PushTの学習・制御評価
 
@@ -13,23 +15,28 @@
 | [CEM評価高速化・途中checkpoint](CACHED_CEM.ja.md) | 探索設定を維持した画像キャッシュ、10k／20k固定50ケース評価、同一GPUの時間・メモリ実測 |
 | [Goal付き動画・viewer](PUSHT_VIEWER.ja.md) | 保存の重複整理、シーク・選択保持の修正、Playwright検証 |
 
-## LIBEROの学習・評価
+## LIBEROの世界モデル学習・評価
 
 | レポート | 内容 |
 |---|---|
-| [TC-LeWM条件と再学習](TCLEWM_ALIGNMENT.ja.md) | 再生成データ、採用した構成、最新のBT10k→BC40kと固定ジョブ |
-| [LIBERO BC実装](LIBERO_BC.ja.md) | 凍結ViT方策の保存再開・native接続確認、依頼されたBT世界モデル100kの起動記録 |
-| [BT100kのTC-LeWM形式BC](LIBERO_BC_BT100K.ja.md) | 論文仕様の再照合、実データGPU保存再開一致、10タスク推論と短期native接続 |
-| [GB10メモリ対照試験](GB10_MEMORY_CONTROLS.ja.md) | PushT／LIBERO単独・併走・pin切替と新規CUDA context OOMの再現 |
+| [TC-LeWM条件と再学習](TCLEWM_ALIGNMENT.ja.md) | 再生成データ、採用した構成、既存BT10k・補助BC40kの固定ジョブ |
 | [LIBERO固定メモリなしの本学習](LIBERO_NO_PIN_TRAINING.ja.md) | 新規BT100kの開始条件、pin切替の検証、1更新時間の実測 |
 | [LIBERO BT100kの初回CEM評価](LIBERO_BT100K_EVALUATION.ja.md) | 10タスク各1試行・520行動で0/10、全描画監査・終了確認・画像一覧 |
 | [LIBERO CEM切り分け](LIBERO_CEM_DIAGNOSTIC.ja.md) | 成功デモ対ランダム50窓と探索予算60件のオフライン診断、成功率は未再評価 |
 | [世界モデル制御の切り分け](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md) | BT10k・110候補の実測、探索16倍、短期予測、行動分布とGoal距離 |
-| [BC実生成行動の診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md) | 全388デモ・3時刻・3生成、5k／25kの教師行動誤差と汎化 |
-| [再生成データBCの5k／25k評価](LIBERO_BC_OPENVLA_EVALUATION.ja.md) | 256px対応・全タスク画像監査・同条件500試行ずつの起動記録 |
 | [旧・新モデルの予測比較](LIBERO_PREDICTION_COMPARISON.ja.md) | 再生成データBT10kの351条件、旧BT100kとの参考比較、旧BC21%の解釈 |
 | [LIBEROモデル診断](LIBERO_MODEL_DIAGNOSTICS.ja.md) | 保持50デモの行動依存予測と、公式初期状態からの候補順位診断 |
-| [実装・運用監査履歴](IMPLEMENTATION_AUDIT.ja.md) | 数学・接続・再開テスト、LIBERO短期診断、Issue対応、旧試作・失敗記録 |
+
+## BCによる視覚表現の補助評価
+
+未来予測器を使わない経路です。生成行動の教師誤差と、環境での成功率を区別します。
+
+| レポート | 内容 |
+|---|---|
+| [LIBERO BC実装](LIBERO_BC.ja.md) | 凍結ViT方策の保存再開・native接続確認、依頼されたBT世界モデル100kの起動記録 |
+| [BT100kのTC-LeWM形式BC](LIBERO_BC_BT100K.ja.md) | 論文仕様の再照合、実データGPU保存再開一致、10タスク推論と短期native接続 |
+| [BC実生成行動の診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md) | 全388デモ・3時刻・3生成、5k／25k／35kの教師行動誤差と汎化 |
+| [再生成データBCの5k／25k評価](LIBERO_BC_OPENVLA_EVALUATION.ja.md) | 256px対応・画像監査、5k／25k／34k環境評価の起動・停止記録 |
 
 ## データ形式・Policy・学習基盤
 
@@ -38,6 +45,8 @@
 | [LeRobot v3対応](LEROBOT_V3.ja.md) | HDF5との共存、形式間推論、実データBT100更新・保存再開・回帰確認 |
 | [ckpt／LeRobot Policy変換](POLICY_EXPORT.ja.md) | 共通CEM・config・コンバーター、実データ2episode／22時刻の行動一致 |
 | [学習高速化（2026-09-10）](TRAINING_SPEED_20260910.ja.md) | GB10での短期速度比較、同期・転送・任意コンパイル、依存版による差と再開検証 |
+| [GB10メモリ対照試験](GB10_MEMORY_CONTROLS.ja.md) | PushT／LIBERO単独・併走・pin切替と新規CUDA context OOMの再現 |
+| [実装・運用監査履歴](IMPLEMENTATION_AUDIT.ja.md) | 数学・接続・再開テスト、LIBERO短期診断、Issue対応、旧試作・失敗記録 |
 
 ## 研究調査・構成履歴
 

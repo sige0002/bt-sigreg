@@ -1,5 +1,11 @@
 # 構成整理と復元
 
+## 比較評価を入口にした文書整理（2026-09-16）
+
+[比較手順](../COMPARISON_PROTOCOL.ja.md)と[実験一覧](../EXPERIMENTS.ja.md)を追加し、READMEから研究方針・既存結果・操作ガイドへ辿れるようにした。世界モデル＋CEMを主評価、BCを視覚表現の補助評価として、ガイドとレポート索引を整理した。
+
+長くなったVALIDATIONの時系列は[検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md)へ移し、[現行VALIDATION](../VALIDATION.ja.md)には現在の結論と不足をまとめた。旧見出しへのリンクは互換アンカーで保持する。実装・設定・重み・生成物・固定ソースは移動・削除せず、既存runの証拠を保持した。
+
 ## src移行・共通処理整理（2026-09-11）
 
 Python実装を`src/mylewm/`の`algorithms`・`training`・`data`・`evaluation`・`environments`・`policy`へ集約し、シェルはリポジトリ直下の`scripts/`へ移動しました。[現行構成と起動](../../README.md#コードの構成と起動)を参照してください。

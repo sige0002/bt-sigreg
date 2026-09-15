@@ -1,5 +1,8 @@
 # LIBEROのBC：凍結画像encoderから行動を学ぶ
 
+この文書は**視覚表現の補助評価**の手順です。BT-SIGRegの主比較は[比較手順](COMPARISON_PROTOCOL.ja.md)に従い、世界モデルの予測・固定CEMでの制御を測ります。BC生成行動の誤差とBC環境成功率は、明示して区別します。
+
+
 [文書一覧](README.md) · [学習ガイド](TRAINING.ja.md) · [評価ガイド](EVALUATION.ja.md)
 
 BC（Behavior Cloning、行動模倣）は、成功デモの画像に対応する行動を学ぶ方策です。このリポジトリでは、世界モデルで学習したViTを凍結し、タスクID付きのflow matching方策を追加学習します。世界モデルの正則化方式はRaw／TC／BTのままです。

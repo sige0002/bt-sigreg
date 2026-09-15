@@ -2,11 +2,13 @@
 
 [アルゴリズム](ALGORITHM.ja.md) → [実装](IMPLEMENTATION.ja.md) → 学習 → [評価](EVALUATION.ja.md)
 
+2026-09-16の主方針は[BT-SIGRegの比較評価](COMPARISON_PROTOCOL.ja.md)です。このページは学習操作のガイドで、記載したBT10k→BC40kは既存のLIBEROレシピです。**BC工程は補助評価を選んだ場合だけ実施します。** 世界モデル＋CEMの比較では世界モデル学習後に評価へ進みます。
+
 ## 何を学習するか選ぶ
 
 | 目的 | 経路 |
 |---|---|
-| 現在のLIBERO設定で学習する | このページの手順。再生成データ→BT10k→BC40k |
+| 既存のLIBERO再生成データレシピを使う | このページの手順。BT10kまでが世界モデル、BC40kは任意の補助評価 |
 | PushTで基本動作を確認する | [PushT HDF5手順](reference/TRAINING.ja.md#hdf5-pusht-training) |
 | LeRobot Dataset v3を使う | [LeRobot手順](reference/TRAINING.ja.md#lerobot-training)。単一カメラ経路 |
 | 既存のLIBERO世界モデルにBCを追加する | [BCガイド](BEHAVIOR_CLONING.ja.md) |
@@ -125,7 +127,7 @@ validation lossは保持デモ上の誤差であり、制御成功率ではあ�
 
 再開は開始時と同じソース・依存・manifest・構成・予算・出力で`--resume`を指定します。BCでは`--execute`も必要です。LIBEROの再開状態は`resume.pt`です。未使用出力へ新規起動する場合と混同しないでください。固定ソースの場所と、このPCの逐次ジョブの引継ぎは[運用記録](AGENT_OPERATIONS.ja.md)にあります。
 
-このガイドのコマンドは各工程を手動で実行するものです。今回の承認済みジョブは固定ソースから逐次実行しています。ジョブの起動記録を再実行せず、学習後の制御確認は[評価ガイド](EVALUATION.ja.md)へ進んでください。
+このガイドのコマンドは各工程を手動で実行するものです。既存のBT10k・BC40kジョブは固定ソースから逐次実行した記録で、完了状況は[実験一覧](EXPERIMENTS.ja.md)を参照してください。ジョブの起動記録を再実行せず、学習後の制御確認は[評価ガイド](EVALUATION.ja.md)へ進んでください。
 
 <details>
 <summary>従来の詳細手順へのリンク（旧URL互換）</summary>

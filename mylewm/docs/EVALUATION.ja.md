@@ -2,12 +2,14 @@
 
 [アルゴリズム](ALGORITHM.ja.md) → [実装](IMPLEMENTATION.ja.md) → [学習](TRAINING.ja.md) → 評価
 
+BT-SIGRegの効果を調べる場合は、先に[比較手順](COMPARISON_PROTOCOL.ja.md)でRaw／TC／BTの共通条件を決め、[既存実験一覧](EXPERIMENTS.ja.md)で再利用できる証拠を確認します。このページはその条件を実行するための操作ガイドです。CEM改善とBCは主比較の代わりにしません。
+
 ## 最初に評価経路を選ぶ
 
 | 経路 | 入力checkpoint | 測るもの |
 |---|---|---|
 | 世界モデル＋CEM | `step_N_object.ckpt` | 予測器と行動探索を組み合わせた制御能力 |
-| 凍結encoder＋BC | `step_N_bc.pt` | 画像表現と学習済み模倣方策を組み合わせた制御能力 |
+| 凍結encoder＋BC（補助） | `step_N_bc.pt` | 画像表現と学習済み模倣方策を組み合わせた制御能力 |
 | オフライン診断 | 世界モデルcheckpointと保持デモ | 行動依存の予測、候補順位、誤差。環境成功率ではない |
 
 **lossが低いことと、タスクに成功することは別です。** CEMの候補数を増やして予測コストが下がっても、実環境で成功した証拠にはなりません。BC評価ではCEMを使いません。
@@ -20,6 +22,14 @@ LIBERO-10は10タスクを環境内で実行し、`env.check_success()`で成功
 学習時と評価時で、カメラ・画像の向きと前処理・行動の意味・正規化統計を一致させます。LIBERO本体とOSMesaを用意し、[画像監査](reference/EVALUATION.ja.md#libero-2-osmesa画像監査)を先に通してください。実環境を呼ぶコマンドは`scripts/run_libero.sh`経由で実行します。
 
 BC評価器は保存データの全デモ・両カメラから描画解像度（128／256px）を判定し、混在を拒否します。256pxモデルには同じデータで取得した256pxの画像監査が必要です。`audit_libero_images --regenerated --dataset <再生成data> --task-id N --output <未使用出力>`を`run_libero.sh`経由で全タスク実行してください。再生成データは元デモ順のresetを再現し、実測状態が保存されているt=1,4,8を監査します。t=0は元の初期状態が保存され、settling後画像と一致しないため使いません。閾値は旧経路と同じです。
+
+### 世界モデル＋CEMを評価する
+
+`mylewm.evaluation.evaluate_libero`へ世界モデルのobject checkpointを渡します。BC checkpointは渡せません。Goal画像を使って、予測上でGoalに近づく行動列を探索します。[CEMの実行例と出力確認](reference/EVALUATION.ja.md#libero-4-実環境cem評価)
+
+比較するときは候補数・反復数・horizon・実行行動数を固定し、初期状態・Goal・前処理も照合します。探索量が違う結果を、そのまま世界モデルの優劣としません。CEMとBCの成功率も同条件比較にはなりません。
+
+現行の通しCEM評価器は128px描画を前提とする箇所が残っています。新256pxモデルの比較に進む前に、この経路の解像度対応と画像監査を確認してください。BC評価器・native診断の256px対応だけでは代用できません。
 
 ### BCを評価する
 
@@ -41,12 +51,6 @@ bash scripts/run_libero.sh -m mylewm.evaluation.evaluate_libero_bc \
 既定はdry-runです。実行する場合だけ同じコマンドに`--execute`を追加します。各タスク50初期状態で計500試行、1試行最大520行動です。通常reset→固定初期状態→ゼロ行動5回の後、8行動ずつ生成・実行します。
 
 少数の接続確認なら`--task-ids 0 --episodes 1 --budget 9`に変え、別出力で実行できます。少数試行の成績から全タスク平均を推定しません。BCのタスクIDは名前を経由してcheckpoint内の順序へ対応付けます。
-
-### 世界モデル＋CEMを評価する
-
-`mylewm.evaluation.evaluate_libero`へ世界モデルのobject checkpointを渡します。BC checkpointは渡せません。Goal画像を使って、予測上でGoalに近づく行動列を探索します。[CEMの実行例と出力確認](reference/EVALUATION.ja.md#libero-4-実環境cem評価)
-
-比較するときは候補数・反復数・horizon・実行行動数を固定し、初期状態・Goal・前処理も照合します。探索量が違う結果を、そのまま世界モデルの優劣としません。CEMとBCの成功率も同条件比較にはなりません。
 
 <a id="pusht"></a>
 ## PushTを評価する
