@@ -28,6 +28,8 @@ def main():
     group.add_argument('--task-index',type=int,choices=range(10),
                        help='Legacy index into lexically sorted local HDF5 files')
     parser.add_argument('--max-mae',type=float,default=10.)
+    parser.add_argument('--regenerated', action='store_true',
+                        help='OpenVLA regenerated data: seeded default scene, skip synthetic state at t=0')
     args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=False)
     files=sorted(args.dataset.expanduser().glob('*.hdf5'))
@@ -41,27 +43,36 @@ def main():
     else:
         p=files[0 if args.task_index is None else args.task_index]
     with h5py.File(p) as f:
-        demo=f['data/demo_0']
+        demo=f['data'][sorted(f['data'], key=lambda key:int(key.split('_')[1]))[0]]
+        image_size=demo['obs/agentview_rgb'].shape[1]
+        if image_size not in (128,256): raise ValueError('Unsupported image size')
         name=p.stem.removesuffix('_demo')
         env=OffScreenRenderEnv(bddl_file_name=str(Path(get_libero_path('bddl_files'))/'libero_10'/f'{name}.bddl'),
-                              camera_heights=128,camera_widths=128)
+                              camera_heights=image_size,camera_widths=image_size)
         try:
-            tree=ET.fromstring(postprocess_model_xml(demo.attrs['model_file']))
-            for node in tree.find('asset'):
-                filename=node.get('file')
-                if filename and not Path(filename).exists():
-                    if '/assets/' not in filename: raise FileNotFoundError(filename)
-                    new=Path(get_libero_path('assets'))/filename.split('/assets/',1)[1]
-                    if not new.exists(): raise FileNotFoundError(new)
-                    node.set('file',str(new))
-            env.reset(); env.reset_from_xml_string(ET.tostring(tree,encoding='unicode'))
+            if args.regenerated:
+                env.seed(0)
+                # Regeneration resets once for every original demo, including rejected ones.
+                # Fixtures can be randomized outside the flattened simulator state.
+                for _ in range(int(demo.name.rsplit('_', 1)[1]) + 1):
+                    env.reset()
+            else:
+                tree=ET.fromstring(postprocess_model_xml(demo.attrs['model_file']))
+                for node in tree.find('asset'):
+                    filename=node.get('file')
+                    if filename and not Path(filename).exists():
+                        if '/assets/' not in filename: raise FileNotFoundError(filename)
+                        new=Path(get_libero_path('assets'))/filename.split('/assets/',1)[1]
+                        if not new.exists(): raise FileNotFoundError(new)
+                        node.set('file',str(new))
+                env.reset(); env.reset_from_xml_string(ET.tostring(tree,encoding='unicode'))
             rows=[]
-            for t in (0,4,8):
+            for t in ((1,4,8) if args.regenerated else (0,4,8)):
                 obs=env.set_init_state(demo['states'][t])
                 for recorded,rendered in [('agentview_rgb','agentview_image'),('eye_in_hand_rgb','robot0_eye_in_hand_image')]:
                     target=demo[f'obs/{recorded}'][t].astype(np.float32)
                     image=obs[rendered].astype(np.float32)
-                    if t==0:
+                    if t==(1 if args.regenerated else 0):
                         target_path=args.output/f'{recorded}_recorded.png'
                         render_path=args.output/f'{recorded}_rendered.png'
                         if not target_path.exists(): Image.fromarray(target.astype(np.uint8)).save(target_path)
@@ -69,7 +80,10 @@ def main():
                     rows.append({'t':t,'camera':recorded,'mae_native':float(np.abs(image-target).mean()),
                                  'mae_vertical_flip':float(np.abs(image[::-1]-target).mean()),
                                  'mae_horizontal_flip':float(np.abs(image[:,::-1]-target).mean())})
-            report={'task':name,'mujoco_state_replay':'stored model XML; only asset file locations rewritten',
+            report={'task':name,'mujoco_state_replay':('seed-0 original-demo reset sequence; measured states t>=1' if args.regenerated else 'stored model XML; only asset file locations rewritten'),
+                    'image_size':image_size, 'dataset_file':str(p.resolve()),
+                    'dataset_size':p.stat().st_size,'dataset_mtime_ns':p.stat().st_mtime_ns,
+                    'demo':demo.name,
                     'comparisons':rows}
             import mujoco
             report['mujoco']=mujoco.__version__

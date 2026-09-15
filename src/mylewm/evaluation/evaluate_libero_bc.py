@@ -89,6 +89,36 @@ def reference_images(m, task_name):
     return None, None
 
 
+def native_image_size(manifest):
+    """Read the recorded camera contract, independently of encoder resize size."""
+    sizes = set()
+    for item in manifest['files']:
+        with h5py.File(item['path'], 'r') as f:
+            for demo in f['data'].values():
+                for camera in manifest['camera_order']:
+                    shape = demo[f'obs/{camera}'].shape
+                    if len(shape) != 4 or shape[-1] != 3 or shape[1] != shape[2]:
+                        raise ValueError('Require square native RGB camera images')
+                    sizes.add(shape[1])
+    if len(sizes) != 1 or next(iter(sizes)) not in (128, 256):
+        raise ValueError('Inconsistent or unsupported native image size')
+    return sizes.pop()
+
+
+def validate_render_audit(audit, task, mujoco_version, size, dataset_file):
+    if not (audit['passed'] and audit['task'] == task and audit['mujoco'] == mujoco_version
+            and audit['render_backend'] == 'osmesa'):
+        raise ValueError(f'Render audit missing or incompatible for {task}')
+    # Historical reports predate resolution metadata and were all 128px.
+    if audit.get('image_size', 128) != size:
+        raise ValueError('Render audit resolution differs from dataset')
+    if size != 128 or 'dataset_file' in audit:
+        st = Path(dataset_file).stat()
+        if (Path(audit.get('dataset_file', '')).resolve() != Path(dataset_file).resolve()
+                or audit.get('dataset_size') != st.st_size or audit.get('dataset_mtime_ns') != st.st_mtime_ns):
+            raise ValueError('Render audit dataset identity differs')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--checkpoint', type=Path, required=True, help='step_N_bc.pt, not a world-model checkpoint')
@@ -119,12 +149,13 @@ def main():
     m = json.loads(args.manifest.read_text())
     validate_manifest(m)
     identity = verify_training_data(m, full=args.verify_data)
+    image_size = native_image_size(m)
     metadata = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     metadata.update(controller='flow_matching_bc_v1', checkpoint_sha256=file_sha256(args.checkpoint),
                     manifest_sha256=file_sha256(args.manifest), data_identity=identity,
                     metric='native env.check_success()', goal='none; task ID supplied to policy',
                     initial_history=f'one current measured camera pair; {args.settling_steps} settling actions',
-                    control_fps=20, video_fps=20,
+                    control_fps=20, video_fps=20, native_image_size=image_size,
                     source_sha256={name: file_sha256(path) for name, path in {
                         'evaluation': Path(__file__),
                         'policy': Path(__file__).parents[1] / 'policy/libero_bc.py',
@@ -159,9 +190,8 @@ def main():
                 raise ValueError(f'Task absent from BC policy: {task.name}')
             audit_path = args.render_audit_dir / f'task_{task_id}' / 'report.json'
             audit = json.loads(audit_path.read_text())
-            if not (audit['passed'] and audit['task'] == task.name and audit['mujoco'] == mujoco.__version__
-                    and audit['render_backend'] == 'osmesa'):
-                raise ValueError(f'Render audit missing or incompatible for {task.name}')
+            validate_render_audit(audit, task.name, mujoco.__version__, image_size,
+                                  m['files'][m['task_names'].index(task.name)]['path'])
             audits[task.name] = file_sha256(audit_path)
             initial_states[task.name] = file_sha256(Path(get_libero_path('init_states')) / task.problem_folder / task.init_states_file)
         metadata.update(mujoco=mujoco.__version__, render_backend='osmesa', render_audit_sha256=audits,
@@ -181,7 +211,7 @@ def main():
                     raise ValueError('Insufficient native initial states')
                 reference, demo_name = reference_images(m, task.name)
                 env = OffScreenRenderEnv(bddl_file_name=str(Path(get_libero_path('bddl_files')) / task.problem_folder / task.bddl_file),
-                                         camera_heights=128, camera_widths=128, control_freq=20)
+                                         camera_heights=image_size, camera_widths=image_size, control_freq=20)
                 try:
                     for init_id in range(args.offset, args.offset + args.episodes):
                         seed = args.seed + task_id * 10000 + init_id

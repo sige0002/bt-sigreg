@@ -272,3 +272,27 @@ def test_bc_default_matches_paper_policy_recipe():
     args=trainer.parser().parse_args(['--checkpoint','world_object.ckpt','--output','unused'])
     assert (args.horizon,args.euler_steps,args.steps,args.batch_size,args.lr)==(8,10,40000,256,2e-4)
     assert not args.execute
+
+
+def test_bc_native_resolution_and_audit_identity(tmp_path):
+    from mylewm.evaluation.evaluate_libero_bc import native_image_size, validate_render_audit
+    path = tmp_path / 'demo.hdf5'
+    with h5py.File(path, 'w') as f:
+        for camera in ('agentview_rgb', 'eye_in_hand_rgb'):
+            f.create_dataset(f'data/demo_7/obs/{camera}', shape=(2, 256, 256, 3), dtype='u1')
+    manifest = {'files': [{'path': str(path)}], 'camera_order': ['agentview_rgb', 'eye_in_hand_rgb']}
+    assert native_image_size(manifest) == 256
+    old = {'passed': True, 'task': 'task', 'mujoco': 'test', 'render_backend': 'osmesa'}
+    with pytest.raises(ValueError, match='resolution'):
+        validate_render_audit(old, 'task', 'test', 256, path)
+    audit = dict(old, image_size=256, dataset_file=str(path), dataset_size=path.stat().st_size,
+                 dataset_mtime_ns=path.stat().st_mtime_ns)
+    validate_render_audit(audit, 'task', 'test', 256, path)
+    with pytest.raises(ValueError, match='identity'):
+        validate_render_audit(dict(audit, dataset_size=1), 'task', 'test', 256, path)
+    with h5py.File(path, 'a') as f:
+        f.create_dataset('data/demo_8/obs/agentview_rgb', shape=(2, 128, 128, 3), dtype='u1')
+        f.create_dataset('data/demo_8/obs/eye_in_hand_rgb', shape=(2, 128, 128, 3), dtype='u1')
+    with pytest.raises(ValueError, match='Inconsistent'):
+        native_image_size(manifest)
+    validate_render_audit(old, 'task', 'test', 128, path)
