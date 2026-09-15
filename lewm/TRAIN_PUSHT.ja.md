@@ -77,7 +77,9 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 
 ### A4. 本学習の予算を選ぶ
 
-公式の既定は`trainer.max_epochs=100`、batch128、LR5e-5、weight decay0.001、SIGReg係数0.09。**100エポックは10万ステップではありません。** 手元HDF5ローダーの過去の件数監査では100エポック相当は約139万更新でしたが、配布モデルの実際の学習履歴とは断定できません。
+2026-09-16訂正：**論文のPushTは10 epochs**（[付録E](https://arxiv.org/html/2603.19312v1#A5)）。[Figure 18（PDF p.28）](https://arxiv.org/pdf/2603.19312v1#page=28)の横軸はNum Stepsで、曲線末尾は約18万更新と読み取れる。ただし厳密な最終更新数を示すログではない。公開コードの`trainer.max_epochs=100`は既定値であり、論文の実験予算ではない。論文条件へ揃える場合は`trainer.max_epochs=10`を明示する。
+
+batch128、LR5e-5、weight decay0.001、SIGReg係数0.09は公開設定を参照する。10 epochsをローカルで何更新と数えるかはデータ・分割・窓抽出・DataLoader長による。過去のローカル監査の「100 epochs相当約139万更新」はその経路の換算であり、論文の約18万更新を否定する根拠ではない。Raw／TC／BTで同じバッチ提示数・更新数・LR進行を揃え、既存100kを論文同予算と呼ばない。
 
 試運転が正常に通った後、別の新しい出力先に切り替えて実行します。次は公式trainer側を10万更新で制限する構文例です。
 

@@ -48,6 +48,8 @@ Rawはzへ直接SIGReg、TCは時間残差へSIGReg、BTは学習専用の有界
 
 ## 3. PushTから比較を組む
 
+論文のPushT学習予算は10 epochs。Figure 18の曲線は約18万更新までを示す（図からの概数）。公開コードの100 epochs既定値や既存ローカル100kと区別する。[一次資料と更新数の扱い](../../lewm/TRAIN_PUSHT.ja.md#a4-本学習の予算を選ぶ)。同じ10 epochsでも窓抽出等で更新数が変わるため、実DataLoader長と提示数を照合する。
+
 最初に既存LeWM・Raw・BTの重みと評価条件を棚卸しする。公式重みとの参考比較を整えつつ、方式差を見る主比較を作る。
 
 1. 同じ学習経路でRawとBTの条件を固定する。現在の`mylewm.training.train`は`--mode raw|bt`対応。**このCLIにTCは未対応**なので、`--mode tc`を使える前提の手順を書かない。TC追加は別の実装・回帰確認が必要。

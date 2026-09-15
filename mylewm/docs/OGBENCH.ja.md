@@ -4,6 +4,8 @@
 
 今回は公開資料・ローカルコードの照合とHydra設定展開まで確認した。データ・重みのダウンロード、環境起動、学習・制御評価は未実施。以下の実行例は、その後に使う手順である。
 
+2026-09-16訂正：初版では公開コードの既定値を採用条件にしていたが、[論文の付録E](https://arxiv.org/html/2603.19312v1#A5)ではCubeも10 epochs、[付録D](https://arxiv.org/html/2603.19312v1#A4)ではCEMはPushTのみ30反復・他環境10反復。論文へ揃える実行例はこの2点を明示的に上書きする。PushT Figure 18の約18万更新をCubeへ転用しない。
+
 ## 何をLeWMに揃えるか
 
 [LeWM公式Cube設定](https://github.com/lucas-maes/le-wm/blob/main/config/eval/cube.yaml)は、データ中の状態を復元して未来の画像をGoalにする評価である。[OGBench標準の5タスク評価](https://github.com/seohongpark/ogbench#usage-for-offline-goal-conditioned-rl)とは評価ケースの定義が異なる。「OGBench全体の標準スコア」として報告しない。
@@ -18,12 +20,12 @@
 | 予測器 | 深さ6、heads16、dim_head64、MLP2048、dropout0.1 |
 | 学習 | batch128、AdamW、LR5e-5、weight decay1e-3、bf16、clip1.0、seed3072 |
 | 正則化の基準 | Raw SIGReg係数0.09、投影1024、knots17 |
-| 予算・分割 | 既定100 epochs、train比率0.9。実更新数・分割単位をデータ読込後に記録 |
+| 予算・分割 | 論文10 epochs（コード既定100を上書き）、train比率0.9は公開設定。実更新数・分割単位を記録 |
 | 計画 | horizon5、receding_horizon5、action_block5 |
-| CEM | 候補300、反復30、elite30、var_scale1.0、solver batch1 |
+| CEM | 候補300、反復10（共通YAML既定30を上書き）、elite30、var_scale1.0、solver batch1 |
 | 評価 | 50ケース、seed42、Goalは25行動先、実行予算50、到達時終了 |
 
-**100 epochsは10万更新ではない。** 1 GPU・勾配蓄積なしなら、実際のtrainサンプル数をNとして概ね`100 × floor(N / 128)`更新になる。データの窓抽出とdrop_lastを含めた実DataLoader長で確定する。配布checkpointがこの既定値で何更新学習したかは、設定ファイルだけから断定しない。
+**論文の10 epochsとコード既定100 epochsを区別する。** 1 GPU・勾配蓄積なしなら、実際のtrainサンプル数をNとして概ね`10 × floor(N / 128)`更新になる。データの窓抽出とdrop_lastを含めた実DataLoader長で確定する。配布checkpointが正確に何更新学習したかは、設定ファイルだけから断定しない。
 
 モデルへの主入力は画像・行動であり、`ob_type=states`という環境設定を理由に状態ベクトル学習へ変更しない。学習設定は`observation`も読み込むが、どの列がモデルに消費されるかは実経路で確認する。qpos/qvelとブロック位置・姿勢は初期状態／Goal復元に使い、報酬やタスク仕様を世界モデルの教師に加えない。
 
@@ -61,9 +63,9 @@ HF重みはobject checkpointではない。[LeWM READMEの変換例](../../lewm/
 ```bash
 .venv/bin/python lewm/train.py data=ogb \
   subdir=ogbench_reference output_model_name=cube_lewm \
-  wandb.enabled=false --cfg job --resolve
+  wandb.enabled=false trainer.max_epochs=10 --cfg job --resolve
 .venv/bin/python lewm/eval.py --config-name=cube \
-  policy=ogbench_reference/cube_lewm --cfg job --resolve
+  policy=ogbench_reference/cube_lewm solver.n_steps=10 --cfg job --resolve
 ```
 
 `action_encoder.input_dim`と環境の`max_episode_steps`の`???`は実行関数内で埋まる。設定展開だけでは、データ読込・GPU・描画・checkpoint保存の成功は確認できない。
@@ -73,7 +75,7 @@ HF重みはobject checkpointではない。[LeWM READMEの変換例](../../lewm/
 ```bash
 .venv/bin/python lewm/train.py data=ogb \
   subdir=ogbench_reference output_model_name=cube_lewm \
-  wandb.enabled=false trainer.max_epochs=100 \
+  wandb.enabled=false trainer.max_epochs=10 \
   hydra.run.dir="$OGB_RUN_ROOT/hydra_train"
 ```
 
@@ -91,7 +93,7 @@ HF重みはobject checkpointではない。[LeWM READMEの変換例](../../lewm/
 .venv/bin/python lewm/eval.py --config-name=cube \
   policy=ogbench_reference/cube_lewm \
   +cache_dir="$OGB_DATA_ROOT" \
-  output.filename=cube_reference_50.txt \
+  solver.n_steps=10 output.filename=cube_reference_50.txt \
   hydra.run.dir="$OGB_RUN_ROOT/hydra_eval"
 ```
 
