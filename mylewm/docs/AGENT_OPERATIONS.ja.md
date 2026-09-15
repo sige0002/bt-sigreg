@@ -1,5 +1,8 @@
 # 学習・運用記録
 
+2026-09-15追記：新たなユーザー依頼で最新保存済みBC34kの環境評価を新規起動。`bt-libero10-eval-bc-openvla-34k-s3072`、各10タスク×50試行。5k／25kの停止指示は継続。[34k起動記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md)。
+
+
 2026-09-15 21:46 JST追記：ユーザー指示により再生成データBCの5k／25k環境評価を停止維持。両serviceのMainPID=0・終了143・実プロセスなしを確認。BC40k学習は継続。[停止記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md)。
 
 
