@@ -1,17 +1,36 @@
-# 文書一覧
+# 文書の読み方
 
-目的に合う文書から読み始めてください。操作手順はこの階層、研究の説明は`research/`、実験・監査の記録は`reports/`にまとめています。
+このリポジトリでは、**仕組みを理解するガイド、操作手順、実験の記録**を分けています。初めて読む場合、過去のrun名や実行ログを覚える必要はありません。
 
-| 目的 | 文書 | 内容 |
+## 基本の4章
+
+| 順番 | 文書 | 読み終えたらできること |
 |---|---|---|
-| 学習する | [学習手順](TRAINING.ja.md) | LeRobot／HDF5（PushT・LIBERO-10）別の準備・学習・再開・評価への入口 |
-| 成功率を測る | [評価手順](EVALUATION.ja.md) | PushT・LIBERO-10の環境評価、途中checkpoint評価、結果確認 |
-| 学習済みモデルを使う | [モデル利用](MODEL_USAGE.ja.md) | 入力契約、形式間推論、ckpt読込、LeRobot Policy変換 |
-| LIBERO行動模倣方策を学習する | [BC手順](BEHAVIOR_CLONING.ja.md) | 凍結ViT＋タスクID付きflow方策の学習・再開・native評価 |
-| 実施済み・未完了を確認する | [検証状況](VALIDATION.ja.md) | 現在の検証範囲と主張の限界 |
-| 数式・実装原理を理解する | [BT-SIGReg仕様](research/BT_SIGREG.ja.md) | 目的、写像、境界、証明と制約 |
-| 関連研究・採否を読む | [研究レビュー](research/RESEARCH_REVIEW.ja.md) | 一次資料、比較方針、仮説 |
-| 個別の実験証拠を探す | [実験レポート一覧](reports/README.md) | 実測値、条件、失敗記録、保存先 |
-| 旧構成・復元方法を調べる | [整理履歴](reports/CLEANUP.ja.md) | 改名・統合・削除と復元方法 |
+| 1 | [アルゴリズム](ALGORITHM.ja.md) | 状態z、予測、正則化、BTの役割を説明できる |
+| 2 | [実装](IMPLEMENTATION.ja.md) | 修正したい機能のファイルと、データの流れを探せる |
+| 3 | [学習](TRAINING.ja.md) | データ準備から世界モデル・BC学習までの工程を選べる |
+| 4 | [評価](EVALUATION.ja.md) | CEM／BCのどちらで何を測るか決め、結果を確認できる |
 
-新しい学習や評価は、手順を読むだけでは開始しません。レポートにある旧コマンドは当時の実行記録です。現在の操作には上の手順を使ってください。
+## 目的別の資料
+
+| 目的 | 文書 |
+|---|---|
+| BCの入力・保存再開を詳しく知る | [BCガイド](BEHAVIOR_CLONING.ja.md) |
+| HDF5／LeRobot、推論、Policy exportを使う | [モデル利用](MODEL_USAGE.ja.md) |
+| 数学的な導出・Cayley v2の詳細を読む | [BT仕様](research/BT_SIGREG.ja.md) |
+| 関連研究・研究仮説・比較条件を読む | [研究レビュー](research/RESEARCH_REVIEW.ja.md) |
+| 実証されたことと残る課題を知る | [検証状況](VALIDATION.ja.md) |
+| 個別の実験条件・失敗記録・証拠を探す | [実験レポート一覧](reports/README.md) |
+| このPCの稼働run・停止指示・再開条件を確認する | [運用記録](AGENT_OPERATIONS.ja.md) |
+| 評価や依存変更の作業ルールを確認する | [検証上の制約](AGENT_VALIDATION.ja.md) |
+| 旧構成の改名・復元方法を調べる | [整理履歴](reports/CLEANUP.ja.md) |
+
+## 詳細手順と履歴
+
+`reference/`には従来の細かなCLI例・旧レシピ・トラブルシューティングを保持しています。現在のガイドから必要な節へ移動してください。
+
+- [学習の詳細参照](reference/TRAINING.ja.md)：PushT、LeRobot、旧LIBEROデータ経路
+- [評価の詳細参照](reference/EVALUATION.ja.md)：描画監査、CEM設定、途中checkpoint、viewer
+- [BCの詳細参照](reference/BEHAVIOR_CLONING.ja.md)：保存・再開契約とCLI
+
+`reports/`の「学習中」「未実装」はその記録時点の説明です。最新の操作条件にはガイドと運用記録を使い、過去の実験証拠は書き換えません。

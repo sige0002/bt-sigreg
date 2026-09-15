@@ -121,3 +121,12 @@ CPU限定回帰は **102合格・5スキップ**（15.02秒）。公式Rawのlos
 過去runを厳密再開する場合は、開始時のGit版・環境を別checkoutに用意し、このtarをそのcheckoutへ展開して元のmanifestを復元します（現行checkoutへ一括展開すると現行manifestを上書きするため避けます）。旧絶対パスを必要とする場合に限り、旧パスが未使用であることを確認してその復元checkoutへの一時リンクを作り、作業後にリンクだけを削除します。新manifestへの差し替えやhash照合解除で再開しません。通常運用では旧リンクは不要です。
 
 リンク削除後の検証：全3manifestのサイズ・mtime検証、LIBERO実サンプル1件読込、学習dry-run、評価シェル既定manifestのdry-runが成功。関連回帰17合格（2.26秒）、`git diff --check`合格。ログは`/tmp/bt-manifest-*.log`です。学習・環境評価は開始していません。
+
+
+## 2026-09-15：初読者向けの文書導線
+
+ルートREADMEと文書一覧を、アルゴリズム→実装→学習→評価の4章へ整理した。`ALGORITHM.ja.md`・`IMPLEMENTATION.ja.md`を追加し、`TRAINING.ja.md`・`EVALUATION.ja.md`・`BEHAVIOR_CLONING.ja.md`を現行ガイドとして再構成。最新のLIBERO設定はBT10k→BC40kであり、過去の100k設定と分けて記述した。
+
+旧3文書の詳細は[学習参照](../reference/TRAINING.ja.md)、[評価参照](../reference/EVALUATION.ja.md)、[BC参照](../reference/BEHAVIOR_CLONING.ja.md)へ保持し、移動に伴う相対リンクを補正した。旧明示anchorは現行ガイド末尾の互換リンクから参照できる。個別の実験レポート、データ、checkpoint、固定runソースは削除・移動していない。過去の「LIBERO100更新のみ」は当時の記録と明示した。
+
+今回の整理は文書のみ。現在のCLI引数と照合し、Markdown全体のローカルファイル・anchorリンクを確認した。環境の同期・学習や評価の再起動は行っていない。現行BC評価の128px固定と新256pxデータの条件差も、未完了事項としてガイドへ明記した。

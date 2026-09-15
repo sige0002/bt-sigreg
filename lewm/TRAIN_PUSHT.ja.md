@@ -94,7 +94,7 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 
 途中再開について：公式コードは`run_dir/lewm_weights.ckpt`がある場合にManagerへ渡しますが、通常のLightning保存先とこの探索名の整合・完全再開をこの環境では未検証です。`weights_epoch_N.pt`をその名前に変更して代用してはいけません。確実な途中再開とBTとの比較を優先する場合はBを使います。
 
-公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/TRAINING.ja.md#5-本学習を開始する)が使えます。
+公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/reference/TRAINING.ja.md#5-本学習を開始する)が使えます。
 
 ## B. BTと同条件で比較するRaw LeWM
 
@@ -114,4 +114,4 @@ uv run python mylewm/train.py --mode raw \
 
 本当に学習を開始する場合だけ、上記へ `--execute` を付け、GPUでは `CUBLAS_WORKSPACE_CONFIG=:4096:8` を指定します。比較するBTは `--mode bt` と別の出力名に変え、それ以外は共通にします。両configの `initial_model_sha256`、データ・manifest・予算・前処理を確認してください。新経路に旧 `--initialization` や旧 `resume.pt` を渡しません。
 
-旧初期値生成・比較計画CLIは削除済みです。以前の方式で追試する必要がある場合は[整理記録](../mylewm/docs/CLEANUP.ja.md)の固定コミットから別ディレクトリへ復元します。現在の公式配布重み・既存100kの評価結果と、新規同予算比較は別の実験です。
+旧初期値生成・比較計画CLIは削除済みです。以前の方式で追試する必要がある場合は[整理記録](../mylewm/docs/reports/CLEANUP.ja.md)の固定コミットから別ディレクトリへ復元します。現在の公式配布重み・既存100kの評価結果と、新規同予算比較は別の実験です。
