@@ -132,6 +132,18 @@ def clip_dataset(manifest):
 
 
 def split_datasets(ds, manifest):
+    if manifest.get('split_kind') == 'random_clip_90_10':
+        from mylewm.data.prepare_pusht_comparison import clip_split, index_hash
+        train, val = clip_split(ds, manifest['split_seed'])
+        actual = dict(total_clips=len(ds), train_clips=len(train), validation_clips=len(val),
+                      train_indices_sha256=index_hash(train.indices),
+                      validation_indices_sha256=index_hash(val.indices),
+                      clip_order_sha256=index_hash(np.asarray(ds.clip_indices).reshape(-1)))
+        if any(manifest.get(k) != v for k, v in actual.items()):
+            raise ValueError('Clip split or native loader order changed since preparation')
+        return train, val
+    if manifest.get('split_kind') is not None:
+        raise ValueError('Unknown split kind')
     groups = [manifest[k] for k in ('train_episodes', 'validation_episodes', 'test_episodes')]
     flat = [e for g in groups for e in g]
     if len(flat) != len(set(flat)) or any(not isinstance(e, int) or e < 0 or e >= len(ds.lengths) for e in flat):

@@ -8,6 +8,7 @@
 
 | レポート | 内容 |
 |---|---|
+| [Raw／BT 140k同条件比較](PUSHT_RAW_BT_140K.ja.md) | 公開データの90/10クリップ分割、共通初期値・140k LR、同時学習 |
 | [PushT 100k学習](PUSHT_TRAINING_100K.ja.md) | 完了済みrunの開始条件・出力・最終loss |
 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md) | 途中・最終checkpoint、固定200ケースと上流50ケース、比較条件・失敗・hash |
 | [PushT失敗監査](PUSHT_FAILURE_AUDIT.ja.md) | 固定ケースの一段・5遷移誤差と、遷移／cost／探索の切り分け範囲 |
