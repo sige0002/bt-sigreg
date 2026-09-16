@@ -76,7 +76,7 @@
 
 ## 起動障害・メモリ・所要時間
 
-最初はGB10のCUDAコンテキスト初期化がOOMで失敗。対象HDF5のclean読み取りcache解放でfree RAMが約2.4→34 GiBとなり、CUDA先行初期化で実行可能になった。次に評価専用`PlanningActionAdapter`のCPU過去行動/GPU統計の不一致を修正した。詳しくは[検証記録](../VALIDATION.ja.md)。いずれも試行前の障害を成功率0%に数えていない。
+最初はGB10のCUDAコンテキスト初期化がOOMで失敗。対象HDF5のclean読み取りcache解放でfree RAMが約2.4→34 GiBとなり、CUDA先行初期化で実行可能になった。次に評価専用`PlanningActionAdapter`のCPU過去行動/GPU統計の不一致を修正した。詳しくは[検証記録](VALIDATION.ja.md)。いずれも試行前の障害を成功率0%に数えていない。
 
 15,000/20,000更新の正常評価ではPyTorch peak allocated 471,998,464 bytes、peak reserved 497,025,024 bytes。これらはドライバや他ライブラリ分を含むGPUプロセス全体のpeakではない。学習やQwenの使用量を評価必要量と混同しない。
 
@@ -134,7 +134,7 @@ checkpoint SHA256（削除前に確認）：
 
 出力は`retry_devicefix/step_60000_retry/`。旧`step_60000/`の失敗ログを保持する。結果JSON SHA256は`83781bf0456ede5eb940d0e0c6c65215c76cadcfc66ea74b1c545f711b074159`。公式とのprotocol/provenance、初期状態/Goal、物理探索分布、実checkpoint/manifest hash、成功率を主エージェントが照合した。評価部分411.4秒、PyTorch peak allocated/reservedは471,998,464/497,025,024 bytes。
 
-新launcherの`status.json`は結果検証後succeededとなった。独立監視も動いたが、systemdの一時unitが終了後に自動回収され、最初はmonitor_errorを記録した。これを修正して、検証済み結果は`result_verified`、終了コードの再確認不能は`service_exit_verified=false`と分離。実結果で再確認した。通知daemon不在による送信失敗は依然残り、チャットへの自動通知も未成立。詳しくは[検証記録](../VALIDATION.ja.md)と[過去の監査記録](IMPLEMENTATION_AUDIT.ja.md)。この独立監視は現在廃止済み。
+新launcherの`status.json`は結果検証後succeededとなった。独立監視も動いたが、systemdの一時unitが終了後に自動回収され、最初はmonitor_errorを記録した。これを修正して、検証済み結果は`result_verified`、終了コードの再確認不能は`service_exit_verified=false`と分離。実結果で再確認した。通知daemon不在による送信失敗は依然残り、チャットへの自動通知も未成立。詳しくは[検証記録](VALIDATION.ja.md)と[過去の監査記録](IMPLEMENTATION_AUDIT.ja.md)。この独立監視は現在廃止済み。
 
 ## 70,000/80,000更新の明示依頼による評価（2026-09-09）
 

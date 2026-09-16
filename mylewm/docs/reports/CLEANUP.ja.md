@@ -1,10 +1,27 @@
 # 構成整理と復元
 
+## 初心者向け4章への集約（2026-09-16）
+
+ユーザーの要望により、入口から読む資料をアルゴリズム・実装・学習・評価の4章に絞った。基本ガイドから進行中run・ステップ数・サービス名・過去成績を外し、PushTを例に説明する。学習と評価の同名ファイルは廃止し、補足は内容を示す名前へ変更した。
+
+| 旧配置 | 新配置 |
+|---|---|
+| `reference/TRAINING.ja.md` | `reference/DATASET_RECIPES.ja.md` |
+| `reference/EVALUATION.ja.md` | `reference/CEM_AND_RENDERING.ja.md` |
+| `reference/BEHAVIOR_CLONING.ja.md` | `reference/BC_CHECKPOINT_CONTRACT.ja.md` |
+| `lewm/TRAIN_PUSHT.ja.md` | `reference/LEWM_TRAINER_NOTES.ja.md` |
+| 旧TRAININGのLIBERO中心の本文 | `reference/LIBERO_RECIPE.ja.md` |
+| BC・モデル利用・OGBench・比較条件 | `reference/`の専用資料 |
+| 実験一覧・検証状況 | `reports/` |
+| 作業者向け運用・検証規則 | `operations/` |
+
+リポジトリ内のリンクは新配置へ更新した。旧パスの同名転送ページは残さない。外部から旧ファイルへのリンクはこの表かGit履歴で解決する。実装、学習設定、重み、固定ソース、実験結果は変更していない。
+
 ## 比較評価を入口にした文書整理（2026-09-16）
 
-[比較手順](../COMPARISON_PROTOCOL.ja.md)と[実験一覧](../EXPERIMENTS.ja.md)を追加し、READMEから研究方針・既存結果・操作ガイドへ辿れるようにした。世界モデル＋CEMを主評価、BCを視覚表現の補助評価として、ガイドとレポート索引を整理した。
+[比較手順](../reference/COMPARISON_PROTOCOL.ja.md)と[実験一覧](EXPERIMENTS.ja.md)を追加し、READMEから研究方針・既存結果・操作ガイドへ辿れるようにした。世界モデル＋CEMを主評価、BCを視覚表現の補助評価として、ガイドとレポート索引を整理した。
 
-長くなったVALIDATIONの時系列は[検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md)へ移し、[現行VALIDATION](../VALIDATION.ja.md)には現在の結論と不足をまとめた。旧見出しへのリンクは互換アンカーで保持する。実装・設定・重み・生成物・固定ソースは移動・削除せず、既存runの証拠を保持した。
+長くなったVALIDATIONの時系列は[検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md)へ移し、[現行VALIDATION](VALIDATION.ja.md)には現在の結論と不足をまとめた。旧見出しへのリンクは互換アンカーで保持する。実装・設定・重み・生成物・固定ソースは移動・削除せず、既存runの証拠を保持した。
 
 ## src移行・共通処理整理（2026-09-11）
 
@@ -39,7 +56,7 @@ Python実装を`src/mylewm/`の`algorithms`・`training`・`data`・`evaluation`
 | 旧配置（docs基準） | 現在の配置 |
 |---|---|
 | EVALUATE_PUSHT.ja.md / EVALUATE_LIBERO.ja.md / EVALUATE_INTERMEDIATE.ja.md | [EVALUATION.ja.md](../EVALUATION.ja.md) の各章 |
-| DATA_FORMATS.ja.md / LEROBOT_POLICY.ja.md | [MODEL_USAGE.ja.md](../MODEL_USAGE.ja.md) の各章 |
+| DATA_FORMATS.ja.md / LEROBOT_POLICY.ja.md | [MODEL_USAGE.ja.md](../reference/MODEL_IO.ja.md) の各章 |
 | BT_SIGREG.ja.md / RESEARCH_REVIEW.ja.md | `research/` |
 | CLEANUP.ja.md | 本文書（`reports/`） |
 
@@ -100,7 +117,7 @@ CPU限定回帰は **102合格・5スキップ**（15.02秒）。公式Rawのlos
 
 ## Issueの整理
 
-ユーザー承認により、旧issue #2・#4〜#13 の11件を `not planned` で閉じた。openは0件。実装・学習・検証の完了認定ではなく旧計画の廃止であり、未完了の同予算比較・LIBERO本評価等は[検証状況](../VALIDATION.ja.md)に残す。
+ユーザー承認により、旧issue #2・#4〜#13 の11件を `not planned` で閉じた。openは0件。実装・学習・検証の完了認定ではなく旧計画の廃止であり、未完了の同予算比較・LIBERO本評価等は[検証状況](VALIDATION.ja.md)に残す。
 
 
 ## ローカル仮想環境の統一（2026-09-11）
@@ -133,6 +150,6 @@ CPU限定回帰は **102合格・5スキップ**（15.02秒）。公式Rawのlos
 
 ルートREADMEと文書一覧を、アルゴリズム→実装→学習→評価の4章へ整理した。`ALGORITHM.ja.md`・`IMPLEMENTATION.ja.md`を追加し、`TRAINING.ja.md`・`EVALUATION.ja.md`・`BEHAVIOR_CLONING.ja.md`を現行ガイドとして再構成。最新のLIBERO設定はBT10k→BC40kであり、過去の100k設定と分けて記述した。
 
-旧3文書の詳細は[学習参照](../reference/TRAINING.ja.md)、[評価参照](../reference/EVALUATION.ja.md)、[BC参照](../reference/BEHAVIOR_CLONING.ja.md)へ保持し、移動に伴う相対リンクを補正した。旧明示anchorは現行ガイド末尾の互換リンクから参照できる。個別の実験レポート、データ、checkpoint、固定runソースは削除・移動していない。過去の「LIBERO100更新のみ」は当時の記録と明示した。
+旧3文書の詳細は[学習参照](../reference/DATASET_RECIPES.ja.md)、[評価参照](../reference/CEM_AND_RENDERING.ja.md)、[BC参照](../reference/BC_CHECKPOINT_CONTRACT.ja.md)へ保持し、移動に伴う相対リンクを補正した。旧明示anchorは現行ガイド末尾の互換リンクから参照できる。個別の実験レポート、データ、checkpoint、固定runソースは削除・移動していない。過去の「LIBERO100更新のみ」は当時の記録と明示した。
 
 今回の整理は文書のみ。現在のCLI引数と照合し、Markdown全体のローカルファイル・anchorリンクを確認した。環境の同期・学習や評価の再起動は行っていない。現行BC評価の128px固定と新256pxデータの条件差も、未完了事項としてガイドへ明記した。

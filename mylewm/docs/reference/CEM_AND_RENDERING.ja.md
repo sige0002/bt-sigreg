@@ -1,4 +1,6 @@
-# 評価手順：PushT／LIBERO-10／途中checkpoint
+# CEM・描画監査・viewerの詳細
+
+CLIの詳細と過去の実行例です。現在の比較対象と評価順は[評価ガイド](../EVALUATION.ja.md)を参照してください。
 
 > 詳細参照資料：2026-09-15の整理時点の手順を保持しています。新規作業は[学習ガイド](../TRAINING.ja.md)・[評価ガイド](../EVALUATION.ja.md)から選んでください。過去runの出力名を新規実行に流用しないでください。
 
@@ -8,9 +10,9 @@
 |---|---|
 | HDF5のPushTモデルで成功率を測る | [第1章 PushT](#pusht) |
 | HDF5のLIBERO-10モデルで成功率を測る | [第2章 LIBERO-10](#libero) |
-| LIBEROの凍結ViT＋行動模倣方策を評価する | [BC方策の学習・評価](../BEHAVIOR_CLONING.ja.md) |
+| LIBEROの凍結ViT＋行動模倣方策を評価する | [BC方策の学習・評価](BC_GUIDE.ja.md) |
 | 学習終了前の保存済み重みを評価する | [第3章 途中checkpoint](#intermediate) |
-| LeRobotの保持軌道で予測・Policyを確認する | [学習手順のLeRobot評価](../TRAINING.ja.md#lerobot-evaluation)・[モデル利用](../MODEL_USAGE.ja.md) |
+| LeRobotの保持軌道で予測・Policyを確認する | [学習手順のLeRobot評価](DATASET_RECIPES.ja.md#lerobot-evaluation)・[モデル利用](MODEL_IO.ja.md) |
 
 LeRobot入力からの環境成功率評価は未対応です。validation・オフライン潜在予測・Policy保存形式の一致確認と、環境での制御成功率を分けて扱います。[文書一覧へ戻る](../README.md)。
 

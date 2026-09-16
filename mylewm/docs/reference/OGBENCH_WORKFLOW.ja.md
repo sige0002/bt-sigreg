@@ -10,7 +10,7 @@
 
 [LeWM公式Cube設定](https://github.com/lucas-maes/le-wm/blob/main/config/eval/cube.yaml)は、データ中の状態を復元して未来の画像をGoalにする評価である。[OGBench標準の5タスク評価](https://github.com/seohongpark/ogbench#usage-for-offline-goal-conditioned-rl)とは評価ケースの定義が異なる。「OGBench全体の標準スコア」として報告しない。
 
-参照するローカルファイルは[学習データ](../../lewm/config/train/data/ogb.yaml)、[学習共通設定](../../lewm/config/train/lewm.yaml)、[モデル](../../lewm/config/train/model/lewm.yaml)、[Cube評価](../../lewm/config/eval/cube.yaml)、[CEM](../../lewm/config/eval/solver/cem.yaml)。今回の確認元はGit `569e8ae`。実行時はこれらのhash、解決済み設定、依存版を記録する。`lewm/`にはローカル修正があるため、上流の無改変コピーとは呼ばない。
+参照するローカルファイルは[学習データ](../../../lewm/config/train/data/ogb.yaml)、[学習共通設定](../../../lewm/config/train/lewm.yaml)、[モデル](../../../lewm/config/train/model/lewm.yaml)、[Cube評価](../../../lewm/config/eval/cube.yaml)、[CEM](../../../lewm/config/eval/solver/cem.yaml)。今回の確認元はGit `569e8ae`。実行時はこれらのhash、解決済み設定、依存版を記録する。`lewm/`にはローカル修正があるため、上流の無改変コピーとは呼ばない。
 
 | 項目 | 採用するLeWM設定 |
 |---|---|
@@ -54,7 +54,7 @@ tar --zstd -tf "$OGB_DATA_ROOT/download/cube_single_expert.tar.zst"
 
 HDF5を読み取り専用で調べ、画像・行動の形状／時刻対応、episode境界、`qpos`、`qvel`、`privileged_block_0_pos`、`privileged_block_0_quat`を確認する。`goal_`付き列が評価時にどの未来行から生成されるかも照合する。欠損列を推測で元ファイルへ書き足さない。初回prepareでSHA-256、サイズ・mtime、配布revision、分割、列契約を記録し、通常起動はサイズ・mtime確認にする。OGBench用prepareは現状未実装。
 
-HF重みはobject checkpointではない。[LeWM READMEの変換例](../../lewm/README.md)の入力を`hf_cube`、出力をCube専用パスに変更し、配布configから構築して`strict=True`で読み込む。今回確認したCube configは行動encoder入力25次元で、frameskip5と物理行動5次元に対応する。PushTの2次元行動設定を流用しない。変換後は元state_dictとの一致・予測出力・Goal cost・保存再読込を確認してから評価へ進む。変換自体は未検証。
+HF重みはobject checkpointではない。[LeWM READMEの変換例](../../../lewm/README.md)の入力を`hf_cube`、出力をCube専用パスに変更し、配布configから構築して`strict=True`で読み込む。今回確認したCube configは行動encoder入力25次元で、frameskip5と物理行動5次元に対応する。PushTの2次元行動設定を流用しない。変換後は元state_dictとの一致・予測出力・Goal cost・保存再読込を確認してから評価へ進む。変換自体は未検証。
 
 ## 2. 公式学習設定を展開し、短期接続を確認する
 
@@ -116,4 +116,4 @@ HF重みはobject checkpointではない。[LeWM READMEの変換例](../../lewm/
 
 採用順は、データ／公式重みの準備 → 公式経路の接続・参考評価 → 同じ初期値・データ順・予算のRaw／TC／BT学習 → 固定CEMでの比較。実装回帰、保存再開、公式参考成績、方式間比較を別々に記録する。Cube singleの結果だけでLIBEROの10タスク共有改善を主張しない。
 
-今回はこの手順を追加した段階。実行結果が出たら[実験一覧](EXPERIMENTS.ja.md)と[検証状況](VALIDATION.ja.md)へ証拠を添えて反映する。
+今回はこの手順を追加した段階。実行結果が出たら[実験一覧](../reports/EXPERIMENTS.ja.md)と[検証状況](../reports/VALIDATION.ja.md)へ証拠を添えて反映する。

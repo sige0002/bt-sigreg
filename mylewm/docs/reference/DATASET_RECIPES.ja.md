@@ -1,8 +1,10 @@
-# LeRobot／HDF5：初心者向け学習・評価手順
+# 別データ形式・旧学習経路の詳細
+
+LeRobot・旧episode分割PushT・LIBEROの補足です。現在のPushT clip90・140k比較には[学習ガイド](../TRAINING.ja.md)を使用します。
 
 > 詳細参照資料：2026-09-15の整理時点の手順を保持しています。新規作業は[学習ガイド](../TRAINING.ja.md)・[評価ガイド](../EVALUATION.ja.md)から選んでください。過去runの出力名を新規実行に流用しないでください。
 
-学習済みLIBERO世界モデルにタスクID付き行動模倣方策を追加する場合は[凍結ViT＋BCの学習・評価](../BEHAVIOR_CLONING.ja.md)を参照してください。世界モデル学習とは別工程で、既定dry-runです。
+学習済みLIBERO世界モデルにタスクID付き行動模倣方策を追加する場合は[凍結ViT＋BCの学習・評価](BC_GUIDE.ja.md)を参照してください。世界モデル学習とは別工程で、既定dry-runです。
 
 コードは`src/mylewm/`へ移動しました。環境準備でeditableパッケージを導入し、`python -m mylewm.…`で起動します。[構成・環境準備](../../README.md#コードの構成と起動)。
 
@@ -60,9 +62,9 @@ PYCODE
 
 ## 第1章 LeRobot v3の学習・評価
 
-学習後のckptは直接CEMコントローラーへ読み込むか、別CLIでLeRobot Policyへ変換できます。[変換・config・実データ確認の手順](../MODEL_USAGE.ja.md#policy)。
+学習後のckptは直接CEMコントローラーへ読み込むか、別CLIでLeRobot Policyへ変換できます。[変換・config・実データ確認の手順](MODEL_IO.ja.md#policy)。
 
-HDF5とLeRobot v3は同じ`src/mylewm/training/train.py`を使い、manifestの`data_format`でローダーを選びます。一つのrunに両形式を混ぜません。以下は公式`lerobot/pusht`を取得し、BTを100更新する完全な例です。HDF5の手順は[第2章](#hdf5-pusht-training)を参照してください。入力契約付きの新HDF5 prepareと、HDF5で学習したcheckpointをLeRobotデータへ適用する例は[データ形式と推論](../MODEL_USAGE.ja.md#data)を参照してください。
+HDF5とLeRobot v3は同じ`src/mylewm/training/train.py`を使い、manifestの`data_format`でローダーを選びます。一つのrunに両形式を混ぜません。以下は公式`lerobot/pusht`を取得し、BTを100更新する完全な例です。HDF5の手順は[第2章](#hdf5-pusht-training)を参照してください。入力契約付きの新HDF5 prepareと、HDF5で学習したcheckpointをLeRobotデータへ適用する例は[データ形式と推論](MODEL_IO.ja.md#data)を参照してください。
 
 ### 1.1 環境を用意する
 
@@ -182,15 +184,15 @@ uv run --no-sync python -m mylewm.policy.infer_trajectories \
 
 ### 1.9 Policyの動作確認と環境評価の対応範囲
 
-ckpt直接読込とLeRobot Policy形式のCEM行動一致は、[Policy変換・実データ確認手順](../MODEL_USAGE.ja.md#policy)で確認できます。実機I/O・stockの`lerobot-record`起動・環境成功率評価への接続は未対応です。第2章のHDF5用評価コマンドへLeRobot manifestを渡して評価することはできません。
+ckpt直接読込とLeRobot Policy形式のCEM行動一致は、[Policy変換・実データ確認手順](MODEL_IO.ja.md#policy)で確認できます。実機I/O・stockの`lerobot-record`起動・環境成功率評価への接続は未対応です。第2章のHDF5用評価コマンドへLeRobot manifestを渡して評価することはできません。
 
-保存形式をまたいでモデルを使う場合は、[入力契約と形式間の推論](../MODEL_USAGE.ja.md#data)でカメラ・行動・FPSなどの一致を確認してください。
+保存形式をまたいでモデルを使う場合は、[入力契約と形式間の推論](MODEL_IO.ja.md#data)でカメラ・行動・FPSなどの一致を確認してください。
 
 <a id="hdf5-pusht-training"></a>
 
 ## 第2章 HDF5（PushT）の学習・評価
 
-この章は既存PushT HDF5と従来manifestを使う `pusht_spt_v1` の手順です。入力契約付きHDF5を新規prepareする場合は[契約付きHDF5の学習例](../MODEL_USAGE.ja.md#data-契約付きhdf5で学習する例)を使います。既存データへ未確認のFPSなどを付与しないでください。
+この章は既存PushT HDF5と従来manifestを使う `pusht_spt_v1` の手順です。入力契約付きHDF5を新規prepareする場合は[契約付きHDF5の学習例](MODEL_IO.ja.md#data-契約付きhdf5で学習する例)を使います。既存データへ未確認のFPSなどを付与しないでください。
 
 <a id="新しいpusht経路公式ライブラリへ委託2026-09-09"></a>
 
@@ -448,9 +450,9 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
   --num-eval 50 --seed 42
 ```
 
-内容を確認した後、同じコマンドの末尾に`--execute`を追加します。Rawならcheckpointと出力先をRawのrunに替え、manifest・ケース数・seed・CEM条件を揃えます。GB10固有のcache対処、結果ファイル、終了コードと`status.json`の照合は[PushT評価手順](../EVALUATION.ja.md#pusht)を参照してください。途中checkpointは[途中評価手順](../EVALUATION.ja.md#intermediate-pusht)を使います。
+内容を確認した後、同じコマンドの末尾に`--execute`を追加します。Rawならcheckpointと出力先をRawのrunに替え、manifest・ケース数・seed・CEM条件を揃えます。GB10固有のcache対処、結果ファイル、終了コードと`status.json`の照合は[PushT評価手順](../EVALUATION.ja.md#pusht)を参照してください。途中checkpointは[途中評価手順](CEM_AND_RENDERING.ja.md#intermediate-pusht)を使います。
 
-入力契約付きHDF5の保存軌道上の予測やLeRobotへの適用は、[データ形式とオフライン推論](../MODEL_USAGE.ja.md#data)を参照してください。
+入力契約付きHDF5の保存軌道上の予測やLeRobotへの適用は、[データ形式とオフライン推論](MODEL_IO.ja.md#data)を参照してください。
 
 ### 8. 学習レシピ・過去runとの違い
 
@@ -501,7 +503,7 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 新規PushTの学習は冒頭の `train.py` に統一します。PushTのパス指定・prepare・学習・再開は前半の完全な例を使います。LIBEROは `train_libero.py` から共有ループを使用します。旧RBG、`--blocks`、`--cross-weight`、廃止済み初期値ファイルの読込引数 `--initialization` はありません。Raw/TC/BTは同じseedから初期化し、記録された初期モデルhashで照合します。過去の完全な手順・再開は[整理記録](../reports/CLEANUP.ja.md)のGit履歴を参照してください。
 
-公式LeWM側を学習したい場合は[公式PushT学習の説明書](../../../lewm/TRAIN_PUSHT.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
+公式LeWM側を学習したい場合は[公式PushT学習の説明書](LEWM_TRAINER_NOTES.ja.md)を参照してください。公式trainerの経路と、公平なBT比較向けRaw経路を分けています。
 
 以下はLIBERO-10のHDF5取得・学習手順です。PushTの学習は前半の例を使い、ここでは重ねて起動しません。LIBEROには新PushT用の`--val-every`と`--compile-encoder`はありません。PushTとLIBEROの学習は一方ずつ実行してください。
 
@@ -513,7 +515,7 @@ UV_NO_SYNC=1 bash scripts/evaluate_pusht.sh \
 
 ### 0. 固定依存の環境を用意する
 
-以下は環境準備の工程です。学習・評価が稼働中の共有`.venv`では`uv sync`や自動同期を行わず、準備済み環境を`UV_NO_SYNC=1`で使うか、分離環境を用意します。[途中評価時の環境注意](../EVALUATION.ja.md#intermediate-実行前の確認)を参照してください。
+以下は環境準備の工程です。学習・評価が稼働中の共有`.venv`では`uv sync`や自動同期を行わず、準備済み環境を`UV_NO_SYNC=1`で使うか、分離環境を用意します。[途中評価時の環境注意](CEM_AND_RENDERING.ja.md#intermediate-実行前の確認)を参照してください。
 
 前半で固定依存の環境を準備済みなら、同期を繰り返す必要はありません。別端末では`cd`と環境変数を同じ値で設定します。以下は準備済みの環境を確認する例です。`pyproject.toml`と`uv.lock`はGB10/CUDA 13向けです。
 
@@ -673,9 +675,9 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run --no-sync python -m mylewm.training.train
 
 ### 8. 評価：LIBERO環境で成功率を測る
 
-学習後の`output/libero10/bt_train/step_100000_object.ckpt`と、学習に使った`output/manifests/libero10/manifest.json`を使います。環境評価にはLIBERO本体・OSMesaなどの準備とrender監査が必要です。[LIBERO評価手順](../EVALUATION.ja.md#libero-2-osmesa画像監査)の監査を済ませ、同文書の「実環境CEM評価」へ進んでください。BTではcheckpointと出力先をBTのrunに合わせます。
+学習後の`output/libero10/bt_train/step_100000_object.ckpt`と、学習に使った`output/manifests/libero10/manifest.json`を使います。環境評価にはLIBERO本体・OSMesaなどの準備とrender監査が必要です。[LIBERO評価手順](CEM_AND_RENDERING.ja.md#libero-2-osmesa画像監査)の監査を済ませ、同文書の「実環境CEM評価」へ進んでください。BTではcheckpointと出力先をBTのrunに合わせます。
 
-dry-run後に`--execute`を付けて実行します。終了コード0と`status.json`の`succeeded`、`summary.json`、`episodes.jsonl`、各初期状態の記録を照合します。平均成功率に加え、10タスクそれぞれの結果も確認してください。途中checkpointは[途中評価手順](../EVALUATION.ja.md#intermediate-libero-10)を使います。LIBERO-10の本学習・制御成功率は未検証です。
+dry-run後に`--execute`を付けて実行します。終了コード0と`status.json`の`succeeded`、`summary.json`、`episodes.jsonl`、各初期状態の記録を照合します。平均成功率に加え、10タスクそれぞれの結果も確認してください。途中checkpointは[途中評価手順](CEM_AND_RENDERING.ja.md#intermediate-libero-10)を使います。LIBERO-10の本学習・制御成功率は未検証です。
 
 ### 9. よくある問題
 
@@ -688,4 +690,4 @@ dry-run後に`--execute`を付けて実行します。終了コード0と`status
 | NaN/Inf・10分以上進まない | 端末の例外、プロセス、データ読込を確認し報告。自動再起動や設定変更で隠さない |
 | lossが短期確認より大きい | SIGRegの値はbatch数にも依存する。batch16と128の生lossを直接比較しない |
 
-学習が終わっても、PushT/LIBEROの**成功率評価は別工程**です。[PushT評価手順](../EVALUATION.ja.md#pusht)・[LIBERO評価手順](../EVALUATION.ja.md#libero)と[検証記録](../VALIDATION.ja.md)を参照してください。
+学習が終わっても、PushT/LIBEROの**成功率評価は別工程**です。[PushT評価手順](../EVALUATION.ja.md#pusht)・[LIBERO評価手順](../EVALUATION.ja.md#libero)と[検証記録](../reports/VALIDATION.ja.md)を参照してください。

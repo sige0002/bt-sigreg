@@ -1,17 +1,17 @@
 # モデル利用：データ形式・推論・LeRobot Policy
 
-LIBEROのタスクID付き行動模倣方策は[凍結ViT＋BC](BEHAVIOR_CLONING.ja.md)を参照してください。この文書のLeRobot Policyは世界モデル＋CEMを包む形式で、BC方策とは別です。
+LIBEROのタスクID付き行動模倣方策は[凍結ViT＋BC](BC_GUIDE.ja.md)を参照してください。この文書のLeRobot Policyは世界モデル＋CEMを包む形式で、BC方策とは別です。
 
-コードは`src/mylewm/`へ移動しました。環境準備でeditableパッケージを導入し、`python -m mylewm.…`で起動します。[構成・環境準備](../README.md#コードの構成と起動)。
+コードは`src/mylewm/`へ移動しました。環境準備でeditableパッケージを導入し、`python -m mylewm.…`で起動します。[構成・環境準備](../../README.md#コードの構成と起動)。
 
-学習の実行順は[学習手順](TRAINING.ja.md)、環境での成功率計測は[評価手順](EVALUATION.ja.md)を参照してください。この文書は入力条件の照合と学習済みモデルの利用を扱います。
+学習の実行順は[学習手順](../TRAINING.ja.md)、環境での成功率計測は[評価手順](../EVALUATION.ja.md)を参照してください。この文書は入力条件の照合と学習済みモデルの利用を扱います。
 
 | 目的 | 読む章 |
 |---|---|
 | HDF5／LeRobotの入力契約、形式間のオフライン推論 | [第1章 データ形式と推論](#data) |
 | ckptを直接使う、LeRobot Policyへ変換・検証する | [第2章 Policy利用](#policy) |
 
-[文書一覧へ戻る](README.md)。
+[文書一覧へ戻る](../README.md)。
 
 <a id="data"></a>
 
@@ -124,7 +124,7 @@ uv run --no-sync python -m mylewm.policy.infer_trajectories \
 
 ## 第2章 ckpt読込・LeRobot Policy変換
 
-世界モデル＋CEMの共通コントローラーを、既存ckptから直接、またはLeRobot形式の保存ディレクトリから使えます。コンバーターは別CLIです。実データの画像・行動・目標を使った比較まで確認しています。[実行記録](reports/POLICY_EXPORT.ja.md)。
+世界モデル＋CEMの共通コントローラーを、既存ckptから直接、またはLeRobot形式の保存ディレクトリから使えます。コンバーターは別CLIです。実データの画像・行動・目標を使った比較まで確認しています。[実行記録](../reports/POLICY_EXPORT.ja.md)。
 
 現行対応は単一カメラの`lewm_tiny_v1`（192次元の既存LeWM E/A/F）、Raw／BTの推論用object ckpt、および新経路Lightningの訓練ckptです。BTのT・optimizerはPolicyへ含めません。LIBEROの2カメラモデルや任意のPyTorchモデルを自動変換するものではありません。
 

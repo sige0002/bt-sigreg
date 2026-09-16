@@ -1,12 +1,14 @@
-# 公式LeWMをPushTで学習する：初心者向け手順
+# LeWM公式trainerの補足とローカル経路との差
 
-この説明書はローカル比較用の補足です。上流の説明は[README](README.md)、参照commitは[UPSTREAM.md](UPSTREAM.md)に記録しています。対象は**既存環境とダウンロード済みPushT HDF5がある、このPC**です。PushT用の`pyproject.toml`・`uv.lock`と[環境・データ導入手順](../mylewm/docs/TRAINING.ja.md)は整備済みです。ただし別PCの全ハードウェア構成やAの公式trainer完走まで保証するものではありません。
+公式trainerの参考資料です。現在のRaw／BT共通学習は[学習ガイド](../TRAINING.ja.md)を使用します。以下の過去の起動例・経緯を、現在の稼働状態とは扱いません。
+
+この説明書はローカル比較用の補足です。上流の説明は[README](../../../lewm/README.md)、参照commitは[UPSTREAM.md](../../../lewm/UPSTREAM.md)に記録しています。対象は**既存環境とダウンロード済みPushT HDF5がある、このPC**です。PushT用の`pyproject.toml`・`uv.lock`と[環境・データ導入手順](../TRAINING.ja.md)は整備済みです。ただし別PCの全ハードウェア構成やAの公式trainer完走まで保証するものではありません。
 
 2026-09-09時点でBTの100,000更新は完了しています。この説明書の更新では公式学習を開始していません。新規実行前にGPU上の既存プロセスを確認し、重複起動しないでください。
 
 ## どちらの方法を使うか
 
-2026-09-09追記：新規の同条件Raw／BT比較には、公式ライブラリへ委託した [新PushT経路](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09) の `mylewm/train.py --mode raw` を使ってください。以下のBも新しい経路に更新しました。旧比較レシピはGit履歴を参照してください。Aの公式trainer自体は変更していません。
+2026-09-09追記：新規の同条件Raw／BT比較には、公式ライブラリへ委託した [新PushT経路](DATASET_RECIPES.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09) の `mylewm/train.py --mode raw` を使ってください。以下のBも新しい経路に更新しました。旧比較レシピはGit履歴を参照してください。Aの公式trainer自体は変更していません。
 
 | 方法 | 使う場面 | 注意 |
 |---|---|---|
@@ -96,15 +98,15 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 uv run python lewm/train.py \
 
 途中再開について：公式コードは`run_dir/lewm_weights.ckpt`がある場合にManagerへ渡しますが、通常のLightning保存先とこの探索名の整合・完全再開をこの環境では未検証です。`weights_epoch_N.pt`をその名前に変更して代用してはいけません。確実な途中再開とBTとの比較を優先する場合はBを使います。
 
-公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](../mylewm/docs/reference/TRAINING.ja.md#5-本学習を開始する)が使えます。
+公式経路は共有trainer用の`metrics.jsonl`を出さないため、`monitor_training.sh`ではlossを表示できません。学習端末のLightning表示・出力ログを確認します。途中切断対策には[学習手順のtmux説明](DATASET_RECIPES.ja.md#5-本学習を開始する)が使えます。
 
 ## B. BTと同条件で比較するRaw LeWM
 
-RawはTなしのSIGRegモデルです。ローカルの新Rawは74,504更新で停止し、保存済み70kで50ケース評価まで実施しています。公式配布重みの学習ステップが70kという意味ではありません。[実測結果と条件差](../mylewm/docs/reports/PUSHT_ISSUE20.ja.md)を参照してください。
+RawはTなしのSIGRegモデルです。ローカルの新Rawは74,504更新で停止し、保存済み70kで50ケース評価まで実施しています。公式配布重みの学習ステップが70kという意味ではありません。[実測結果と条件差](../reports/PUSHT_ISSUE20.ja.md)を参照してください。
 
 この共有比較経路の通常起動はデータのサイズ・更新時刻を確認し、全量ハッシュを読み直しません。必要なときだけ`--verify-data`を追加します。Aの公式trainerにはこの引数を渡しません。
 
-新しい比較には `pusht_spt_v1` を使います。分割作成、短期確認、CSVの見方、保存再開は[新しいPushT学習手順](../mylewm/docs/TRAINING.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)に集約しています。
+新しい比較には `pusht_spt_v1` を使います。分割作成、短期確認、CSVの見方、保存再開は[新しいPushT学習手順](DATASET_RECIPES.ja.md#新しいpusht経路公式ライブラリへ委託2026-09-09)に集約しています。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -116,4 +118,4 @@ uv run python mylewm/train.py --mode raw \
 
 本当に学習を開始する場合だけ、上記へ `--execute` を付け、GPUでは `CUBLAS_WORKSPACE_CONFIG=:4096:8` を指定します。比較するBTは `--mode bt` と別の出力名に変え、それ以外は共通にします。両configの `initial_model_sha256`、データ・manifest・予算・前処理を確認してください。新経路に旧 `--initialization` や旧 `resume.pt` を渡しません。
 
-旧初期値生成・比較計画CLIは削除済みです。以前の方式で追試する必要がある場合は[整理記録](../mylewm/docs/reports/CLEANUP.ja.md)の固定コミットから別ディレクトリへ復元します。現在の公式配布重み・既存100kの評価結果と、新規同予算比較は別の実験です。
+旧初期値生成・比較計画CLIは削除済みです。以前の方式で追試する必要がある場合は[整理記録](../reports/CLEANUP.ja.md)の固定コミットから別ディレクトリへ復元します。現在の公式配布重み・既存100kの評価結果と、新規同予算比較は別の実験です。

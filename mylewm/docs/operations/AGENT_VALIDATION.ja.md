@@ -16,7 +16,7 @@ PushT評価のHDF5は`--dataset`、manifestの`dataset`の順で解決する。�
 
 PushT評価の初心者用シェルは`bash scripts/evaluate_pusht.sh --help`。既定はdry-run、`--execute`だけがGPU評価を起動する。手順は`mylewm/docs/EVALUATION.ja.md`。新規`output/`子ディレクトリへ出力し、信頼済み`*_object.ckpt`だけを入力する。GB10の対象データclean cache解放は明示フラグで行い、他プロセス停止や全体cache削除はしない。既存評価と重複起動しない。公式配布checkpointと途中checkpointの差を、同更新予算の方式の優劣と呼ばない。
 
-- 現在の主比較の進め方は[比較手順](COMPARISON_PROTOCOL.ja.md)。従来の100,000更新計画と、既存LIBERO10,000更新レシピは別。共通初期値・データ順・予算を比較単位で固定し、計画と実施済みを区別する。
+- 現在の主比較の進め方は[比較手順](../reference/COMPARISON_PROTOCOL.ja.md)。従来の100,000更新計画と、既存LIBERO10,000更新レシピは別。共通初期値・データ順・予算を比較単位で固定し、計画と実施済みを区別する。
 - データ分割、前処理、行動座標、精度、optimizer、計画予算、開始状態、Goal、環境成功関数を揃える。追加Tの訓練計算量も報告する。
 - PushTだけでマルチタスクを実証しない。LIBERO-10の平均・各タスク・下位タスクと学習seed間の変動を報告する。
 - TC論文の凍結表現＋BCと、CEMによる計画成功率を直接順位付けしない。公式checkpoint再現と同予算での再学習も別の比較である。

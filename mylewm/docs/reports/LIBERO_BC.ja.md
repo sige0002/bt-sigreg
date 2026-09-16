@@ -1,6 +1,6 @@
 # LIBERO BCの実装・検証とBT学習起動（2026-09-11）
 
-ユーザー依頼で、凍結ViT＋タスクID条件付きflow matching行動模倣方策を追加しました。[利用手順・論文との条件差](../BEHAVIOR_CLONING.ja.md)。BCの本学習・成功率比較は行っていません。
+ユーザー依頼で、凍結ViT＋タスクID条件付きflow matching行動模倣方策を追加しました。[利用手順・論文との条件差](../reference/BC_GUIDE.ja.md)。BCの本学習・成功率比較は行っていません。
 
 ## 実装
 

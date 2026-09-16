@@ -45,7 +45,7 @@ LIBERO環境は`scripts/run_libero.sh`で起動します。Pythonパッケージ
 bash scripts/run_libero.sh -m mylewm.evaluation.evaluate_libero --help
 ```
 
-別の場所へ導入している場合は対応する環境変数を指定します。[描画監査](docs/reference/EVALUATION.ja.md#libero-2-osmesa画像監査)を通し、学習と評価のカメラ・向き・解像度を照合してください。
+別の場所へ導入している場合は対応する環境変数を指定します。[描画監査](docs/reference/CEM_AND_RENDERING.ja.md#libero-2-osmesa画像監査)を通し、学習と評価のカメラ・向き・解像度を照合してください。
 
 ## 検証と運用
 
@@ -54,4 +54,4 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python -m pytest mylewm -q
 git diff --check
 ```
 
-CPU実行や外部ファイルがない環境ではskipがあり得ます。実測した件数を記録します。特定PCのrun・サービス状態・再開用の固定ソースは[運用記録](docs/AGENT_OPERATIONS.ja.md)、旧構成の復元は[整理履歴](docs/reports/CLEANUP.ja.md)に分けています。
+CPU実行や外部ファイルがない環境ではskipがあり得ます。実測した件数を記録します。特定PCのrun・サービス状態・再開用の固定ソースは[運用記録](docs/operations/AGENT_OPERATIONS.ja.md)、旧構成の復元は[整理履歴](docs/reports/CLEANUP.ja.md)に分けています。

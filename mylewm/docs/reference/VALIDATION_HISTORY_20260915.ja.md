@@ -1,4 +1,4 @@
-> 2026-09-15までの検証記録を保存した履歴です。「学習中」「未実装」は当時の記載で、現在の状況は[検証状況](../VALIDATION.ja.md)、比較の主方針は[比較手順](../COMPARISON_PROTOCOL.ja.md)を参照してください。内容の事実関係は遡及修正せず、移動に伴う相対リンクのみ補正しています。
+> 2026-09-15までの検証記録を保存した履歴です。「学習中」「未実装」は当時の記載で、現在の状況は[検証状況](../reports/VALIDATION.ja.md)、比較の主方針は[比較手順](COMPARISON_PROTOCOL.ja.md)を参照してください。内容の事実関係は遡及修正せず、移動に伴う相対リンクのみ補正しています。
 
 # 検証状況と未完了事項
 
@@ -19,15 +19,15 @@
 
 2026-09-11 15:38 JST追記：LIBERO共有ループへpin-memory切替を追加。関連66テスト合格・スキップ0で、GPU／CPU・workers0／2・pin ON／OFFの実batchと保存再開一致、設定変更時の拒否を確認しました。ユーザー依頼で固定メモリなしのBT100kを別runで開始し、21〜120更新の平均1.220秒／更新を実測しました。旧LIBEROとPushTは停止維持、新runは継続中です。10万更新完了・制御性能の検証ではありません。[起動と計測](../reports/LIBERO_NO_PIN_TRAINING.ja.md)。
 
-2026-09-11追記：LIBEROの凍結ViT＋タスクID付きflow BCを実装。実データ4更新・保存再開・native task 0の9行動／2chunk生成とviewerまで確認しました。CPU全回帰185合格・CUDA専用18スキップ、追加BC GPUテスト1合格。BC本学習・成功率比較は未実施です。別途ユーザー依頼でBT LIBERO世界モデルの100,000更新を同一GPU上に起動し、開始時ソースを固定してバックグラウンド実行中です。[手順](../BEHAVIOR_CLONING.ja.md)・[検証と起動記録](../reports/LIBERO_BC.ja.md)。
+2026-09-11追記：LIBEROの凍結ViT＋タスクID付きflow BCを実装。実データ4更新・保存再開・native task 0の9行動／2chunk生成とviewerまで確認しました。CPU全回帰185合格・CUDA専用18スキップ、追加BC GPUテスト1合格。BC本学習・成功率比較は未実施です。別途ユーザー依頼でBT LIBERO世界モデルの100,000更新を同一GPU上に起動し、開始時ソースを固定してバックグラウンド実行中です。[手順](BC_GUIDE.ja.md)・[検証と起動記録](../reports/LIBERO_BC.ja.md)。
 
 2026-09-11：srcへの構成整理後、隔離環境の全回帰182合格・スキップ0。GPU・保存再開・LeRobot Policy・CLI・旧LIBERO object checkpointの読込を確認しました。長時間学習・制御成功率評価ではありません。[移行内容・検証記録](../reports/CLEANUP.ja.md#src移行共通処理整理2026-09-11)。
 
-2026-09-10追記（Policy変換）：ckpt直接読込／LeRobot Policyの共通CEMと別CLIのコンバーターを追加。既存の実データBT100更新重みをconfig・safetensors・前後処理込みで変換。公式LeRobot PushTの保持2episode・計22時刻で、推論用／訓練用ckptとLeRobot形式の行動が完全一致し、実履歴更新と再計画まで確認した。標準processorで時刻が落ちる等の実行時問題も修正。全回帰171合格・スキップ0。オフライン記録データでの接続確認であり、実機I/O・環境での提案行動実行・制御成功率は未実施。[実データの結果と失敗記録](../reports/POLICY_EXPORT.ja.md)・[利用手順](../MODEL_USAGE.ja.md#policy)。
+2026-09-10追記（Policy変換）：ckpt直接読込／LeRobot Policyの共通CEMと別CLIのコンバーターを追加。既存の実データBT100更新重みをconfig・safetensors・前後処理込みで変換。公式LeRobot PushTの保持2episode・計22時刻で、推論用／訓練用ckptとLeRobot形式の行動が完全一致し、実履歴更新と再計画まで確認した。標準processorで時刻が落ちる等の実行時問題も修正。全回帰171合格・スキップ0。オフライン記録データでの接続確認であり、実機I/O・環境での提案行動実行・制御成功率は未実施。[実データの結果と失敗記録](../reports/POLICY_EXPORT.ja.md)・[利用手順](MODEL_IO.ja.md#policy)。
 
-2026-09-10追記（LeRobot v3）：HDF5／LeRobotを選択するRaw／BT入力と、訓練統計・入力条件を維持する形式間のオフライン推論を追加。公式`lerobot/pusht`の実データで実モデルBTの100更新、10更新ごとのvalidation、50／100更新保存、test由来32clip推論を完了。50更新から再開した100更新時点の全state・optimizer・scheduler・乱数状態も連続実行と完全一致。固定依存の隔離環境でGPU・compile・既存重み読込を含む160件合格・スキップ0。単一カメラ入力とオフライン予測の対応であり、実機・多カメラ融合・長期収束・制御成功率の検証ではない。[条件・証拠](../reports/LEROBOT_V3.ja.md)・[実行手順](../TRAINING.ja.md#lerobot-v3で学習する)。
+2026-09-10追記（LeRobot v3）：HDF5／LeRobotを選択するRaw／BT入力と、訓練統計・入力条件を維持する形式間のオフライン推論を追加。公式`lerobot/pusht`の実データで実モデルBTの100更新、10更新ごとのvalidation、50／100更新保存、test由来32clip推論を完了。50更新から再開した100更新時点の全state・optimizer・scheduler・乱数状態も連続実行と完全一致。固定依存の隔離環境でGPU・compile・既存重み読込を含む160件合格・スキップ0。単一カメラ入力とオフライン予測の対応であり、実機・多カメラ融合・長期収束・制御成功率の検証ではない。[条件・証拠](../reports/LEROBOT_V3.ja.md)・[実行手順](DATASET_RECIPES.ja.md#lerobot-v3で学習する)。
 
-2026-09-10追記（validation間隔）：新PushTに`--val-every`を追加し、`--save-every`から分離した。省略時は従来と同じ間隔。CPU小型モデルでvalidationを2／4／6更新、checkpointを3／6更新に実行し、3更新checkpointからの再開でloss・全state・optimizer・schedulerが連続実行と一致した。間隔変更での再開拒否と不正値拒否も確認。固定依存の隔離環境でGPU・コンパイルを含む全回帰140件合格・スキップ0件（25.73秒、警告601件）。ログは`output/benchmarks/validation_intervals_20260910/pytest.log`。本学習は開始していない。[指定方法](../TRAINING.ja.md#ログ保存再開)。
+2026-09-10追記（validation間隔）：新PushTに`--val-every`を追加し、`--save-every`から分離した。省略時は従来と同じ間隔。CPU小型モデルでvalidationを2／4／6更新、checkpointを3／6更新に実行し、3更新checkpointからの再開でloss・全state・optimizer・schedulerが連続実行と一致した。間隔変更での再開拒否と不正値拒否も確認。固定依存の隔離環境でGPU・コンパイルを含む全回帰140件合格・スキップ0件（25.73秒、警告601件）。ログは`output/benchmarks/validation_intervals_20260910/pytest.log`。本学習は開始していない。[指定方法](DATASET_RECIPES.ja.md#ログ保存再開)。
 
 2026-09-10追記：学習高速化のユーザー依頼により、新PushTのGPU転送・射影乱数カウンタ・BTのCayley一括計算を改善し、任意の`--compile-encoder`を追加。固定依存の隔離環境とGB10による32更新比較で、通常stepはRaw／BTとも既定設定で約5%、コンパイル有効時は約33%短縮（初回コンパイル待ちを除く）。GPU・コンパイルを含む全回帰139件合格・スキップ0件。元の`.venv`はTransformers 5.17.0で公式checkpoint読込が1件失敗したため、変更せず隔離環境の固定4.57.6で検証した。BT一括計算・コンパイルの前後で学習軌跡はビット一致せず、変更後コード内の短期保存・再開一致を確認した。本学習・成功率評価ではない。[計測条件と詳細](../reports/TRAINING_SPEED_20260910.ja.md)。
 

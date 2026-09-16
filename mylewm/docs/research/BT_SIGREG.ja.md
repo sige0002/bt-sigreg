@@ -150,4 +150,4 @@ configは `normalization=cayley_spectral_v2` と活性化・初期化方式を�
 
 固定されたbi-Lipschitz写像では任意の分布をGaussian化できない。離散・特異支持、コンパクト支持、強いtail差等には制限がある。m,Mを緩めれば自由度は増すが尺度逃避への保護は弱くなる。これを「任意のマルチタスク分布に対応」とは主張しない。
 
-BT v2は実装・PushT 100,000更新・制御評価まで完了した。ただし同予算Raw/TC比較とLIBERO-10のマルチタスク改善は未実証。[検証状況](../VALIDATION.ja.md)を参照。旧Frobenius試作の数式・制限は[監査履歴](../reports/IMPLEMENTATION_AUDIT.ja.md)へ分離した。
+BT v2は実装・PushT 100,000更新・制御評価まで完了した。ただし同予算Raw/TC比較とLIBERO-10のマルチタスク改善は未実証。[検証状況](../reports/VALIDATION.ja.md)を参照。旧Frobenius試作の数式・制限は[監査履歴](../reports/IMPLEMENTATION_AUDIT.ja.md)へ分離した。

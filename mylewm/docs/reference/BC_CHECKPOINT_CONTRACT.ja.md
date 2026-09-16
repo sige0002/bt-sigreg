@@ -1,4 +1,6 @@
-# LIBERO：凍結ViT＋行動模倣方策
+# BCの保存再開契約・native接続の詳細
+
+BCは補助評価です。現在の操作入口は[BCガイド](BC_GUIDE.ja.md)、実施状況は[実験一覧](../reports/EXPERIMENTS.ja.md)です。
 
 > 詳細参照資料：2026-09-15の整理時点の手順を保持しています。新規作業は[学習ガイド](../TRAINING.ja.md)・[評価ガイド](../EVALUATION.ja.md)から選んでください。過去runの出力名を新規実行に流用しないでください。
 

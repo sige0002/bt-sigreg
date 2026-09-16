@@ -1,6 +1,6 @@
 # ckpt／LeRobot Policy・コンバーター実データ確認（2026-09-10）
 
-ユーザー依頼で、共通の世界モデル＋CEMをckpt直接読込とLeRobot Policyの両方から使えるようにし、独立したコンバーターCLIを追加した。[操作手順・config・API](../MODEL_USAGE.ja.md#policy)。新規学習とロボット接続は行っていない。
+ユーザー依頼で、共通の世界モデル＋CEMをckpt直接読込とLeRobot Policyの両方から使えるようにし、独立したコンバーターCLIを追加した。[操作手順・config・API](../reference/MODEL_IO.ja.md#policy)。新規学習とロボット接続は行っていない。
 
 ## 入出力と保存
 

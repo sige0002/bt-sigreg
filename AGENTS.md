@@ -5,7 +5,7 @@ LeWM 程度の小型共有世界モデルで、PushT と LIBERO-10 の画像・�
 ## 作業範囲と運用
 
 - 依頼された実装・文書・関連検証まで進める。新規・再開の長時間学習、追加評価、自動評価予約はユーザーの明示依頼があるときだけ行う。定期監視や checkpoint 到達待機の service / エージェントは起動しない。
-- 旧 PushT `bt_compiled_100k_s3072` と旧 LIBERO `bt_spectral_v2_100k_s3072` は停止維持の指示がある。別途依頼された `bt_no_pin_100k_s3072` の記録と再開条件は [運用記録](mylewm/docs/AGENT_OPERATIONS.ja.md)。記録を現在の稼働状態の証拠にしない。
+- 旧 PushT `bt_compiled_100k_s3072` と旧 LIBERO `bt_spectral_v2_100k_s3072` は停止維持の指示がある。別途依頼された `bt_no_pin_100k_s3072` の記録と再開条件は [運用記録](mylewm/docs/operations/AGENT_OPERATIONS.ja.md)。記録を現在の稼働状態の証拠にしない。
 - 再開は開始時のソース・環境・設定を使い、hash 照合を解除しない。過去の manifest、checkpoint、評価証拠を書き換えない。
 - 稼働中の学習用 `.venv` に依存を同期しない。依存変更の検証は `UV_PROJECT_ENVIRONMENT` で隔離する。旧 object checkpoint の復元も確認する（既存 Transformers 固定の理由は検証資料を参照）。
 - 他のプロセス・GPU サービスを検証目的で停止しない。失敗ログを保持し、無限再起動しない。
@@ -17,7 +17,7 @@ LeWM 程度の小型共有世界モデルで、PushT と LIBERO-10 の画像・�
 - 非操作物体保持は補助診断であり主目的ではない。人手の交差対応表、複製ビューを実測と扱う学習、多段予測損失、大型事前学習モデルへの置換で主題をすり替えない。
 - 実装の容易さは研究案の採択理由にしない。モデル規模、推論速度、学習計算量、安定性は評価対象とする。
 
-- 現行 BT は Cayley 特異値制約 v2。旧 Frobenius checkpoint と互換性はない。旧 RBG の結果を BT と呼ばない。実施済み範囲と未実証の主張は [VALIDATION](mylewm/docs/VALIDATION.ja.md) で照合する。
+- 現行 BT は Cayley 特異値制約 v2。旧 Frobenius checkpoint と互換性はない。旧 RBG の結果を BT と呼ばない。実施済み範囲と未実証の主張は [VALIDATION](mylewm/docs/reports/VALIDATION.ja.md) で照合する。
 - 予測・rollout・Goal 距離は状態 z で計算し、学習専用の同次元可逆写像 u=T(z) に SIGReg を適用する。T は全タスク・時刻で共有し、ID・Goal・行動・batch 統計で条件付けず、乱数で分散を作らない。
 - 固定の大域的 bi-Lipschitz 上下界が設計条件。可逆性だけで尺度逃避を防げるとしない。近似スペクトルノルムを保証された上界と呼ばない。
 - 推論から T を除く一方、再開 checkpoint には T と optimizer 状態を保存する。未来教師側 encoder への勾配を維持する。
@@ -36,10 +36,10 @@ LeWM 程度の小型共有世界モデルで、PushT と LIBERO-10 の画像・�
 | 作業 | 参照先 |
 |---|---|
 | 研究設計・主張 | [総合レビュー](mylewm/docs/research/RESEARCH_REVIEW.ja.md)、[BT-SIGReg](mylewm/docs/research/BT_SIGREG.ja.md) |
-| prepare・学習・再開 | [TRAINING](mylewm/docs/TRAINING.ja.md)、[運用記録](mylewm/docs/AGENT_OPERATIONS.ja.md) |
-| 評価・比較・依存更新 | [検証上の制約](mylewm/docs/AGENT_VALIDATION.ja.md)、[EVALUATION](mylewm/docs/EVALUATION.ja.md) |
-| dataset / 推論 / policy export | [MODEL_USAGE](mylewm/docs/MODEL_USAGE.ja.md) |
-| BC の追加学習・native 評価 | [BEHAVIOR_CLONING](mylewm/docs/BEHAVIOR_CLONING.ja.md) |
+| prepare・学習・再開 | [TRAINING](mylewm/docs/TRAINING.ja.md)、[運用記録](mylewm/docs/operations/AGENT_OPERATIONS.ja.md) |
+| 評価・比較・依存更新 | [検証上の制約](mylewm/docs/operations/AGENT_VALIDATION.ja.md)、[EVALUATION](mylewm/docs/EVALUATION.ja.md) |
+| dataset / 推論 / policy export | [MODEL_USAGE](mylewm/docs/reference/MODEL_IO.ja.md) |
+| BC の追加学習・native 評価 | [BEHAVIOR_CLONING](mylewm/docs/reference/BC_GUIDE.ja.md) |
 
 - コード変更は対応する回帰テストを実行する。全体の回帰入口は `.venv/bin/python -m pytest mylewm -q`。文書だけの修正ではリンクと契約の整合を確認する。
 - CPU での合格・GPU skip・学習・制御評価を区別する。依頼された評価は終了コード・結果・`status.json` を照合し、SIGKILL 等では実プロセスも確認する。

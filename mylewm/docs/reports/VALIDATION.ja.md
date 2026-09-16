@@ -1,6 +1,6 @@
 # 検証状況と不足している比較
 
-整理日：2026-09-16。現在の主方針は**CEMを固定してBT-SIGRegの比較評価を蓄積すること**。BCやCEM改良の診断は補助資料として扱う。[比較手順](COMPARISON_PROTOCOL.ja.md)・[既存実験一覧](EXPERIMENTS.ja.md)から進めてください。
+整理日：2026-09-16。現在の主方針は**CEMを固定してBT-SIGRegの比較評価を蓄積すること**。BCやCEM改良の診断は補助資料として扱う。[比較手順](../reference/COMPARISON_PROTOCOL.ja.md)・[既存実験一覧](EXPERIMENTS.ja.md)から進めてください。
 
 ## 現在言えること
 
@@ -24,61 +24,61 @@
 
 | 内容 | 記録 |
 |---|---|
-| PushTの実測と比較条件差 | [PushT評価](reports/PUSHT_CHECKPOINT_EVALUATION.ja.md)、[Raw／BT70kと初期状態差](reports/PUSHT_ISSUE20.ja.md) |
-| 世界モデルの行動依存性 | [旧モデル診断](reports/LIBERO_MODEL_DIAGNOSTICS.ja.md)、[新旧の予測比較](reports/LIBERO_PREDICTION_COMPARISON.ja.md) |
-| 予測・Goal・CEMの限界 | [世界モデル制御診断](reports/LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md) |
-| BCの生成行動と停止済み環境評価 | [行動診断](reports/LIBERO_BC_ACTION_DIAGNOSTIC.ja.md)、[環境評価記録](reports/LIBERO_BC_OPENVLA_EVALUATION.ja.md) |
-| 実装・データ・互換性 | [実装監査](reports/IMPLEMENTATION_AUDIT.ja.md)、[検証履歴](reference/VALIDATION_HISTORY_20260915.ja.md) |
+| PushTの実測と比較条件差 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md)、[Raw／BT70kと初期状態差](PUSHT_ISSUE20.ja.md) |
+| 世界モデルの行動依存性 | [旧モデル診断](LIBERO_MODEL_DIAGNOSTICS.ja.md)、[新旧の予測比較](LIBERO_PREDICTION_COMPARISON.ja.md) |
+| 予測・Goal・CEMの限界 | [世界モデル制御診断](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md) |
+| BCの生成行動と停止済み環境評価 | [行動診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md)、[環境評価記録](LIBERO_BC_OPENVLA_EVALUATION.ja.md) |
+| 実装・データ・互換性 | [実装監査](IMPLEMENTATION_AUDIT.ja.md)、[検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md) |
 
 2026-09-15の全回帰は240件合格・skipなし（61.03秒）。その後の世界モデル診断関連回帰は25件合格・skipなし（3.69秒）。これは別の変更時点・別範囲の検証であり、「現在の全回帰25件」と読まない。今回の2026-09-16整理は文書のみで、学習・制御評価・全回帰の再実行はしていない。
 
 ## 文書と実験の更新方法
 
-新しい実験は個別レポートへ条件・結果・失敗・証拠を記録し、[実験一覧](EXPERIMENTS.ja.md)へ追加する。このページには結論と不足だけを反映する。操作手順はガイド、日付順の経緯はレポート、稼働確認と停止指示は[運用記録](AGENT_OPERATIONS.ja.md)に置く。
+新しい実験は個別レポートへ条件・結果・失敗・証拠を記録し、[実験一覧](EXPERIMENTS.ja.md)へ追加する。このページには結論と不足だけを反映する。操作手順はガイド、日付順の経緯はレポート、稼働確認と停止指示は[運用記録](../operations/AGENT_OPERATIONS.ja.md)に置く。
 
-過去の詳細は[2026-09-15までの検証履歴](reference/VALIDATION_HISTORY_20260915.ja.md)へ移した。履歴の「未実施」「稼働中」は当時の説明で、現在のプロセス・完了状態の証拠ではない。
+過去の詳細は[2026-09-15までの検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md)へ移した。履歴の「未実施」「稼働中」は当時の説明で、現在のプロセス・完了状態の証拠ではない。
 
 <details>
 <summary>以前の見出しへの互換リンク</summary>
 
 <a id="実施済み"></a>
 
-[実施済み](reference/VALIDATION_HISTORY_20260915.ja.md#実施済み)
+[実施済み](../reference/VALIDATION_HISTORY_20260915.ja.md#実施済み)
 
 <a id="issue-20pusht評価画像動画診断メモリ2026-09-10"></a>
 
-[issue-20pusht評価画像動画診断メモリ2026-09-10](reference/VALIDATION_HISTORY_20260915.ja.md#issue-20pusht評価画像動画診断メモリ2026-09-10)
+[issue-20pusht評価画像動画診断メモリ2026-09-10](../reference/VALIDATION_HISTORY_20260915.ja.md#issue-20pusht評価画像動画診断メモリ2026-09-10)
 
 <a id="issue-19評価設定の列リスト変更2026-09-10"></a>
 
-[issue-19評価設定の列リスト変更2026-09-10](reference/VALIDATION_HISTORY_20260915.ja.md#issue-19評価設定の列リスト変更2026-09-10)
+[issue-19評価設定の列リスト変更2026-09-10](../reference/VALIDATION_HISTORY_20260915.ja.md#issue-19評価設定の列リスト変更2026-09-10)
 
 <a id="公式ライブラリへのpusht移行2026-09-09"></a>
 
-[公式ライブラリへのpusht移行2026-09-09](reference/VALIDATION_HISTORY_20260915.ja.md#公式ライブラリへのpusht移行2026-09-09)
+[公式ライブラリへのpusht移行2026-09-09](../reference/VALIDATION_HISTORY_20260915.ja.md#公式ライブラリへのpusht移行2026-09-09)
 
 <a id="旧方式撤去役割名への整理2026-09-09"></a>
 
-[旧方式撤去役割名への整理2026-09-09](reference/VALIDATION_HISTORY_20260915.ja.md#旧方式撤去役割名への整理2026-09-09)
+[旧方式撤去役割名への整理2026-09-09](../reference/VALIDATION_HISTORY_20260915.ja.md#旧方式撤去役割名への整理2026-09-09)
 
 <a id="既存経路での実績"></a>
 
-[既存経路での実績](reference/VALIDATION_HISTORY_20260915.ja.md#既存経路での実績)
+[既存経路での実績](../reference/VALIDATION_HISTORY_20260915.ja.md#既存経路での実績)
 
 <a id="未完了主張できないこと"></a>
 
-[未完了主張できないこと](reference/VALIDATION_HISTORY_20260915.ja.md#未完了主張できないこと)
+[未完了主張できないこと](../reference/VALIDATION_HISTORY_20260915.ja.md#未完了主張できないこと)
 
 <a id="issueと運用"></a>
 
-[issueと運用](reference/VALIDATION_HISTORY_20260915.ja.md#issueと運用)
+[issueと運用](../reference/VALIDATION_HISTORY_20260915.ja.md#issueと運用)
 
 <a id="学習起動時のデータ検証変更2026-09-10"></a>
 
-[学習起動時のデータ検証変更2026-09-10](reference/VALIDATION_HISTORY_20260915.ja.md#学習起動時のデータ検証変更2026-09-10)
+[学習起動時のデータ検証変更2026-09-10](../reference/VALIDATION_HISTORY_20260915.ja.md#学習起動時のデータ検証変更2026-09-10)
 
 <a id="既存checkpointの依存互換性修正2026-09-10issue-15"></a>
 
-[既存checkpointの依存互換性修正2026-09-10issue-15](reference/VALIDATION_HISTORY_20260915.ja.md#既存checkpointの依存互換性修正2026-09-10issue-15)
+[既存checkpointの依存互換性修正2026-09-10issue-15](../reference/VALIDATION_HISTORY_20260915.ja.md#既存checkpointの依存互換性修正2026-09-10issue-15)
 
 </details>
