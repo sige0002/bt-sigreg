@@ -1,8 +1,7 @@
 # 作業者向けの運用資料
 
-初心者向けの説明は[文書の入口](../README.md)へ戻ってください。
+- [停止指示・再開条件](AGENT_OPERATIONS.ja.md)：実行許可とrun別の固定ソース。
+- [マシン固有設定](MACHINE_NOTES.ja.md)：保存先・GPU・描画runtimeの扱い。
+- [検証ルール](AGENT_VALIDATION.ja.md)：データ照合・依存変更・完了確認。
 
-- [運用記録](AGENT_OPERATIONS.ja.md)：過去の起動・停止指示、固定ソース、再開条件。
-- [検証ルール](AGENT_VALIDATION.ja.md)：データ照合、依存変更、比較、完了確認。
-
-記録中の「稼働中」は記録した時点の状態です。現在の状態は実プロセス・ログ・完了記録で確認します。
+初心者向けの実行手順は[学習](../TRAINING.ja.md)と[評価](../EVALUATION.ja.md)にあります。

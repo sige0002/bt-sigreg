@@ -150,6 +150,12 @@ CPU限定回帰は **102合格・5スキップ**（15.02秒）。公式Rawのlos
 
 ルートREADMEと文書一覧を、アルゴリズム→実装→学習→評価の4章へ整理した。`ALGORITHM.ja.md`・`IMPLEMENTATION.ja.md`を追加し、`TRAINING.ja.md`・`EVALUATION.ja.md`・`BEHAVIOR_CLONING.ja.md`を現行ガイドとして再構成。最新のLIBERO設定はBT10k→BC40kであり、過去の100k設定と分けて記述した。
 
-旧3文書の詳細は[学習参照](../reference/DATASET_RECIPES.ja.md)、[評価参照](../reference/CEM_AND_RENDERING.ja.md)、[BC参照](../reference/BC_CHECKPOINT_CONTRACT.ja.md)へ保持し、移動に伴う相対リンクを補正した。旧明示anchorは現行ガイド末尾の互換リンクから参照できる。個別の実験レポート、データ、checkpoint、固定runソースは削除・移動していない。過去の「LIBERO100更新のみ」は当時の記録と明示した。
+この時点では旧3文書の詳細をreference配下へ移動し、相対リンクと互換anchorを設けていた。その後の下記再整理で旧操作ガイドは削除したため、当時の配置はGit履歴で参照する。個別の実験レポート、データ、checkpoint、固定runソースは削除・移動していない。過去の「LIBERO100更新のみ」は当時の記録と明示した。
 
 今回の整理は文書のみ。現在のCLI引数と照合し、Markdown全体のローカルファイル・anchorリンクを確認した。環境の同期・学習や評価の再起動は行っていない。現行BC評価の128px固定と新256pxデータの条件差も、未完了事項としてガイドへ明記した。
+
+## 2026-09-16：初心者向け手順の再整理
+
+READMEに環境構築からPushT学習開始までの実コマンドを掲載した。PushTは取得・prepare・dry-run・学習・再開をTRAINING内で完結させ、LIBERO・評価・BCも作業別の正本へ統合した。初心者役エージェントの再レビューで、参照の往復、SSH端末保持の欠落、成功数と試行数の曖昧さを確認・修正した。実在の初心者による操作試験ではない。
+
+ユーザーの追加指示を受け、旧操作ガイド6本は履歴フォルダへ複製せず削除した。旧内容はGit履歴で参照できる。reportsとresearchの証拠は保持し、削除先へのリンクを現行正本へ更新した。EXPERIMENTSは条件・結果、VALIDATIONは結論、AGENT_OPERATIONSは停止・再開条件へ役割を分けた。データ・checkpoint・稼働中環境・固定runソースは変更していない。

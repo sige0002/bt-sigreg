@@ -50,7 +50,7 @@ Rawはzへ直接SIGReg、TCは時間残差へSIGReg、BTは学習専用の有界
 
 2026-09-16の実行指定：RawとBTを各140,000更新で同時学習する。[固定条件と起動記録](../reports/PUSHT_RAW_BT_140K.ja.md)。公開コードに合わせたクリップ分割は、episode単位の保持検証とは区別する。
 
-論文のPushT学習予算は10 epochs。Figure 18の曲線は約18万更新までを示す（図からの概数）。公開コードの100 epochs既定値や既存ローカル100kと区別する。[一次資料と更新数の扱い](LEWM_TRAINER_NOTES.ja.md#a4-本学習の予算を選ぶ)。同じ10 epochsでも窓抽出等で更新数が変わるため、実DataLoader長と提示数を照合する。
+論文のPushT学習予算は10 epochs。Figure 18の曲線は約18万更新までを示す（図からの概数）。公開コードの100 epochs既定値や既存ローカル100kと区別する。[論文付録E](https://arxiv.org/html/2603.19312v1#A5)・[Figure 18](https://arxiv.org/pdf/2603.19312v1#page=28)・[公開データでの更新数](../TRAINING.ja.md)。同じ10 epochsでも窓抽出等で更新数が変わるため、実DataLoader長と提示数を照合する。
 
 最初に既存LeWM・Raw・BTの重みと評価条件を棚卸しする。公式重みとの参考比較を整えつつ、方式差を見る主比較を作る。
 
@@ -59,7 +59,7 @@ Rawはzへ直接SIGReg、TCは時間残差へSIGReg、BTは学習専用の有界
 3. 同じケースでの成功率差、片方だけ成功するケース、失敗動作、時間を報告する。開始画像だけでなく物理初期状態も照合する。
 4. 既存の固定200ケース、別の50ケース、train由来ケースを混ぜない。ケース定義と分割由来を集計表に付ける。
 
-操作は[PushT評価手順](CEM_AND_RENDERING.ja.md#pusht)、学習は[PushT手順](DATASET_RECIPES.ja.md#hdf5-pusht-training)。過去のRaw70kとBT70kには学習経路・初期物理状態差があり、すでに主比較が完成しているとは扱わない。
+操作は[PushT評価手順](../EVALUATION.ja.md)、学習は[PushT手順](../TRAINING.ja.md)。過去のRaw70kとBT70kには学習経路・初期物理状態差があり、すでに主比較が完成しているとは扱わない。
 
 ## 4. LIBERO-10でマルチタスクを確かめる
 

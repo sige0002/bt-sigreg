@@ -1,6 +1,6 @@
 # モデル利用：データ形式・推論・LeRobot Policy
 
-LIBEROのタスクID付き行動模倣方策は[凍結ViT＋BC](BC_GUIDE.ja.md)を参照してください。この文書のLeRobot Policyは世界モデル＋CEMを包む形式で、BC方策とは別です。
+LIBEROのタスクID付き行動模倣方策は[凍結ViT＋BC](../BEHAVIOR_CLONING.ja.md)を参照してください。この文書のLeRobot Policyは世界モデル＋CEMを包む形式で、BC方策とは別です。
 
 コードは`src/mylewm/`へ移動しました。環境準備でeditableパッケージを導入し、`python -m mylewm.…`で起動します。[構成・環境準備](../../README.md#コードの構成と起動)。
 

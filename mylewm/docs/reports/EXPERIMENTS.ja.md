@@ -49,9 +49,3 @@ BCの途中checkpointと各診断は保持するが、BT正則化の主比較の
 | Cube | `lewm/config/train/data/ogb.yaml`、`lewm/config/eval/cube.yaml` | [LeWMに揃える手順](../reference/OGBENCH_WORKFLOW.ja.md)を追加。公開配布メタデータと設定展開を確認。実行・方式比較は未実施 |
 
 設定が置かれていることを「この環境でもBTを実行済み」と説明しない。追加前の確認順は[比較手順](../reference/COMPARISON_PROTOCOL.ja.md)を参照する。
-
-## 直近で埋める不足
-
-1. PushTの再利用可能な公式／Raw／BT重みと結果の実体を揃え、参考比較と主比較を分ける。古い物理初期状態の不一致を持ち越さない。
-2. PushTは同一経路Raw／BT、LIBEROは同一データ版Raw／TC／BTの比較仕様を確定する。既存BTを再利用できるかは初期値・レシピの照合で決める。
-3. 不足runの学習・評価は、その条件を示した実行依頼があるときに行う。複数seedを含む主比較の完了までは、BTの優位性を主張しない。

@@ -1,21 +1,21 @@
-# はじめに読む文書
+# 作業に必要な1ページを選ぶ
 
-**まずは以下の4章だけで十分です。** PushTを例に、何を学び、どのコードで学習し、どう評価するかを説明します。
+最初のPushT学習なら[TRAINING](TRAINING.ja.md)を上から読んでください。環境構築、データ取得、設定確認、学習、保存、再開まで同じページにあります。[ルートREADME](../../README.md)にも環境構築からRaw学習開始までの入門例を載せています。
 
-| 順番 | 文書 | 分かること |
-|---|---|---|
-| 1 | [アルゴリズム](ALGORITHM.ja.md) | 世界モデル・SIGReg・BTの考え方 |
-| 2 | [実装](IMPLEMENTATION.ja.md) | 学習中のデータの流れと主要ファイル |
-| 3 | [学習](TRAINING.ja.md) | データ準備からモデル保存まで |
-| 4 | [評価](EVALUATION.ja.md) | CEMを使った制御とRaw／BTの比較 |
-
-学習手順の入口は`TRAINING.ja.md`、評価手順の入口は`EVALUATION.ja.md`の1つずつです。進捗や過去の実行ログは基本ガイドに含めません。
-
-## 必要になったら読むもの
-
-| 場所 | 内容 |
+| したいこと | 正本 |
 |---|---|
-| [補足資料](reference/README.md) | LIBERO・OGBench・BC、詳しいCLIや保存契約 |
-| [研究資料](research/RESEARCH_REVIEW.ja.md) | 数学的な導出・関連研究・研究仮説 |
-| [実験記録](reports/README.md) | 実施した条件と結果。初読では不要 |
-| [運用資料](operations/README.md) | 作業者向けの停止・再開・検証ルール |
+| PushTをRaw／BTで学習する | [PushT学習](TRAINING.ja.md) |
+| LIBERO-10の世界モデルを学習する | [LIBERO学習](TRAINING_LIBERO.ja.md) |
+| 世界モデル＋CEMを環境で評価する | [評価](EVALUATION.ja.md) |
+| BCを追加学習・再開・環境評価する | [BC](BEHAVIOR_CLONING.ja.md) |
+| 仕組みを理解する | [アルゴリズム](ALGORITHM.ja.md)・[実装](IMPLEMENTATION.ja.md) |
+
+旧操作ガイドは削除し、Git履歴で参照します。研究資料と実験の証拠は残します。
+
+| 必要になったときだけ読む | 役割 |
+|---|---|
+| [実験一覧](reports/EXPERIMENTS.ja.md) | 条件・結果・証拠リンク |
+| [検証状況](reports/VALIDATION.ja.md) | 実証済みの主張と不足 |
+| [運用](operations/AGENT_OPERATIONS.ja.md) | 停止指示と再開条件 |
+| [研究資料](research/RESEARCH_REVIEW.ja.md) | 数学的導出・関連研究・仮説 |
+| [補足](reference/README.md) | OGBench・入出力契約・比較仕様 |

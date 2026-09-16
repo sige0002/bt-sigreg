@@ -48,4 +48,4 @@ CUBLAS_WORKSPACE_CONFIG=:4096:8 .venv/bin/python -m pytest mylewm -q
 
 テスト合格と環境での操作成功は別です。文章だけを変更した場合は、リンクと記載したコマンドの整合を確認します。
 
-LIBEROの2カメラやBCなど、別経路の詳細は[補足資料](reference/README.md)にまとめています。
+LIBEROの実行手順は[LIBERO学習](TRAINING_LIBERO.ja.md)、BCは[BC手順](BEHAVIOR_CLONING.ja.md)にまとめています。

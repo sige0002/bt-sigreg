@@ -1,7 +1,7 @@
 
 # LeWorldModel
 
-このリポジトリでの[公式LeWM trainerの補足（日本語）](../mylewm/docs/reference/LEWM_TRAINER_NOTES.ja.md)。公式trainerとRaw比較経路の違い、ローカルHDF5指定、保存・監視・再開の注意を説明しています。以下の上流READMEと現在のローカル依存に差がある箇所は、補足に明記しています。
+このリポジトリで同条件のRaw／BTを学習する手順は[日本語の学習ガイド](../mylewm/docs/TRAINING.ja.md)が正本です。以下は上流READMEです。共通trainerのRaw比較と、上流trainerの完全再現は区別してください。
 ### Stable End-to-End Joint-Embedding Predictive Architecture from Pixels
 
 [Lucas Maes*](https://x.com/lucasmaes_), [Quentin Le Lidec*](https://quentinll.github.io/), [Damien Scieur](https://scholar.google.com/citations?user=hNscQzgAAAAJ&hl=fr), [Yann LeCun](https://yann.lecun.com/) and [Randall Balestriero](https://randallbalestriero.github.io/)

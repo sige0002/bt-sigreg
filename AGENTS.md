@@ -39,7 +39,7 @@ LeWM 程度の小型共有世界モデルで、PushT と LIBERO-10 の画像・�
 | prepare・学習・再開 | [TRAINING](mylewm/docs/TRAINING.ja.md)、[運用記録](mylewm/docs/operations/AGENT_OPERATIONS.ja.md) |
 | 評価・比較・依存更新 | [検証上の制約](mylewm/docs/operations/AGENT_VALIDATION.ja.md)、[EVALUATION](mylewm/docs/EVALUATION.ja.md) |
 | dataset / 推論 / policy export | [MODEL_USAGE](mylewm/docs/reference/MODEL_IO.ja.md) |
-| BC の追加学習・native 評価 | [BEHAVIOR_CLONING](mylewm/docs/reference/BC_GUIDE.ja.md) |
+| BC の追加学習・native 評価 | [BEHAVIOR_CLONING](mylewm/docs/BEHAVIOR_CLONING.ja.md) |
 
 - コード変更は対応する回帰テストを実行する。全体の回帰入口は `.venv/bin/python -m pytest mylewm -q`。文書だけの修正ではリンクと契約の整合を確認する。
 - CPU での合格・GPU skip・学習・制御評価を区別する。依頼された評価は終了コード・結果・`status.json` を照合し、SIGKILL 等では実プロセスも確認する。

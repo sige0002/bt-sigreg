@@ -21,7 +21,7 @@ BC評価の初期化を関数化し、公式LIBEROのreset→固定init state→
 
 通常resetでrobot／gripperを初期化してからstateを復元する。BCは現在の実測2カメラ画像だけを入力し、世界モデル診断で必要だった追加の履歴収集はしない。
 
-[利用手順](../reference/BC_GUIDE.ja.md)の例を、`bt_no_pin_100k_s3072/step_100000_object.ckpt`と本学習出力予定`bc_bt100k_40k_s3072/`へ更新した。本学習コマンドのdry-runを確認し、出力予定ディレクトリは作成されていない。
+[利用手順](../BEHAVIOR_CLONING.ja.md)の例を、`bt_no_pin_100k_s3072/step_100000_object.ckpt`と本学習出力予定`bc_bt100k_40k_s3072/`へ更新した。本学習コマンドのdry-runを確認し、出力予定ディレクトリは作成されていない。
 
 ## 実測した検証
 
