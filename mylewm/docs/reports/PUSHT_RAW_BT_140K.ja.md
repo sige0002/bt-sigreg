@@ -66,3 +66,29 @@
 | BT | `output/pusht/bt_clip90_140k_s3072/` | `bt-pusht-bt-clip90-140k-s3072` |
 
 起動引数・ログ・方式別status・初回進捗証拠は`output/pusht/raw_bt140k_launch_20260916/`、固定ソースはその`source/`。guardは単一の学習子プロセスを待ち、終了コードとcompleted.jsonの140kを照合して状態を保存する。自動再起動なし（Restart=no）、追加評価・定期監視なし。再開時はこの固定ソースを使い、新しいGit HEADで照合を回避しない。
+
+## 20,000更新checkpointの評価（2026-09-16）
+
+ユーザーの明示依頼により、両方式の保存済み20,000更新object checkpointを固定confirm先頭50ケースで評価する。学習は継続し、同じGPUで両評価を実行。候補300・反復30・elite30・seed42・計画5×5行動・環境予算50を固定した。clip90学習なので、未知episodeだけの保持評価とは呼ばない。
+
+評価用固定ソースはGit `d6cd395`、`output/pusht/eval_clip90_20k_20260916_launch/source/`。両学習configに記録されたソースhashと一致することを確認した。manifestは`output/manifests/pusht/manifest.json`で、clip90学習manifestとは役割が異なる。両dry-runのデータ・ケース・seed・launcher hash一致を確認。依存同期・学習再起動・全量データhash再走査は行っていない。
+
+| 方式 | checkpoint SHA-256 | 評価出力 |
+|---|---|---|
+| Raw | `3c2626efb580b7046d6351a33c414c94def914dd4277c4182c54443e43f75ee1` | `output/pusht/eval_raw_clip90_step20000_seed42_50/` |
+| BT | `0ed07eb82dac3854bc40cb0204097b6f91aa261b4765752f7cc81221402210b0` | `output/pusht/eval_bt_clip90_step20000_seed42_50/` |
+
+起動条件・dry-run・serviceログは`output/pusht/eval_clip90_20k_20260916_launch/`。user serviceは`bt-pusht-eval-{raw,bt}-clip90-20k-20260916`、Restart=no。これは指定された2checkpointだけの評価で、将来checkpointの自動評価や監視serviceは予約していない。
+
+### 20k評価結果
+
+両service終了コード0・`status.json=succeeded`・50件の成否・checkpoint hash・viewer生成を照合した。
+
+| 方式 | 成功数 | 成功率 | 評価本体の時間 |
+|---|---:|---:|---:|
+| RAW | 32/50 | 64% | 493.56秒 |
+| BT | 42/50 | 84% | 445.02秒 |
+
+BT−Rawは+20ポイント。同じケースでBTだけ成功12件、Rawだけ成功2件、両方成功30件、両方失敗6件。`compare_paired`でケース・物理初期状態／Goal hash・探索設定・行動統計・ソース・依存の一致を検証した。集計は`output/pusht/eval_clip90_20k_20260916_launch/paired_comparison.json`。
+
+このcheckpoint・固定50ケースではBTの観測成功率が高い。ただし単一学習seed・途中更新の結果であり、14万更新時や別seedでの優位性は未確認。既存の保守的な片側95%差下限は−0.65ポイントで、同集計器の厳密非劣性条件は未達。評価時間は2本の学習・2本の評価が同一GPUで併走した壁時計時間であり、方式間の推論速度比較には使わない。起動から保存確認までは約10分。
