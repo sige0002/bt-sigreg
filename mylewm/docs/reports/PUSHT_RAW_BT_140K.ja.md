@@ -55,3 +55,14 @@
 分割・train統計・hash不一致拒否・既存学習／保存再開の関連回帰は21件合格（15.73秒）。実データprepareで上表の件数と13,933バッチ／epochを確認した。起動・GPU接続確認は以下に追記する。ここに書かれた予定は完了した学習成績ではない。
 
 追加のデータ契約・検証回帰は11件合格（0.59秒）。実データGPU併走はRaw／BTとも4更新・終了コード0・completed.json一致。共通初期値hashは`1c1962d31c04bb65617d468686d5f23efe777058988c032408429d64dc02bc7d`。同時実行中のGPU表示は各約13.2 GiB、利用可能RAM約68 GiB。これは短期観測であり長時間完走の証明ではない。証拠は`output/pusht/raw_bt140k_preflight_20260916/`。
+
+## 本学習の開始
+
+2026-09-16 09:19 JST、固定ソースGit `41693e1`から2本を同時起動。両serviceのactive/running、実GPUプロセス、CSVの更新進行を確認した。本番configの差はmodeのみで、共通初期値hash・manifest・データ順・LR等は一致。開始時の数更新を確認した段階で、140k完了ではない。
+
+| 方式 | 出力 | user service |
+|---|---|---|
+| Raw | `output/pusht/raw_clip90_140k_s3072/` | `bt-pusht-raw-clip90-140k-s3072` |
+| BT | `output/pusht/bt_clip90_140k_s3072/` | `bt-pusht-bt-clip90-140k-s3072` |
+
+起動引数・ログ・方式別status・初回進捗証拠は`output/pusht/raw_bt140k_launch_20260916/`、固定ソースはその`source/`。guardは単一の学習子プロセスを待ち、終了コードとcompleted.jsonの140kを照合して状態を保存する。自動再起動なし（Restart=no）、追加評価・定期監視なし。再開時はこの固定ソースを使い、新しいGit HEADで照合を回避しない。
