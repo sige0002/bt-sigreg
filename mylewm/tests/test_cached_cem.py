@@ -69,3 +69,24 @@ def test_cached_search_matches_checkpoint():
         print(cls.__name__, 'wall_seconds', time.perf_counter() - start)
     torch.testing.assert_close(outputs[0]['actions'], outputs[1]['actions'], rtol=0, atol=0)
     np.testing.assert_array_equal(outputs[0]['costs'], outputs[1]['costs'])
+
+
+def test_solver_seed_changes_candidates_without_changing_global_rng():
+    class Cost:
+        def get_cost(self, info, actions):
+            self.candidates = actions.clone()
+            return (actions - 0.3).square().sum((-1, -2))
+
+    torch.manual_seed(42)
+    global_state = torch.random.get_rng_state().clone()
+    samples = []
+    for seed in (7, 7, 43):
+        model = Cost()
+        solver = CEMSolver(model, device='cpu', seed=seed, num_samples=16, n_steps=1, topk=4)
+        solver.configure(action_space=gym.spaces.Box(-1, 1, (2,)), n_envs=1,
+                         config=PlanConfig(horizon=2, receding_horizon=1, action_block=1))
+        solver.solve({'pixels': torch.zeros(1, 1)})
+        samples.append(model.candidates)
+        assert torch.equal(torch.random.get_rng_state(), global_state)
+    assert torch.equal(samples[0], samples[1])
+    assert not torch.equal(samples[0], samples[2])

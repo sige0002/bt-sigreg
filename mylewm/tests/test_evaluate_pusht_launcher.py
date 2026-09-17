@@ -169,3 +169,22 @@ def test_execute_orchestration_with_mock_evaluator(launch_fixture,monkeypatch,fa
         assert state['phase'] == 'visual_report' and state['evaluation_verified'] is True
     elif failure is None:
         assert state['visual_report'] == 'viewer/index.html'
+
+
+@pytest.mark.parametrize('cem_seed', [None, 7, 43])
+def test_cem_seed_override_preserves_environment_and_cases(launch_fixture, monkeypatch, cem_seed):
+    root, manifest, output, command = launch_fixture
+    source = Path(command[1]).read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+    extra = [] if cem_seed is None else ['--cem-seed', str(cem_seed)]
+    monkeypatch.setattr(sys, 'argv', ['-', str(root), *command[2:], '--seed', '42', *extra])
+    namespace = {'__name__': '__main__'}
+    with pytest.raises(SystemExit) as stop:
+        exec(compile(source, '<launcher>', 'exec'), namespace)
+    assert stop.value.code == 0
+    plan = namespace['plan']
+    assert plan['seed'] == 42 and plan['cases'] == 50 and plan['offset'] == 0
+    assert 'seed=42' in plan['command']
+    overrides = [x for x in plan['command'] if x.startswith('solver.seed=')]
+    assert overrides == ([] if cem_seed is None else [f'solver.seed={cem_seed}'])
+    assert plan['cem_seed'] == (42 if cem_seed is None else cem_seed)
+    assert not output.exists()

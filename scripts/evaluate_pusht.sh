@@ -22,7 +22,8 @@ parser.add_argument('--manifest', type=Path, default=root/'output/manifests/push
 parser.add_argument('--num-eval', type=int, default=50)
 parser.add_argument('--dataset', type=Path, help='Relocated HDF5; otherwise use manifest dataset')
 parser.add_argument('--offset', type=int, default=0, help='Index into the fixed confirm cases')
-parser.add_argument('--seed', type=int, default=42, help='CEM/environment seed; confirm cases stay fixed')
+parser.add_argument('--seed', type=int, default=42, help='Environment/global seed; also CEM seed unless --cem-seed is set')
+parser.add_argument('--cem-seed', type=int, help='Override only solver RNG; keep --seed and fixed cases unchanged')
 parser.add_argument('--gb10-cache-workaround', action='store_true', help='Release only the dataset clean file cache before CUDA initialization')
 parser.add_argument('--cem-audit', action='store_true', help='Record CEM convergence and selected-plan diagnostics')
 parser.add_argument('--execute', action='store_true', help='Actually run evaluation on GPU')
@@ -89,12 +90,16 @@ command = [sys.executable, '-c', bootstrap, str(root), str(dataset),
            '+eval.dataset_path=' + json.dumps(str(dataset)),
            '+eval.audit_provenance=true', '+eval.shared_physical_search=true',
            'output.filename=results.txt', f'hydra.run.dir={output}/hydra']
+if args.cem_seed is not None:
+    command.append(f'solver.seed={args.cem_seed}')
 if args.cem_audit:
     command.append('solver._target_=mylewm.evaluation.cem_audit.AuditedCEMSolver')
 else:
     command.append('solver._target_=mylewm.evaluation.cached_cem.CachedCEMSolver')
 plan = {'checkpoint': str(checkpoint), 'dataset': str(dataset), 'output': str(output), 'cases': len(cases),
-        'offset': args.offset, 'seed': args.seed, 'partition': 'confirm', 'execute': args.execute,
+        'offset': args.offset, 'seed': args.seed,
+        'cem_seed': args.seed if args.cem_seed is None else args.cem_seed,
+        'partition': 'confirm', 'execute': args.execute,
         'cem_audit': args.cem_audit,
         'verify_data': args.verify_data,
         'gb10_cache_workaround': args.gb10_cache_workaround,
