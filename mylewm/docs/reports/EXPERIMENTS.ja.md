@@ -27,7 +27,7 @@
 
 世界モデルrunは`output/libero10/`、manifestは`output/manifests/libero10/`。今回、旧BT100kと新BT10kの`completed.json`を実際に確認した。新データは再実行500デモ中388本を保持、分割はtrain310／validation39／test39。旧manifestと混ぜない。
 
-結果の入口は[旧CEM評価](LIBERO_BT100K_EVALUATION.ja.md)、[旧モデル診断](LIBERO_MODEL_DIAGNOSTICS.ja.md)、[新旧予測診断](LIBERO_PREDICTION_COMPARISON.ja.md)、[新モデル制御診断](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md)。最後の診断のCEM改善案は補助的な次案であり、現在の主方針は[方式間比較](../reference/COMPARISON_PROTOCOL.ja.md)を先に揃えること。
+結果の入口は[旧CEM評価](LIBERO_BT100K_EVALUATION.ja.md)、[旧モデル診断](LIBERO_MODEL_DIAGNOSTICS.ja.md)、[新旧予測診断](LIBERO_PREDICTION_COMPARISON.ja.md)、[新モデル制御診断](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md)。候補分布を切り分ける追加検証は[尺度・平滑化診断](LIBERO_CEM_PROPOSAL_DIAGNOSTIC.ja.md)に記録する。これは制御経路の補助診断であり、方式の優位性を測る主方針は[方式間比較](../reference/COMPARISON_PROTOCOL.ja.md)を先に揃えること。
 
 ## BC：視覚表現の補助評価
 

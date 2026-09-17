@@ -9,7 +9,7 @@
 | BT Cayley v2 | 学習専用T、共有世界モデル、保存再開・推論からT除去の実装と回帰検証 | 非崩壊や距離境界による制御成功の保証 |
 | PushT | 旧BTの参考比較と、同条件Raw／BTの20k・40k・60k固定ケース比較を確認。60kではBTの上回りは続かず、CEMの4 seed比較では順位の入れ替わりも確認 | 最終予算・複数seedでのRaw／TCに対する一般的優位性 |
 | LIBERO世界モデル | 旧BT100k・新BT10kの学習、保持デモ予測とnative候補の診断 | 同条件Raw／TCに対するマルチタスク改善 |
-| LIBERO制御診断 | 予測・Goal距離・探索量の影響を候補診断で切り分け | 32行動の分岐成績を通しのタスク成功率に換算すること |
+| LIBERO制御診断 | 予測・Goal距離・探索量を診断。3タスクで候補の尺度・平滑化により短期予測は改善したが、物体操作改善は未確認 | 32行動の分岐成績を通しのタスク成功率に換算すること |
 | BC | 環境評価・教師行動診断・追加学習の実施記録 | 世界モデルの未来予測による計画能力、未評価の40k制御成績 |
 
 ## 比較を完成させるための不足
@@ -26,7 +26,7 @@
 |---|---|
 | PushTの実測と比較条件差 | [PushT評価](PUSHT_CHECKPOINT_EVALUATION.ja.md)、[Raw／BT70kと初期状態差](PUSHT_ISSUE20.ja.md) |
 | 世界モデルの行動依存性 | [旧モデル診断](LIBERO_MODEL_DIAGNOSTICS.ja.md)、[新旧の予測比較](LIBERO_PREDICTION_COMPARISON.ja.md) |
-| 予測・Goal・CEMの限界 | [世界モデル制御診断](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md) |
+| 予測・Goal・CEMの限界 | [世界モデル制御診断](LIBERO_WORLD_MODEL_CONTROL_DIAGNOSTIC.ja.md)、[候補分布診断](LIBERO_CEM_PROPOSAL_DIAGNOSTIC.ja.md) |
 | BCの生成行動と停止済み環境評価 | [行動診断](LIBERO_BC_ACTION_DIAGNOSTIC.ja.md)、[環境評価記録](LIBERO_BC_OPENVLA_EVALUATION.ja.md) |
 | 実装・データ・互換性 | [実装監査](IMPLEMENTATION_AUDIT.ja.md)、[検証履歴](../reference/VALIDATION_HISTORY_20260915.ja.md) |
 

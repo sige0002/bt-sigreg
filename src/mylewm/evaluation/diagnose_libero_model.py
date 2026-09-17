@@ -190,6 +190,10 @@ def native(args, model, manifest):
     image_size = native_image_size(manifest)
     suite = benchmark.get_benchmark_dict()['libero_10']()
     rows, rankings = [], []
+    if args.proposal_controls:
+        from mylewm.evaluation.libero_proposals import ProposalCEM, fit_temporal_correlation
+        statistics = fit_temporal_correlation(manifest)
+        dump(args.output/'proposal_statistics.json', statistics)
     with (args.output / 'cases.jsonl').open('x') as log, torch.inference_mode():
         for task_id in args.task_ids:
             task = suite.get_task(task_id)
@@ -234,6 +238,28 @@ def native(args, model, manifest):
                     larger.plan(history, past, goal)
                     candidates = torch.cat((candidates, larger.final_sequence[None]))
                     names.append('cem_large')
+                if args.proposal_controls:
+                    for label, scaled, smooth, unscored in (
+                        ('cem_scaled', True, False, False),
+                        ('cem_smooth', False, True, False),
+                        ('cem_scaled_smooth', True, True, False),
+                        ('unscored_scaled_smooth', True, True, True)):
+                        control = ProposalCEM(model, scaled=scaled,
+                            rho=statistics['rho'] if smooth else None, unscored=unscored,
+                            horizon=8, samples=128, elites=16, iterations=5, seed=seed)
+                        control.plan(history, past, goal)
+                        candidates = torch.cat((candidates, control.final_sequence[None]))
+                        names.append(label)
+                from mylewm.training.train_libero import preprocess
+                pixels = torch.from_numpy(hist_images.copy()).permute(0,1,4,2,3)[None]
+                raw_actions = candidates[0, :3][None]
+                training_images, training_actions = preprocess((pixels, raw_actions), manifest, args.device)
+                inference_images = torch.cat([image_tensor(rgb, args.device) for rgb in hist_images], dim=1)
+                torch.testing.assert_close(training_images, inference_images, atol=0, rtol=0)
+                torch.testing.assert_close(training_actions, planner.normalize(raw_actions), atol=0, rtol=0)
+                dump(args.output/f'task{task_id}_preprocessing.json', {
+                    'image_exact_match':True, 'action_exact_match':True,
+                    'real_history_frames':[5,9,13], 'image_shape':list(training_images.shape)})
                 predicted = rollout(planner, history, past, candidates)
                 costs = (predicted-goal.reshape(1, 1, -1)).square().mean(-1)
                 torch.testing.assert_close(costs[:, -1], CEM.costs(planner, history, past, candidates, goal), atol=1e-6, rtol=1e-5)
@@ -259,6 +285,16 @@ def native(args, model, manifest):
                             observed_z.append(encode(model, frames[-1], args.device).reshape(-1))
                             predicate_flags.append([bool(env.env._eval_predicate(g)) for g in env.env.parsed_problem['goal_state']])
                     observed_z = torch.stack(observed_z)
+                    # Teacher-forced one-chunk prediction uses only already measured history.
+                    measured = torch.cat((history[0], observed_z), dim=0)
+                    action_history = torch.cat((past[0], candidates[ci]), dim=0)
+                    one_step, one_persistence = [], []
+                    for t in range(8):
+                        hz = measured[t:t+3][None]
+                        act = action_history[t:t+3][None]
+                        pred = model.predict(hz, model.action_encoder(planner.normalize(act)))[:, -1]
+                        one_step.append((pred-observed_z[t]).square().mean().item())
+                        one_persistence.append((hz[:, -1]-observed_z[t]).square().mean().item())
                     actual_costs = (observed_z-goal.reshape(1, -1)).square().mean(-1)
                     prediction_errors = (predicted[ci]-observed_z).square().mean(-1)
                     persistence_errors = (history[:, -1]-observed_z).square().mean(-1)
@@ -267,6 +303,8 @@ def native(args, model, manifest):
                     row = {'task_id':task_id, 'task':task.name, 'init_id':args.init_id, 'candidate':label,
                            'goal_demo':c['demo'], 'initial_cost':initial_cost, 'predicted_costs':costs[ci].cpu().tolist(),
                            'actual_costs':actual_costs.cpu().tolist(), 'prediction_errors':prediction_errors.cpu().tolist(),
+                           'teacher_forced_errors':one_step, 'one_step_persistence_errors':one_persistence,
+                           'normalized_action_jitter_rms':float(np.sqrt(np.mean((np.diff(actions, axis=0)/np.asarray(manifest['action_std']))**2))),
                            'persistence_errors':persistence_errors.cpu().tolist(), 'success_any':any(flags), 'success_final':flags[-1],
                            'initial_predicates':initial_predicates, 'predicates':predicate_flags,
                            'goal_predicates':env.env.parsed_problem['goal_state'],
@@ -291,7 +329,7 @@ def native(args, model, manifest):
                 dump(args.output/'rankings.json', rankings)
             finally:
                 env.close()
-    if len(rows) != len(args.task_ids)*(2+args.random_candidates+bool(args.large_cem_samples)):
+    if len(rows) != len(args.task_ids)*(2+args.random_candidates+bool(args.large_cem_samples)+4*args.proposal_controls):
         raise ValueError('Missing native cases')
     return {'cases':len(rows), 'tasks':len(args.task_ids), 'native_steps':32*len(rows), 'rankings':rankings,
             'success_counts':{kind:sum(r['success_any'] for r in rows
@@ -312,10 +350,13 @@ def main():
     parser.add_argument('--task-ids', type=int, nargs='+', default=list(range(10)))
     parser.add_argument('--init-id', type=int, default=0)
     parser.add_argument('--random-candidates', type=int, default=8)
+    parser.add_argument('--proposal-controls', action='store_true', help='Native-only scale/smoothness factorial and unscored control')
     parser.add_argument('--large-cem-samples', type=int, default=0,
                         help='Additional native branch using this many CEM samples; 0 disables')
     parser.add_argument('--render-audit-dir', type=Path, default=ROOT/'output/libero10/eval_bt100k_20260914/render_audit')
     args = parser.parse_args()
+    if args.proposal_controls and args.stage != 'native':
+        parser.error('Proposal controls require native mode')
     if args.large_cem_samples and args.large_cem_samples < 16:
         parser.error('Large CEM needs at least 16 samples')
     args.output = args.output.resolve()
@@ -338,6 +379,8 @@ def main():
                 raise ValueError('Dataset size/mtime changed')
         source_paths = [Path(__file__), ROOT/'src/mylewm/environments/libero_planner.py',
                         ROOT/'src/mylewm/algorithms/libero_model.py', ROOT/'lewm/jepa.py', ROOT/'lewm/module.py']
+        if args.proposal_controls:
+            source_paths.append(ROOT/'src/mylewm/evaluation/libero_proposals.py')
         official = ROOT/'external/libero'
         source_paths += [official/'libero/lifelong/metric.py', official/'libero/libero/envs/env_wrapper.py',
                          official/'libero/libero/envs/bddl_base_domain.py']
