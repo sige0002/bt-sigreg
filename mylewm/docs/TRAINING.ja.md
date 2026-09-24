@@ -1,6 +1,8 @@
 # 学習手順：環境構築からPushTの学習・再開まで
 
-**新型BT（ノルム保存BT）を使う方へ：** 構成から学習・再開・評価までをまとめた[新型BTの1ページ手順書](TRAINING_PUSHT_NORM_PRESERVING.ja.md)を使用してください。以下は従来のRaw／BT・clip90分割・14万更新の手順であり、新型のepisode分割・1万→7万更新の実験とは別です。
+**OGBench Cubeの3方式比較：** [Cube専用の1ページ手順書](TRAINING_CUBE.ja.md)に、構成・データ準備・Raw／Cayley v2 BT／ノルム保存BT v1の設定と起動・再開をまとめています。
+
+**ノルム保存BT v1を使う方へ：** 構成から学習・再開・評価までをまとめた[ノルム保存BT v1の1ページ手順書](TRAINING_PUSHT_NORM_PRESERVING.ja.md)を使用してください。以下は従来のRaw／BT・clip90分割・14万更新の手順であり、新型のepisode分割・1万→7万更新の実験とは別です。
 
 このページだけで、公開PushTデータの取得 → 分割 → 設定確認 → Raw／BTの学習 → 保存結果の確認 → 再開まで進めます。既に終えた工程は飛ばしてください。LIBEROはデータ形式と再開方法が異なるため、別の正本[LIBERO学習](TRAINING_LIBERO.ja.md)にまとめています。
 

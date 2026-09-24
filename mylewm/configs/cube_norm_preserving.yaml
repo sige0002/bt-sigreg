@@ -1,0 +1,62 @@
+environment: ogbench_cube_single
+algorithm: cube_norm_preserving_sigreg_v1
+model:
+  _target_: jepa.JEPA
+  encoder:
+    _target_: stable_pretraining.backbone.utils.vit_hf
+    size: tiny
+    patch_size: 14
+    image_size: 224
+    pretrained: false
+    use_mask_token: false
+  predictor:
+    _target_: module.ARPredictor
+    num_frames: 3
+    input_dim: 192
+    hidden_dim: 192
+    output_dim: 192
+    depth: 6
+    heads: 16
+    mlp_dim: 2048
+    dim_head: 64
+    dropout: 0.1
+    emb_dropout: 0.0
+  action_encoder:
+    _target_: module.Embedder
+    input_dim: 25
+    emb_dim: 192
+    smoothed_dim: 10
+  projector:
+    _target_: module.MLP
+    input_dim: 192
+    output_dim: 192
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+  pred_proj:
+    _target_: module.MLP
+    input_dim: 192
+    output_dim: 192
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+loss:
+  prediction: original_latent_one_step_mse
+  sigreg_weight: 0.09
+  future_target_gradient: true
+  goal: original_z_euclidean
+  teacher: false
+  reconstruction: false
+regularizer:
+  family: norm_preserving
+  dim: 192
+  depth: 2
+  kappa: 0.2
+  projections: 1024
+  knots: 17
+  hidden: null
+  pair_size: 2
+  basis_schedule: identity_then_dct2
+  radial_unit: 1.0

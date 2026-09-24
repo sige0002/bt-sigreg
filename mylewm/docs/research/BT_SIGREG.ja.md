@@ -2,7 +2,9 @@
 
 初めて読む場合は[アルゴリズム入門](../ALGORITHM.ja.md)へ。この文書は数式・設計・過去の改訂理由を含む詳細仕様です。現在の学習予算は[学習ガイド](../TRAINING.ja.md)と最新ユーザー指示に従います。
 
-更新日：2026-09-09。現行実装は `cayley_spectral_v2`。本書は数式・構成・成立条件を扱い、[研究レビュー](RESEARCH_REVIEW.ja.md)は関連研究と採否、[実験レポート](../reports/README.md)は測定結果を扱います。名称は仮称で、新規性やSOTAの認定ではありません。
+本書の対象版：Cayley特異値制約v2（`cayley_spectral_v2`、2026-09-09）。本書は数式・構成・成立条件を扱い、[研究レビュー](RESEARCH_REVIEW.ja.md)は関連研究と採否、[実験レポート](../reports/README.md)は測定結果を扱います。名称は仮称で、新規性やSOTAの認定ではありません。
+
+2026-09-24版名整理：本書はCayley v2の説明です。後続の新版試作S+O（`student_observed_transport_v1`）と、ノルム保存T v1（`mixed_pair_mobius_norm_preserving_v1`）は別方式です。最近のPushT比較で「新型」と呼んだのはノルム保存BT v1です。[構成と学習手順](../TRAINING_PUSHT_NORM_PRESERVING.ja.md)に明記しています。
 
 ## 1. 固定する目的
 
