@@ -1,5 +1,7 @@
 # BT-SIGReg
 
+新型BT（ノルム保存BT）の構成・環境構築・SSD保存・学習・再開・評価は、[初めて使う人向けの1ページ手順書](mylewm/docs/TRAINING_PUSHT_NORM_PRESERVING.ja.md)にまとめています。
+
 画像と行動の記録から、行動後の変化を予測する小型の世界モデルを学習します。LeWMのモデル・損失を使うRawを比較対象とし、正則化に学習専用の変換を加えるBT-SIGRegの効果を調べます。
 
 ## 最初のPushT学習を始める
